@@ -1,0 +1,13 @@
+# Core dependencies
+requests>=2.31.0
+python-dotenv>=1.0.0
+
+# System automation
+pyautogui>=0.9.53
+keyboard>=0.13.5
+mouse>=0.7.1
+
+# API and utilities
+FastAPI>=0.104.0
+uvicorn>=0.24.0
+pydantic>=2.5.0

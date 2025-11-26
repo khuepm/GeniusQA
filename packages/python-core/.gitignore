@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*$py. class
+*.so
+. Python
+env/
+venv/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+. tox/
+.coverage
+. pytest_cache/
+*. egg-info/
+dist/
+build/

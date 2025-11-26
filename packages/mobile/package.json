@@ -1,0 +1,20 @@
+{
+  "name": "@geniusqa/mobile",
+  "version": "0.1.0",
+  "description": "GeniusQA React Native Desktop App for Windows and macOS",
+  "main": "index.js",
+  "scripts": {
+    "dev": "react-native start",
+    "build": "echo 'Build for mobile'",
+    "test": "jest"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-native": "latest"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-native": "latest",
+    "typescript": "^5.3.3"
+  }
+}
