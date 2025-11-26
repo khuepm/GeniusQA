@@ -1,0 +1,4 @@
+- project này sử dụng monorepo, pnpm là package management. Đảm bảo code được sử dụng tại thư mục packages/web
+- chỉ tạo / sử dụng các file giao diện trọng package/web
+- thêm, sửa, cập nhật các task, requirement vào trong thư mục docs, cấp tiếp theo là tên packages
+- Đây là dự án Automation cho Desktop như Windows, MacOS, Nhiệm vụ của Bolt là tạo giao diện người dùng, kết nối tới cơ sở dữ liệu trên Firebase, quản lý testcase, sinh testcase tự động, tạo dự án (project), kết nối tới các dịch vụ đám mây như Google Docs, google sheets
