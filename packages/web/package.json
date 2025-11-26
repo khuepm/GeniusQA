@@ -1,23 +1,27 @@
 {
   "name": "@geniusqa/web",
-  "version": "0.1.0",
-  "description": "GeniusQA Web Platform - Authentication and Dashboard",
+  "version": "1. 0.0",
+  "description": "GeniusQA web platform for authentication and dashboard",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.20.0"
+    "react-dom": "^18. 2.0",
+    "react-router-dom": "^6.20.0",
+    "axios": "^1.6.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.2.0",
+    "typescript": "^5.3. 3",
     "vite": "^5.0.0",
-    "typescript": "^5.3.3"
+    "@vitejs/plugin-react": "^4.2.0",
+    "vitest": "^1.0.0"
   }
 }

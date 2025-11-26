@@ -1,1 +1,24 @@
-{\n  "name": "@geniusqa/desktop",\n  "version": "1.0.0",\n  "description": "GeniusQA Desktop Application for Windows and macOS - Main Application",\n  "main": "src/main.ts",\n  "scripts": {\n    "dev": "tauri dev",\n    "build": "tauri build",\n    "test": "jest"\n  },\n  "dependencies": {\n    "react": "^18.2.0",\n    "react-dom": "^18.2.0"\n  },\n  "devDependencies": {\n    "@tauri-apps/cli": "^1.5.0",\n    "@tauri-apps/api": "^1.5.0",\n    "@types/react": "^18.2.0",\n    "@types/react-dom": "^18.2.0",\n    "typescript": "^5.3.3"\n  },\n  "license": "MIT"\n}
+{
+  "name": "@geniusqa/desktop",
+  "version": "1.0.0",
+  "description": "GeniusQA desktop application using React Native/Tauri for Windows and macOS",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "preview": "tauri dev",
+    "lint": "eslint src",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18. 2.0",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3. 3",
+    "@tauri-apps/cli": "^1.5.0",
+    "@tauri-apps/api": "^1.5.0"
+  }
+}

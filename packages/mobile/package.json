@@ -1,20 +1,25 @@
 {
   "name": "@geniusqa/mobile",
-  "version": "0.1.0",
-  "description": "GeniusQA React Native Desktop App for Windows and macOS",
+  "version": "1.0.0",
+  "description": "GeniusQA mobile app for remote control and notifications",
+  "private": true,
   "main": "index.js",
   "scripts": {
-    "dev": "react-native start",
-    "build": "echo 'Build for mobile'",
-    "test": "jest"
+    "dev": "expo start",
+    "build": "expo build",
+    "test": "jest",
+    "lint": "eslint src",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "react": "^18.2.0",
-    "react-native": "latest"
+    "react-native": "^0.72.0",
+    "expo": "^49.0.0",
+    "axios": "^1.6.0"
   },
   "devDependencies": {
+    "typescript": "^5.3. 3",
     "@types/react": "^18.2.0",
-    "@types/react-native": "latest",
-    "typescript": "^5.3.3"
+    "@types/react-native": "^0. 72.0"
   }
 }

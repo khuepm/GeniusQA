@@ -8,9 +8,10 @@ venv/
 .venv
 pip-log.txt
 pip-delete-this-directory.txt
-. tox/
+.tox/
 .coverage
-. pytest_cache/
+.pytest_cache/
 *. egg-info/
 dist/
 build/
+. env

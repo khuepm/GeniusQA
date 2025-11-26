@@ -1,16 +1,25 @@
-# GeniusQA Mobile - React Native Desktop App
+# GeniusQA Mobile Application
 
-React Native application for Windows and macOS with native system automation capabilities.
+React Native mobile app for remote control, notifications, and agent management.
 
 ## Features
 
-- Cross-platform support (Windows, macOS)
-- Native OS automation and system control
-- Integration with Python backend for advanced features
+- Remote control desktop app
+- Real-time notifications
+- Agent management and monitoring
+- Account and API key management
+- Cloud service integration
 
 ## Getting Started
 
 ```bash
+cd packages/mobile
 pnpm install
 pnpm dev
+```
+
+## Building
+
+```bash
+pnpm build
 ```
