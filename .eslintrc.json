@@ -1,0 +1,1 @@
+{\n  "env": {\n    "browser": true,\n    "es6": true,\n    "node": true\n  },\n  "extends": "eslint:recommended",\n  "parserOptions": {\n    "ecmaVersion": 2020\n  },\n  "rules": {\n    "no-console": "warn",\n    "no-unused-vars": "warn"\n  }\n}
