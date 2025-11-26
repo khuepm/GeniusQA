@@ -1,0 +1,1 @@
+{\n  "name": "geniusqa",\n  "version": "1.0.0",\n  "private": true,\n  "workspaces": [\n    "packages/*"\n  ]\n}
