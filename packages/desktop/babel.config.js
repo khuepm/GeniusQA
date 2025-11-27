@@ -1,6 +1,8 @@
 module.exports = {
   presets: [
-    'module:metro-react-native-babel-preset',
-    '@babel/preset-typescript',
+    ['@babel/preset-env', { targets: { node: 'current' } }],
+    ['@babel/preset-react', { runtime: 'automatic' }],
+    ['@babel/preset-typescript', { allowDeclareFields: true }],
+    ['@babel/preset-flow', { allowDeclareFields: true }],
   ],
 };
