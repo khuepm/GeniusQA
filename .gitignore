@@ -53,3 +53,4 @@ lerna-debug.log*
 android/
 ios/
 . bundle/
+GoogleService-Info.plist

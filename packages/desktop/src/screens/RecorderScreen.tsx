@@ -5,18 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Modal,
-  FlatList,
-  Animated,
-} from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { useNavigate } from 'react-router-dom';
 import { AuthButton } from '../components/AuthButton';
 import { getIPCBridge } from '../services/ipcBridgeService';
 import {
@@ -26,9 +15,7 @@ import {
   ActionPreviewData,
 } from '../types/recorder.types';
 import { calculateButtonStates } from '../utils/buttonStates';
-import { RootStackParamList } from '../navigation/AppNavigator';
-
-type RecorderNavigationProp = StackNavigationProp<RootStackParamList, 'Recorder'>;
+import './RecorderScreen.css';
 
 interface ScriptInfo {
   path: string;
@@ -51,13 +38,13 @@ const RecorderScreen: React.FC = () => {
   const [actionIndex, setActionIndex] = useState<number>(0);
   const [totalActions, setTotalActions] = useState<number>(0);
   const [showPreview, setShowPreview] = useState<boolean>(false);
-  const previewOpacity = useState(new Animated.Value(0))[0];
+  const [previewOpacity, setPreviewOpacity] = useState<number>(0);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
   const [loopCount, setLoopCount] = useState<number>(1);
   const [currentLoop, setCurrentLoop] = useState<number>(1);
   const [totalLoops, setTotalLoops] = useState<number>(1);
 
-  const navigation = useNavigation<RecorderNavigationProp>();
+  const navigate = useNavigate();
   const ipcBridge = getIPCBridge();
 
   // Calculate button states
@@ -111,13 +98,7 @@ const RecorderScreen: React.FC = () => {
         setCurrentAction(previewData.action);
         setActionIndex(previewData.index);
         setShowPreview(true);
-
-        // Fade in animation
-        Animated.timing(previewOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }).start();
+        setPreviewOpacity(1);
       }
     };
 
@@ -127,13 +108,7 @@ const RecorderScreen: React.FC = () => {
       setLoading(false);
       setShowPreview(false);
       setCurrentAction(null);
-
-      // Fade out animation
-      Animated.timing(previewOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
+      setPreviewOpacity(0);
     };
 
     const handleErrorEvent = (event: IPCEvent) => {
@@ -143,13 +118,7 @@ const RecorderScreen: React.FC = () => {
       setLoading(false);
       setShowPreview(false);
       setCurrentAction(null);
-
-      // Fade out animation
-      Animated.timing(previewOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
+      setPreviewOpacity(0);
     };
 
     ipcBridge.addEventListener('progress', handleProgressEvent);
@@ -164,7 +133,7 @@ const RecorderScreen: React.FC = () => {
       ipcBridge.removeEventListener('complete', handleCompleteEvent);
       ipcBridge.removeEventListener('error', handleErrorEvent);
     };
-  }, [previewOpacity]);
+  }, []);
 
   /**
    * Load available scripts for selection
@@ -356,725 +325,301 @@ const RecorderScreen: React.FC = () => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Back Button */}
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
-      >
-        <Text style={styles.backButtonText}>← Back to Dashboard</Text>
-      </TouchableOpacity>
+    <div className="recorder-container">
+      <div className="recorder-content">
+        {/* Back Button */}
+        <button
+          className="back-button"
+          onClick={() => navigate(-1)}
+        >
+          ← Back to Dashboard
+        </button>
 
-      {/* Header Section */}
-      <View style={styles.header}>
-        <Text style={styles.logo}>GeniusQA Recorder</Text>
-        <Text style={styles.subtitle}>Record and replay desktop interactions</Text>
-      </View>
+        {/* Header Section */}
+        <div className="header">
+          <h1 className="logo">GeniusQA Recorder</h1>
+          <p className="subtitle">Record and replay desktop interactions</p>
+        </div>
 
-      {/* Status Display */}
-      <View style={styles.statusCard}>
-        <Text style={styles.statusLabel}>Status</Text>
-        <Text style={[styles.statusText, { color: getStatusColor() }]}>
-          {getStatusText()}
-        </Text>
-      </View>
+        {/* Status Display */}
+        <div className="status-card">
+          <span className="status-label">Status</span>
+          <span className="status-text" style={{ color: getStatusColor() }}>
+            {getStatusText()}
+          </span>
+        </div>
 
-      {/* Error Message */}
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      )}
+        {/* Error Message */}
+        {error && (
+          <div className="error-container">
+            <p className="error-text">{error}</p>
+          </div>
+        )}
 
-      {/* Visual Playback Preview */}
-      {showPreview && currentAction && (
-        <Animated.View style={[styles.previewCard, { opacity: previewOpacity }]}>
-          <View style={styles.previewHeader}>
-            <Text style={styles.previewTitle}>
-              {getActionIcon(currentAction)} Playback Preview
-            </Text>
-            <View style={styles.previewProgressContainer}>
-              <Text style={styles.previewProgress}>
-                Action {actionIndex + 1} of {totalActions}
-              </Text>
-              {totalLoops > 1 && (
-                <Text style={styles.previewLoopProgress}>
-                  Loop {currentLoop} of {totalLoops}
-                </Text>
+        {/* Visual Playback Preview */}
+        {showPreview && currentAction && (
+          <div className="preview-card" style={{ opacity: previewOpacity }}>
+            <div className="preview-header">
+              <span className="preview-title">
+                {getActionIcon(currentAction)} Playback Preview
+              </span>
+              <div className="preview-progress-container">
+                <span className="preview-progress">
+                  Action {actionIndex + 1} of {totalActions}
+                </span>
+                {totalLoops > 1 && (
+                  <span className="preview-loop-progress">
+                    Loop {currentLoop} of {totalLoops}
+                  </span>
+                )}
+                {totalLoops === 0 && (
+                  <span className="preview-loop-progress">
+                    Loop {currentLoop} (Infinite)
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="preview-content">
+              <span className="preview-action-type">
+                {currentAction.type.replace('_', ' ').toUpperCase()}
+              </span>
+              <span className="preview-action-details">
+                {formatActionDisplay(currentAction)}
+              </span>
+
+              {currentAction.timestamp !== undefined && (
+                <span className="preview-timestamp">
+                  Time: {currentAction.timestamp.toFixed(2)}s
+                </span>
               )}
-              {totalLoops === 0 && (
-                <Text style={styles.previewLoopProgress}>
-                  Loop {currentLoop} (Infinite)
-                </Text>
+
+              {currentAction.screenshot && (
+                <div className="preview-screenshot-indicator">
+                  <span className="preview-screenshot-text">
+                    📸 Screenshot available
+                  </span>
+                </div>
               )}
-            </View>
-          </View>
+            </div>
 
-          <View style={styles.previewContent}>
-            <Text style={styles.previewActionType}>
-              {currentAction.type.replace('_', ' ').toUpperCase()}
-            </Text>
-            <Text style={styles.previewActionDetails}>
-              {formatActionDisplay(currentAction)}
-            </Text>
-
-            {currentAction.timestamp !== undefined && (
-              <Text style={styles.previewTimestamp}>
-                Time: {currentAction.timestamp.toFixed(2)}s
-              </Text>
-            )}
-
-            {currentAction.screenshot && (
-              <View style={styles.previewScreenshotIndicator}>
-                <Text style={styles.previewScreenshotText}>
-                  📸 Screenshot available
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* Progress Bar */}
-          <View style={styles.progressBarContainer}>
-            <View
-              style={[
-                styles.progressBar,
-                { width: `${((actionIndex + 1) / totalActions) * 100}%` }
-              ]}
-            />
-          </View>
-        </Animated.View>
-      )}
-
-      {/* Control Buttons */}
-      <View style={styles.controlsCard}>
-        <Text style={styles.controlsTitle}>Controls</Text>
-
-        {/* Record Button */}
-        <AuthButton
-          title="Record"
-          onPress={handleRecordClick}
-          loading={loading && status === 'idle'}
-          disabled={!buttonStates.recordEnabled || loading}
-          variant="primary"
-        />
-
-        {/* Script Selection */}
-        {hasRecordings && (
-          <View style={styles.scriptSelectionContainer}>
-            <Text style={styles.scriptSelectionLabel}>Selected Script:</Text>
-            <TouchableOpacity
-              style={styles.scriptSelectionButton}
-              onPress={openScriptSelector}
-              disabled={loading || status !== 'idle'}
-            >
-              <Text style={styles.scriptSelectionText} numberOfLines={1}>
-                {getSelectedScriptName()}
-              </Text>
-              <Text style={styles.scriptSelectionIcon}>▼</Text>
-            </TouchableOpacity>
-          </View>
+            {/* Progress Bar */}
+            <div className="progress-bar-container">
+              <div
+                className="progress-bar"
+                style={{ width: `${((actionIndex + 1) / totalActions) * 100}%` }}
+              />
+            </div>
+          </div>
         )}
 
-        {/* Playback Speed Control */}
-        {hasRecordings && (
-          <View style={styles.speedControlContainer}>
-            <Text style={styles.speedControlLabel}>Playback Speed: {playbackSpeed}x</Text>
-            <View style={styles.speedButtonsContainer}>
-              <TouchableOpacity
-                style={[styles.speedButton, playbackSpeed === 0.5 && styles.speedButtonActive]}
-                onPress={() => setPlaybackSpeed(0.5)}
-                disabled={loading || status !== 'idle'}
-              >
-                <Text style={[styles.speedButtonText, playbackSpeed === 0.5 && styles.speedButtonTextActive]}>0.5x</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.speedButton, playbackSpeed === 1.0 && styles.speedButtonActive]}
-                onPress={() => setPlaybackSpeed(1.0)}
-                disabled={loading || status !== 'idle'}
-              >
-                <Text style={[styles.speedButtonText, playbackSpeed === 1.0 && styles.speedButtonTextActive]}>1x</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.speedButton, playbackSpeed === 1.5 && styles.speedButtonActive]}
-                onPress={() => setPlaybackSpeed(1.5)}
-                disabled={loading || status !== 'idle'}
-              >
-                <Text style={[styles.speedButtonText, playbackSpeed === 1.5 && styles.speedButtonTextActive]}>1.5x</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.speedButton, playbackSpeed === 2.0 && styles.speedButtonActive]}
-                onPress={() => setPlaybackSpeed(2.0)}
-                disabled={loading || status !== 'idle'}
-              >
-                <Text style={[styles.speedButtonText, playbackSpeed === 2.0 && styles.speedButtonTextActive]}>2x</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
+        {/* Control Buttons */}
+        <div className="controls-card">
+          <h2 className="controls-title">Controls</h2>
 
-        {/* Loop/Repeat Control */}
-        {hasRecordings && (
-          <View style={styles.loopControlContainer}>
-            <Text style={styles.loopControlLabel}>
-              Loop Count: {loopCount === 0 ? '∞ (Infinite)' : `${loopCount}x`}
-            </Text>
-            <View style={styles.loopButtonsContainer}>
-              <TouchableOpacity
-                style={[styles.loopButton, loopCount === 1 && styles.loopButtonActive]}
-                onPress={() => setLoopCount(1)}
-                disabled={loading || status !== 'idle'}
-              >
-                <Text style={[styles.loopButtonText, loopCount === 1 && styles.loopButtonTextActive]}>Once</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.loopButton, loopCount === 2 && styles.loopButtonActive]}
-                onPress={() => setLoopCount(2)}
-                disabled={loading || status !== 'idle'}
-              >
-                <Text style={[styles.loopButtonText, loopCount === 2 && styles.loopButtonTextActive]}>2x</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.loopButton, loopCount === 3 && styles.loopButtonActive]}
-                onPress={() => setLoopCount(3)}
-                disabled={loading || status !== 'idle'}
-              >
-                <Text style={[styles.loopButtonText, loopCount === 3 && styles.loopButtonTextActive]}>3x</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.loopButton, loopCount === 5 && styles.loopButtonActive]}
-                onPress={() => setLoopCount(5)}
-                disabled={loading || status !== 'idle'}
-              >
-                <Text style={[styles.loopButtonText, loopCount === 5 && styles.loopButtonTextActive]}>5x</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.loopButton, loopCount === 0 && styles.loopButtonActive]}
-                onPress={() => setLoopCount(0)}
-                disabled={loading || status !== 'idle'}
-              >
-                <Text style={[styles.loopButtonText, loopCount === 0 && styles.loopButtonTextActive]}>∞</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
+          {/* Record Button */}
+          <AuthButton
+            title="Record"
+            onPress={handleRecordClick}
+            loading={loading && status === 'idle'}
+            disabled={!buttonStates.recordEnabled || loading}
+            variant="primary"
+          />
 
-        {/* Start Button */}
-        <AuthButton
-          title="Start Playback"
-          onPress={handleStartClick}
-          loading={loading && status === 'idle'}
-          disabled={!buttonStates.startEnabled || loading}
-          variant="primary"
-        />
-
-        {/* Stop Button */}
-        <AuthButton
-          title="Stop"
-          onPress={handleStopClick}
-          loading={loading && (status === 'recording' || status === 'playing')}
-          disabled={!buttonStates.stopEnabled || loading}
-          variant="secondary"
-        />
-      </View>
-
-      {/* Script Selector Modal */}
-      <Modal
-        visible={showScriptSelector}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowScriptSelector(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Script to Play</Text>
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={() => setShowScriptSelector(false)}
+          {/* Script Selection */}
+          {hasRecordings && (
+            <div className="script-selection-container">
+              <span className="script-selection-label">Selected Script:</span>
+              <button
+                className="script-selection-button"
+                onClick={openScriptSelector}
+                disabled={loading || status !== 'idle'}
               >
-                <Text style={styles.modalCloseText}>×</Text>
-              </TouchableOpacity>
-            </View>
+                <span className="script-selection-text">
+                  {getSelectedScriptName()}
+                </span>
+                <span className="script-selection-icon">▼</span>
+              </button>
+            </div>
+          )}
 
-            <FlatList
-              data={availableScripts}
-              keyExtractor={(item) => item.path}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.scriptItem,
-                    selectedScriptPath === item.path && styles.scriptItemSelected,
-                  ]}
-                  onPress={() => handleScriptSelect(item)}
+          {/* Playback Speed Control */}
+          {hasRecordings && (
+            <div className="speed-control-container">
+              <span className="speed-control-label">Playback Speed: {playbackSpeed}x</span>
+              <div className="speed-buttons-container">
+                <button
+                  className={`speed-button ${playbackSpeed === 0.5 ? 'active' : ''}`}
+                  onClick={() => setPlaybackSpeed(0.5)}
+                  disabled={loading || status !== 'idle'}
                 >
-                  <Text style={styles.scriptFilename}>{item.filename}</Text>
-                  <Text style={styles.scriptInfo}>
-                    Created: {new Date(item.created_at).toLocaleString()}
-                  </Text>
-                  <Text style={styles.scriptInfo}>
-                    Duration: {item.duration.toFixed(2)}s | Actions: {item.action_count}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              ListEmptyComponent={
-                <Text style={styles.emptyText}>No scripts available</Text>
-              }
-              style={styles.scriptList}
-            />
-          </View>
-        </View>
-      </Modal>
+                  0.5x
+                </button>
+                <button
+                  className={`speed-button ${playbackSpeed === 1.0 ? 'active' : ''}`}
+                  onClick={() => setPlaybackSpeed(1.0)}
+                  disabled={loading || status !== 'idle'}
+                >
+                  1x
+                </button>
+                <button
+                  className={`speed-button ${playbackSpeed === 1.5 ? 'active' : ''}`}
+                  onClick={() => setPlaybackSpeed(1.5)}
+                  disabled={loading || status !== 'idle'}
+                >
+                  1.5x
+                </button>
+                <button
+                  className={`speed-button ${playbackSpeed === 2.0 ? 'active' : ''}`}
+                  onClick={() => setPlaybackSpeed(2.0)}
+                  disabled={loading || status !== 'idle'}
+                >
+                  2x
+                </button>
+              </div>
+            </div>
+          )}
 
-      {/* Info Section */}
-      <View style={styles.infoCard}>
-        <Text style={styles.infoTitle}>Information</Text>
-        <Text style={styles.infoText}>
-          • Click Record to capture your interactions{'\n'}
-          • Click Stop to end recording{'\n'}
-          • Click Start Playback to replay the last recording{'\n'}
-          • Recordings are saved automatically
-        </Text>
-        {lastRecordingPath && (
-          <View style={styles.recordingInfo}>
-            <Text style={styles.recordingLabel}>Last Recording:</Text>
-            <Text style={styles.recordingPath} numberOfLines={2}>
-              {lastRecordingPath}
-            </Text>
-          </View>
+          {/* Loop/Repeat Control */}
+          {hasRecordings && (
+            <div className="loop-control-container">
+              <span className="loop-control-label">
+                Loop Count: {loopCount === 0 ? '∞ (Infinite)' : `${loopCount}x`}
+              </span>
+              <div className="loop-buttons-container">
+                <button
+                  className={`loop-button ${loopCount === 1 ? 'active' : ''}`}
+                  onClick={() => setLoopCount(1)}
+                  disabled={loading || status !== 'idle'}
+                >
+                  Once
+                </button>
+                <button
+                  className={`loop-button ${loopCount === 2 ? 'active' : ''}`}
+                  onClick={() => setLoopCount(2)}
+                  disabled={loading || status !== 'idle'}
+                >
+                  2x
+                </button>
+                <button
+                  className={`loop-button ${loopCount === 3 ? 'active' : ''}`}
+                  onClick={() => setLoopCount(3)}
+                  disabled={loading || status !== 'idle'}
+                >
+                  3x
+                </button>
+                <button
+                  className={`loop-button ${loopCount === 5 ? 'active' : ''}`}
+                  onClick={() => setLoopCount(5)}
+                  disabled={loading || status !== 'idle'}
+                >
+                  5x
+                </button>
+                <button
+                  className={`loop-button ${loopCount === 0 ? 'active' : ''}`}
+                  onClick={() => setLoopCount(0)}
+                  disabled={loading || status !== 'idle'}
+                >
+                  ∞
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Start Button */}
+          <AuthButton
+            title="Start Playback"
+            onPress={handleStartClick}
+            loading={loading && status === 'idle'}
+            disabled={!buttonStates.startEnabled || loading}
+            variant="primary"
+          />
+
+          {/* Stop Button */}
+          <AuthButton
+            title="Stop"
+            onPress={handleStopClick}
+            loading={loading && (status === 'recording' || status === 'playing')}
+            disabled={!buttonStates.stopEnabled || loading}
+            variant="secondary"
+          />
+        </div>
+
+        {/* Script Selector Modal */}
+        {showScriptSelector && (
+          <div className="modal-overlay" onClick={() => setShowScriptSelector(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2 className="modal-title">Select Script to Play</h2>
+                <button
+                  className="modal-close-button"
+                  onClick={() => setShowScriptSelector(false)}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="script-list">
+                {availableScripts.length === 0 ? (
+                  <p className="empty-text">No scripts available</p>
+                ) : (
+                  availableScripts.map((item) => (
+                    <button
+                      key={item.path}
+                      className={`script-item ${selectedScriptPath === item.path ? 'selected' : ''}`}
+                      onClick={() => handleScriptSelect(item)}
+                    >
+                      <span className="script-filename">{item.filename}</span>
+                      <span className="script-info">
+                        Created: {new Date(item.created_at).toLocaleString()}
+                      </span>
+                      <span className="script-info">
+                        Duration: {item.duration.toFixed(2)}s | Actions: {item.action_count}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
         )}
-      </View>
 
-      {/* Script Editor Link */}
-      <View style={styles.editorLinkCard}>
-        <Text style={styles.editorLinkTitle}>Manage Scripts</Text>
-        <Text style={styles.editorLinkText}>
-          View, edit, and manage all your recorded scripts
-        </Text>
-        <AuthButton
-          title="Open Script Editor"
-          onPress={() => navigation.navigate('ScriptEditor' as any)}
-          loading={false}
-          disabled={false}
-          variant="secondary"
-        />
-      </View>
-    </ScrollView>
+        {/* Info Section */}
+        <div className="info-card">
+          <h2 className="info-title">Information</h2>
+          <p className="info-text">
+            • Click Record to capture your interactions<br />
+            • Click Stop to end recording<br />
+            • Click Start Playback to replay the last recording<br />
+            • Recordings are saved automatically
+          </p>
+          {lastRecordingPath && (
+            <div className="recording-info">
+              <span className="recording-label">Last Recording:</span>
+              <span className="recording-path">
+                {lastRecordingPath}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Script Editor Link */}
+        <div className="editor-link-card">
+          <h2 className="editor-link-title">Manage Scripts</h2>
+          <p className="editor-link-text">
+            View, edit, and manage all your recorded scripts
+          </p>
+          <AuthButton
+            title="Open Script Editor"
+            onPress={() => navigate('/script-editor')}
+            loading={false}
+            disabled={false}
+            variant="secondary"
+          />
+        </div>
+      </div>
+    </div>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  content: {
-    flexGrow: 1,
-    padding: 24,
-  },
-  backButton: {
-    marginBottom: 16,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    alignSelf: 'flex-start',
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#1a73e8',
-    fontWeight: '500',
-  },
-  header: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 24,
-    marginBottom: 24,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  logo: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a73e8',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#5f6368',
-  },
-  statusCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  statusLabel: {
-    fontSize: 14,
-    color: '#5f6368',
-    marginBottom: 8,
-  },
-  statusText: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  errorContainer: {
-    backgroundColor: '#fce8e6',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  errorText: {
-    color: '#d93025',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  controlsCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  controlsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#202124',
-    marginBottom: 16,
-  },
-  infoCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  infoTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#202124',
-    marginBottom: 12,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#5f6368',
-    lineHeight: 22,
-  },
-  recordingInfo: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#dadce0',
-  },
-  recordingLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#202124',
-    marginBottom: 4,
-  },
-  recordingPath: {
-    fontSize: 12,
-    color: '#5f6368',
-    fontFamily: 'monospace',
-  },
-  editorLinkCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  editorLinkTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#202124',
-    marginBottom: 8,
-  },
-  editorLinkText: {
-    fontSize: 14,
-    color: '#5f6368',
-    marginBottom: 16,
-  },
-  scriptSelectionContainer: {
-    marginVertical: 12,
-  },
-  scriptSelectionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#202124',
-    marginBottom: 8,
-  },
-  scriptSelectionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#dadce0',
-    borderRadius: 8,
-    padding: 12,
-  },
-  scriptSelectionText: {
-    fontSize: 14,
-    color: '#202124',
-    flex: 1,
-    marginRight: 8,
-  },
-  scriptSelectionIcon: {
-    fontSize: 12,
-    color: '#5f6368',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    width: '80%',
-    maxWidth: 600,
-    maxHeight: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#dadce0',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#202124',
-  },
-  modalCloseButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f8f9fa',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalCloseText: {
-    fontSize: 24,
-    color: '#5f6368',
-    fontWeight: 'bold',
-  },
-  scriptList: {
-    padding: 16,
-  },
-  scriptItem: {
-    padding: 12,
-    marginBottom: 8,
-    borderRadius: 8,
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#dadce0',
-  },
-  scriptItemSelected: {
-    backgroundColor: '#e8f0fe',
-    borderColor: '#1a73e8',
-  },
-  scriptFilename: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#202124',
-    marginBottom: 4,
-  },
-  scriptInfo: {
-    fontSize: 12,
-    color: '#5f6368',
-    marginTop: 2,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#5f6368',
-    textAlign: 'center',
-    marginTop: 32,
-  },
-  previewCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
-    borderLeftWidth: 4,
-    borderLeftColor: '#1a73e8',
-  },
-  previewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  previewTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#202124',
-  },
-  previewProgress: {
-    fontSize: 14,
-    color: '#5f6368',
-    fontWeight: '500',
-  },
-  previewContent: {
-    marginBottom: 12,
-  },
-  previewActionType: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#1a73e8',
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  previewActionDetails: {
-    fontSize: 16,
-    color: '#202124',
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  previewTimestamp: {
-    fontSize: 12,
-    color: '#5f6368',
-    fontFamily: 'monospace',
-    marginBottom: 4,
-  },
-  previewScreenshotIndicator: {
-    marginTop: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: '#e8f0fe',
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-  },
-  previewScreenshotText: {
-    fontSize: 12,
-    color: '#1a73e8',
-    fontWeight: '500',
-  },
-  progressBarContainer: {
-    height: 4,
-    backgroundColor: '#e8eaed',
-    borderRadius: 2,
-    overflow: 'hidden',
-    marginTop: 12,
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: '#1a73e8',
-    borderRadius: 2,
-  },
-  speedControlContainer: {
-    marginVertical: 12,
-  },
-  speedControlLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#202124',
-    marginBottom: 8,
-  },
-  speedButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  speedButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#dadce0',
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  speedButtonActive: {
-    backgroundColor: '#e8f0fe',
-    borderColor: '#1a73e8',
-  },
-  speedButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#5f6368',
-  },
-  speedButtonTextActive: {
-    color: '#1a73e8',
-    fontWeight: '600',
-  },
-  loopControlContainer: {
-    marginVertical: 12,
-  },
-  loopControlLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#202124',
-    marginBottom: 8,
-  },
-  loopButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  loopButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#dadce0',
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  loopButtonActive: {
-    backgroundColor: '#e8f0fe',
-    borderColor: '#1a73e8',
-  },
-  loopButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#5f6368',
-  },
-  loopButtonTextActive: {
-    color: '#1a73e8',
-    fontWeight: '600',
-  },
-  previewProgressContainer: {
-    alignItems: 'flex-end',
-  },
-  previewLoopProgress: {
-    fontSize: 12,
-    color: '#5f6368',
-    fontWeight: '500',
-    marginTop: 2,
-  },
-});
 
 export default RecorderScreen;

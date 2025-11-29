@@ -1,0 +1,82 @@
+.register-container {
+  flex: 1;
+  background-color: #ffffff;
+  min-height: 100vh;
+  display: flex;
+}
+
+.register-scroll-content {
+  flex-grow: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+}
+
+.register-content {
+  width: 100%;
+  max-width: 400px;
+}
+
+.register-branding-container {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.register-logo {
+  font-size: 36px;
+  font-weight: bold;
+  color: #1a73e8;
+  margin-bottom: 8px;
+  margin-top: 0;
+}
+
+.register-tagline {
+  font-size: 16px;
+  color: #5f6368;
+  margin: 0;
+}
+
+.register-error-container {
+  background-color: #fce8e6;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.register-error-text {
+  color: #d93025;
+  font-size: 14px;
+  text-align: center;
+  margin: 0;
+}
+
+.register-login-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.register-login-text {
+  font-size: 14px;
+  color: #5f6368;
+}
+
+.register-login-link {
+  font-size: 14px;
+  color: #1a73e8;
+  font-weight: 600;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.register-login-link:hover:not(.disabled) {
+  text-decoration: underline;
+}
+
+.register-login-link.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

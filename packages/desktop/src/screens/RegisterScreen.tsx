@@ -1,24 +1,16 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { AuthInput } from '../components/AuthInput';
 import { AuthButton } from '../components/AuthButton';
+import './RegisterScreen.css';
 
 const RegisterScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [validationError, setValidationError] = useState('');
-  const navigation = useNavigation();
+  const navigate = useNavigate();
   const { signUpWithEmail, loading, error } = useAuth();
 
   const handleRegister = async () => {
@@ -47,32 +39,26 @@ const RegisterScreen: React.FC = () => {
   };
 
   const navigateToLogin = () => {
-    navigation.navigate('Login' as never);
+    navigate('/login');
   };
 
   const displayError = validationError || error;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.content}>
+    <div className="register-container">
+      <div className="register-scroll-content">
+        <div className="register-content">
           {/* Logo/Branding */}
-          <View style={styles.brandingContainer}>
-            <Text style={styles.logo}>GeniusQA</Text>
-            <Text style={styles.tagline}>Tạo tài khoản mới</Text>
-          </View>
+          <div className="register-branding-container">
+            <h1 className="register-logo">GeniusQA</h1>
+            <p className="register-tagline">Tạo tài khoản mới</p>
+          </div>
 
           {/* Error Message */}
           {displayError && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{displayError}</Text>
-            </View>
+            <div className="register-error-container">
+              <p className="register-error-text">{displayError}</p>
+            </div>
           )}
 
           {/* Email Input */}
@@ -124,77 +110,20 @@ const RegisterScreen: React.FC = () => {
           />
 
           {/* Login Link */}
-          <View style={styles.loginContainer}>
-            <Text style={styles.loginText}>Đã có tài khoản? </Text>
-            <TouchableOpacity onPress={navigateToLogin} disabled={loading}>
-              <Text style={[styles.loginLink, loading && styles.disabledLink]}>
-                Đăng nhập ngay
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <div className="register-login-container">
+            <span className="register-login-text">Đã có tài khoản? </span>
+            <button
+              className={`register-login-link ${loading ? 'disabled' : ''}`}
+              onClick={navigateToLogin}
+              disabled={loading}
+            >
+              Đăng nhập ngay
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 24,
-  },
-  content: {
-    width: '100%',
-    maxWidth: 400,
-    alignSelf: 'center',
-  },
-  brandingContainer: {
-    alignItems: 'center',
-    marginBottom: 48,
-  },
-  logo: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#1a73e8',
-    marginBottom: 8,
-  },
-  tagline: {
-    fontSize: 16,
-    color: '#5f6368',
-  },
-  errorContainer: {
-    backgroundColor: '#fce8e6',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  errorText: {
-    color: '#d93025',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  loginContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 24,
-  },
-  loginText: {
-    fontSize: 14,
-    color: '#5f6368',
-  },
-  loginLink: {
-    fontSize: 14,
-    color: '#1a73e8',
-    fontWeight: '600',
-  },
-  disabledLink: {
-    opacity: 0.5,
-  },
-});
 
 export default RegisterScreen;

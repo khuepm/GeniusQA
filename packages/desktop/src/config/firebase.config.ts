@@ -1,12 +1,10 @@
+import { getEnvVar } from '../utils/env';
+
 /**
  * Firebase Configuration for GeniusQA Desktop
  * 
- * Replace these placeholder values with your actual Firebase project configuration.
- * You can find these values in your Firebase Console:
- * 1. Go to Project Settings
- * 2. Scroll down to "Your apps" section
- * 3. Select your web app or create a new one
- * 4. Copy the configuration values
+ * Configuration is loaded from environment variables (.env file).
+ * See .env.example for required variables.
  * 
  * DESKTOP-SPECIFIC SETUP:
  * 
@@ -40,16 +38,18 @@ export interface FirebaseConfig {
   messagingSenderId: string;
   appId: string;
   webClientId: string;
+  measurementId: string;
 }
 
 const firebaseConfig: FirebaseConfig = {
-  apiKey: 'YOUR_API_KEY',
-  authDomain: 'your-project.firebaseapp.com',
-  projectId: 'your-project-id',
-  storageBucket: 'your-project.appspot.com',
-  messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-  appId: 'YOUR_APP_ID',
-  webClientId: 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com',
+  apiKey: getEnvVar('FIREBASE_API_KEY'),
+  authDomain: getEnvVar('FIREBASE_AUTH_DOMAIN'),
+  projectId: getEnvVar('FIREBASE_PROJECT_ID'),
+  storageBucket: getEnvVar('FIREBASE_STORAGE_BUCKET'),
+  messagingSenderId: getEnvVar('FIREBASE_MESSAGING_SENDER_ID'),
+  appId: getEnvVar('FIREBASE_APP_ID'),
+  measurementId: getEnvVar('FIREBASE_MEASUREMENT_ID'),
+  webClientId: getEnvVar('FIREBASE_WEB_CLIENT_ID'),
 };
 
 export default firebaseConfig;

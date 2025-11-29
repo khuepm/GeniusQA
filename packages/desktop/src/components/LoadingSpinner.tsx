@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import './LoadingSpinner.css';
 
 interface LoadingSpinnerProps {
   size?: 'small' | 'large';
@@ -11,16 +11,11 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   color = '#007AFF',
 }) => {
   return (
-    <View style={styles.container}>
-      <ActivityIndicator size={size} color={color} />
-    </View>
+    <div className="loading-spinner-container">
+      <div
+        className={`loading-spinner ${size === 'small' ? 'loading-spinner-small' : 'loading-spinner-large'}`}
+        style={{ borderTopColor: color }}
+      />
+    </div>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});

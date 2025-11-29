@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import './AuthButton.css';
 
 interface AuthButtonProps {
   title: string;
@@ -18,83 +18,23 @@ export const AuthButton: React.FC<AuthButtonProps> = ({
 }) => {
   const isDisabled = disabled || loading;
 
-  const buttonStyles = [
-    styles.button,
-    variant === 'primary' && styles.buttonPrimary,
-    variant === 'secondary' && styles.buttonSecondary,
-    variant === 'google' && styles.buttonGoogle,
-    isDisabled && styles.buttonDisabled,
-  ];
-
-  const textStyles = [
-    styles.buttonText,
-    variant === 'primary' && styles.textPrimary,
-    variant === 'secondary' && styles.textSecondary,
-    variant === 'google' && styles.textGoogle,
-    isDisabled && styles.textDisabled,
-  ];
+  const buttonClasses = [
+    'auth-button',
+    `auth-button-${variant}`,
+    isDisabled && 'auth-button-disabled',
+  ].filter(Boolean).join(' ');
 
   return (
-    <TouchableOpacity
-      style={buttonStyles}
-      onPress={onPress}
+    <button
+      className={buttonClasses}
+      onClick={onPress}
       disabled={isDisabled}
-      activeOpacity={0.7}
     >
       {loading ? (
-        <ActivityIndicator
-          color={variant === 'primary' ? '#fff' : '#333'}
-          size="small"
-        />
+        <span className="auth-button-spinner" />
       ) : (
-        <Text style={textStyles}>{title}</Text>
+        <span className="auth-button-text">{title}</span>
       )}
-    </TouchableOpacity>
+    </button>
   );
 };
-
-const styles = StyleSheet.create({
-  button: {
-    height: 48,
-    minHeight: 44,
-    minWidth: 44,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    marginVertical: 8,
-  },
-  buttonPrimary: {
-    backgroundColor: '#007AFF',
-  },
-  buttonSecondary: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  buttonGoogle: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    flexDirection: 'row',
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  textPrimary: {
-    color: '#fff',
-  },
-  textSecondary: {
-    color: '#333',
-  },
-  textGoogle: {
-    color: '#333',
-  },
-  textDisabled: {
-    color: '#999',
-  },
-});

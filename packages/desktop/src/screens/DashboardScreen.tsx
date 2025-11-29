@@ -1,21 +1,12 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-} from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { AuthButton } from '../components/AuthButton';
-import { RootStackParamList } from '../navigation/AppNavigator';
-
-type DashboardNavigationProp = StackNavigationProp<RootStackParamList, 'Dashboard'>;
+import './DashboardScreen.css';
 
 const DashboardScreen: React.FC = () => {
   const { user, signOut, loading } = useAuth();
-  const navigation = useNavigation<DashboardNavigationProp>();
+  const navigate = useNavigate();
 
   const handleSignOut = async () => {
     try {
@@ -26,186 +17,92 @@ const DashboardScreen: React.FC = () => {
   };
 
   const handleNavigateToRecorder = () => {
-    navigation.navigate('Recorder');
+    navigate('/recorder');
   };
 
   const handleNavigateToScriptEditor = () => {
-    navigation.navigate('ScriptEditor');
+    navigate('/script-editor');
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header Section */}
-      <View style={styles.header}>
-        <Text style={styles.logo}>GeniusQA</Text>
-        <Text style={styles.welcomeText}>Chào mừng trở lại!</Text>
-        {user?.email && (
-          <Text style={styles.emailText}>{user.email}</Text>
-        )}
-      </View>
+    <div className="dashboard-container">
+      <div className="dashboard-content">
+        {/* Header Section */}
+        <div className="dashboard-header">
+          <h1 className="dashboard-logo">GeniusQA</h1>
+          <h2 className="dashboard-welcome-text">Chào mừng trở lại!</h2>
+          {user?.email && (
+            <p className="dashboard-email-text">{user.email}</p>
+          )}
+        </div>
 
-      {/* Main Content - Placeholder */}
-      <View style={styles.mainContent}>
-        <View style={styles.placeholderCard}>
-          <Text style={styles.placeholderTitle}>Dashboard</Text>
-          <Text style={styles.placeholderText}>
-            Nội dung dashboard sẽ được thêm vào trong các phiên bản tiếp theo.
-          </Text>
-        </View>
+        {/* Main Content - Placeholder */}
+        <div className="dashboard-main-content">
+          <div className="dashboard-placeholder-card">
+            <h3 className="dashboard-placeholder-title">Dashboard</h3>
+            <p className="dashboard-placeholder-text">
+              Nội dung dashboard sẽ được thêm vào trong các phiên bản tiếp theo.
+            </p>
+          </div>
 
-        {/* Recorder Feature Card */}
-        <View style={styles.featureCard}>
-          <Text style={styles.featureTitle}>Desktop Recorder</Text>
-          <Text style={styles.featureDescription}>
-            Record and replay desktop interactions for automation testing
-          </Text>
-          <View style={styles.featureButtonContainer}>
-            <AuthButton
-              title="Open Recorder"
-              onPress={handleNavigateToRecorder}
-              loading={false}
-              disabled={false}
-              variant="primary"
-            />
-          </View>
-        </View>
+          {/* Recorder Feature Card */}
+          <div className="dashboard-feature-card">
+            <h3 className="dashboard-feature-title">Desktop Recorder</h3>
+            <p className="dashboard-feature-description">
+              Record and replay desktop interactions for automation testing
+            </p>
+            <div className="dashboard-feature-button-container">
+              <AuthButton
+                title="Open Recorder"
+                onPress={handleNavigateToRecorder}
+                loading={false}
+                disabled={false}
+                variant="primary"
+              />
+            </div>
+          </div>
 
-        {/* Script Editor Feature Card */}
-        <View style={styles.featureCard}>
-          <Text style={styles.featureTitle}>Script Editor</Text>
-          <Text style={styles.featureDescription}>
-            View, edit, and manage your recorded automation scripts
-          </Text>
-          <View style={styles.featureButtonContainer}>
-            <AuthButton
-              title="Open Script Editor"
-              onPress={handleNavigateToScriptEditor}
-              loading={false}
-              disabled={false}
-              variant="primary"
-            />
-          </View>
-        </View>
+          {/* Script Editor Feature Card */}
+          <div className="dashboard-feature-card">
+            <h3 className="dashboard-feature-title">Script Editor</h3>
+            <p className="dashboard-feature-description">
+              View, edit, and manage your recorded automation scripts
+            </p>
+            <div className="dashboard-feature-button-container">
+              <AuthButton
+                title="Open Script Editor"
+                onPress={handleNavigateToScriptEditor}
+                loading={false}
+                disabled={false}
+                variant="primary"
+              />
+            </div>
+          </div>
 
-        <View style={styles.placeholderCard}>
-          <Text style={styles.placeholderTitle}>Tính năng sắp ra mắt</Text>
-          <Text style={styles.placeholderText}>
-            • Quản lý API keys{'\n'}
-            • Lịch sử automation{'\n'}
-            • Cài đặt hệ thống{'\n'}
-            • Báo cáo và phân tích
-          </Text>
-        </View>
-      </View>
+          <div className="dashboard-placeholder-card">
+            <h3 className="dashboard-placeholder-title">Tính năng sắp ra mắt</h3>
+            <p className="dashboard-placeholder-text">
+              • Quản lý API keys<br />
+              • Lịch sử automation<br />
+              • Cài đặt hệ thống<br />
+              • Báo cáo và phân tích
+            </p>
+          </div>
+        </div>
 
-      {/* Sign Out Button */}
-      <View style={styles.footer}>
-        <AuthButton
-          title="Đăng xuất"
-          onPress={handleSignOut}
-          loading={loading}
-          disabled={loading}
-          variant="secondary"
-        />
-      </View>
-    </ScrollView>
+        {/* Sign Out Button */}
+        <div className="dashboard-footer">
+          <AuthButton
+            title="Đăng xuất"
+            onPress={handleSignOut}
+            loading={loading}
+            disabled={loading}
+            variant="secondary"
+          />
+        </div>
+      </div>
+    </div>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  content: {
-    flexGrow: 1,
-    padding: 24,
-  },
-  header: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 24,
-    marginBottom: 24,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  logo: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a73e8',
-    marginBottom: 16,
-  },
-  welcomeText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#202124',
-    marginBottom: 8,
-  },
-  emailText: {
-    fontSize: 16,
-    color: '#5f6368',
-  },
-  mainContent: {
-    flex: 1,
-    marginBottom: 24,
-  },
-  placeholderCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  placeholderTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#202124',
-    marginBottom: 12,
-  },
-  placeholderText: {
-    fontSize: 14,
-    color: '#5f6368',
-    lineHeight: 22,
-  },
-  featureCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    borderLeftWidth: 4,
-    borderLeftColor: '#1a73e8',
-  },
-  featureTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#202124',
-    marginBottom: 8,
-  },
-  featureDescription: {
-    fontSize: 14,
-    color: '#5f6368',
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  featureButtonContainer: {
-    marginTop: 8,
-  },
-  footer: {
-    paddingTop: 16,
-  },
-});
 
 export default DashboardScreen;
