@@ -67,6 +67,10 @@ export interface ButtonStates {
  * - stop_playback: Interrupt ongoing playback
  * - check_recordings: Query if any recordings exist
  * - get_latest: Retrieve path to most recent recording
+ * - list_scripts: Get list of all available scripts
+ * - load_script: Load a specific script file
+ * - save_script: Save changes to a script file
+ * - delete_script: Delete a script file
  */
 export type IPCCommand =
   | 'start_recording'
@@ -74,7 +78,11 @@ export type IPCCommand =
   | 'start_playback'
   | 'stop_playback'
   | 'check_recordings'
-  | 'get_latest';
+  | 'get_latest'
+  | 'list_scripts'
+  | 'load_script'
+  | 'save_script'
+  | 'delete_script';
 
 /**
  * IPC message sent from React Native to Python Core

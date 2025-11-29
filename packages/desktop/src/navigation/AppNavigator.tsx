@@ -13,6 +13,7 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import RecorderScreen from '../screens/RecorderScreen';
+import ScriptEditorScreen from '../screens/ScriptEditorScreen';
 
 // Define navigation param list
 export type RootStackParamList = {
@@ -20,6 +21,7 @@ export type RootStackParamList = {
   Register: undefined;
   Dashboard: undefined;
   Recorder: undefined;
+  ScriptEditor: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -60,6 +62,13 @@ const AppNavigator: React.FC = () => {
           <Stack.Screen
             name="Recorder"
             component={RecorderScreen}
+            options={{
+              animationEnabled: true,
+            }}
+          />
+          <Stack.Screen
+            name="ScriptEditor"
+            component={ScriptEditorScreen}
             options={{
               animationEnabled: true,
             }}

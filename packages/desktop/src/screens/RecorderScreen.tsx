@@ -11,6 +11,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -25,12 +27,23 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 
 type RecorderNavigationProp = StackNavigationProp<RootStackParamList, 'Recorder'>;
 
+interface ScriptInfo {
+  path: string;
+  filename: string;
+  created_at: string;
+  duration: number;
+  action_count: number;
+}
+
 const RecorderScreen: React.FC = () => {
   const [status, setStatus] = useState<RecorderStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [lastRecordingPath, setLastRecordingPath] = useState<string | null>(null);
   const [hasRecordings, setHasRecordings] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
+  const [showScriptSelector, setShowScriptSelector] = useState<boolean>(false);
+  const [availableScripts, setAvailableScripts] = useState<ScriptInfo[]>([]);
+  const [selectedScriptPath, setSelectedScriptPath] = useState<string | null>(null);
 
   const navigation = useNavigation<RecorderNavigationProp>();
   const ipcBridge = getIPCBridge();
@@ -53,6 +66,10 @@ const RecorderScreen: React.FC = () => {
           // Get the latest recording path
           const latestPath = await ipcBridge.getLatestRecording();
           setLastRecordingPath(latestPath);
+          setSelectedScriptPath(latestPath);
+
+          // Load list of available scripts
+          await loadAvailableScripts();
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to initialize recorder';
@@ -94,6 +111,18 @@ const RecorderScreen: React.FC = () => {
   }, []);
 
   /**
+   * Load available scripts for selection
+   */
+  const loadAvailableScripts = async () => {
+    try {
+      const scripts = await ipcBridge.listScripts();
+      setAvailableScripts(scripts);
+    } catch (err) {
+      console.error('Failed to load scripts:', err);
+    }
+  };
+
+  /**
    * Handle Record button click
    * Requirements: 1.1, 1.3
    */
@@ -120,12 +149,38 @@ const RecorderScreen: React.FC = () => {
     try {
       setError(null);
       setLoading(true);
-      await ipcBridge.startPlayback(lastRecordingPath || undefined);
+      // Use selected script path, or fall back to last recording
+      const scriptPath = selectedScriptPath || lastRecordingPath || undefined;
+      await ipcBridge.startPlayback(scriptPath);
       setStatus('playing');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to start playback';
       setError(errorMessage);
       console.error('Playback error:', err);
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Handle script selection from modal
+   */
+  const handleScriptSelect = (script: ScriptInfo) => {
+    setSelectedScriptPath(script.path);
+    setShowScriptSelector(false);
+  };
+
+  /**
+   * Open script selector modal
+   */
+  const openScriptSelector = async () => {
+    try {
+      setLoading(true);
+      await loadAvailableScripts();
+      setShowScriptSelector(true);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load scripts';
+      setError(errorMessage);
+    } finally {
       setLoading(false);
     }
   };
@@ -145,8 +200,11 @@ const RecorderScreen: React.FC = () => {
 
         if (result.success) {
           setLastRecordingPath(result.scriptPath || null);
+          setSelectedScriptPath(result.scriptPath || null);
           setHasRecordings(true);
           setStatus('idle');
+          // Reload available scripts to include the new recording
+          await loadAvailableScripts();
         } else {
           setError(result.error || 'Failed to stop recording');
         }
@@ -162,6 +220,16 @@ const RecorderScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  /**
+   * Get selected script display name
+   */
+  const getSelectedScriptName = (): string => {
+    if (!selectedScriptPath) return 'Latest recording';
+
+    const script = availableScripts.find(s => s.path === selectedScriptPath);
+    return script ? script.filename : 'Latest recording';
   };
 
   /**
@@ -240,6 +308,23 @@ const RecorderScreen: React.FC = () => {
           variant="primary"
         />
 
+        {/* Script Selection */}
+        {hasRecordings && (
+          <View style={styles.scriptSelectionContainer}>
+            <Text style={styles.scriptSelectionLabel}>Selected Script:</Text>
+            <TouchableOpacity
+              style={styles.scriptSelectionButton}
+              onPress={openScriptSelector}
+              disabled={loading || status !== 'idle'}
+            >
+              <Text style={styles.scriptSelectionText} numberOfLines={1}>
+                {getSelectedScriptName()}
+              </Text>
+              <Text style={styles.scriptSelectionIcon}>▼</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Start Button */}
         <AuthButton
           title="Start Playback"
@@ -259,6 +344,54 @@ const RecorderScreen: React.FC = () => {
         />
       </View>
 
+      {/* Script Selector Modal */}
+      <Modal
+        visible={showScriptSelector}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowScriptSelector(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Script to Play</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setShowScriptSelector(false)}
+              >
+                <Text style={styles.modalCloseText}>×</Text>
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={availableScripts}
+              keyExtractor={(item) => item.path}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.scriptItem,
+                    selectedScriptPath === item.path && styles.scriptItemSelected,
+                  ]}
+                  onPress={() => handleScriptSelect(item)}
+                >
+                  <Text style={styles.scriptFilename}>{item.filename}</Text>
+                  <Text style={styles.scriptInfo}>
+                    Created: {new Date(item.created_at).toLocaleString()}
+                  </Text>
+                  <Text style={styles.scriptInfo}>
+                    Duration: {item.duration.toFixed(2)}s | Actions: {item.action_count}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <Text style={styles.emptyText}>No scripts available</Text>
+              }
+              style={styles.scriptList}
+            />
+          </View>
+        </View>
+      </Modal>
+
       {/* Info Section */}
       <View style={styles.infoCard}>
         <Text style={styles.infoTitle}>Information</Text>
@@ -276,6 +409,21 @@ const RecorderScreen: React.FC = () => {
             </Text>
           </View>
         )}
+      </View>
+
+      {/* Script Editor Link */}
+      <View style={styles.editorLinkCard}>
+        <Text style={styles.editorLinkTitle}>Manage Scripts</Text>
+        <Text style={styles.editorLinkText}>
+          View, edit, and manage all your recorded scripts
+        </Text>
+        <AuthButton
+          title="Open Script Editor"
+          onPress={() => navigation.navigate('ScriptEditor' as any)}
+          loading={false}
+          disabled={false}
+          variant="secondary"
+        />
       </View>
     </ScrollView>
   );
@@ -408,6 +556,132 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#5f6368',
     fontFamily: 'monospace',
+  },
+  editorLinkCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  editorLinkTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#202124',
+    marginBottom: 8,
+  },
+  editorLinkText: {
+    fontSize: 14,
+    color: '#5f6368',
+    marginBottom: 16,
+  },
+  scriptSelectionContainer: {
+    marginVertical: 12,
+  },
+  scriptSelectionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#202124',
+    marginBottom: 8,
+  },
+  scriptSelectionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#dadce0',
+    borderRadius: 8,
+    padding: 12,
+  },
+  scriptSelectionText: {
+    fontSize: 14,
+    color: '#202124',
+    flex: 1,
+    marginRight: 8,
+  },
+  scriptSelectionIcon: {
+    fontSize: 12,
+    color: '#5f6368',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    width: '80%',
+    maxWidth: 600,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#dadce0',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#202124',
+  },
+  modalCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f8f9fa',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCloseText: {
+    fontSize: 24,
+    color: '#5f6368',
+    fontWeight: 'bold',
+  },
+  scriptList: {
+    padding: 16,
+  },
+  scriptItem: {
+    padding: 12,
+    marginBottom: 8,
+    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#dadce0',
+  },
+  scriptItemSelected: {
+    backgroundColor: '#e8f0fe',
+    borderColor: '#1a73e8',
+  },
+  scriptFilename: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#202124',
+    marginBottom: 4,
+  },
+  scriptInfo: {
+    fontSize: 12,
+    color: '#5f6368',
+    marginTop: 2,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#5f6368',
+    textAlign: 'center',
+    marginTop: 32,
   },
 });
 

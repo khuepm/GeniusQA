@@ -559,6 +559,126 @@ export class IPCBridgeService {
   }
 
   /**
+   * List all available scripts
+   * 
+   * Queries Python Core for a list of all script files in the recordings directory.
+   * Returns metadata for each script including filename, path, creation date, duration,
+   * and action count.
+   * 
+   * @returns {Promise<Array>} Array of script information objects
+   * 
+   * @throws {Error} If Python Core is unavailable
+   * @throws {Error} If file system access fails
+   * 
+   * @example
+   * const scripts = await ipcBridge.listScripts();
+   * scripts.forEach(script => {
+   *   console.log(`${script.filename}: ${script.action_count} actions`);
+   * });
+   */
+  public async listScripts(): Promise<any[]> {
+    try {
+      const response = await this.sendCommand('list_scripts');
+      
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to list scripts');
+      }
+
+      return response.data?.scripts || [];
+    } catch (error) {
+      throw new Error(this.formatErrorMessage(error as Error));
+    }
+  }
+
+  /**
+   * Load a specific script file
+   * 
+   * Loads and parses a script file from the given path. Returns the complete
+   * script data including metadata and all actions.
+   * 
+   * @param {string} scriptPath - Absolute path to the script file
+   * @returns {Promise<any>} Script data with metadata and actions
+   * 
+   * @throws {Error} If Python Core is unavailable
+   * @throws {Error} If script file not found
+   * @throws {Error} If script file is corrupted or invalid
+   * 
+   * @example
+   * const scriptData = await ipcBridge.loadScript('/path/to/script.json');
+   * console.log(`Loaded ${scriptData.actions.length} actions`);
+   */
+  public async loadScript(scriptPath: string): Promise<any> {
+    try {
+      const response = await this.sendCommand('load_script', { scriptPath });
+      
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to load script');
+      }
+
+      return response.data?.script;
+    } catch (error) {
+      throw new Error(this.formatErrorMessage(error as Error));
+    }
+  }
+
+  /**
+   * Save changes to a script file
+   * 
+   * Saves the modified script data back to the file. Validates the script
+   * structure before saving to ensure data integrity.
+   * 
+   * @param {string} scriptPath - Absolute path to the script file
+   * @param {any} scriptData - Complete script data with metadata and actions
+   * 
+   * @throws {Error} If Python Core is unavailable
+   * @throws {Error} If script data is invalid
+   * @throws {Error} If file write fails
+   * 
+   * @example
+   * await ipcBridge.saveScript('/path/to/script.json', modifiedScriptData);
+   * console.log('Script saved successfully');
+   */
+  public async saveScript(scriptPath: string, scriptData: any): Promise<void> {
+    try {
+      const response = await this.sendCommand('save_script', { scriptPath, scriptData });
+      
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to save script');
+      }
+    } catch (error) {
+      throw new Error(this.formatErrorMessage(error as Error));
+    }
+  }
+
+  /**
+   * Delete a script file
+   * 
+   * Permanently deletes a script file from the recordings directory.
+   * This operation cannot be undone.
+   * 
+   * @param {string} scriptPath - Absolute path to the script file
+   * 
+   * @throws {Error} If Python Core is unavailable
+   * @throws {Error} If script file not found
+   * @throws {Error} If file deletion fails
+   * 
+   * @example
+   * await ipcBridge.deleteScript('/path/to/script.json');
+   * console.log('Script deleted successfully');
+   */
+  public async deleteScript(scriptPath: string): Promise<void> {
+    try {
+      const response = await this.sendCommand('delete_script', { scriptPath });
+      
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to delete script');
+      }
+    } catch (error) {
+      throw new Error(this.formatErrorMessage(error as Error));
+    }
+  }
+
+  /**
    * Terminate the Python Core process
    */
   public terminate(): void {

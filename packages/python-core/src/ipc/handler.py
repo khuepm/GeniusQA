@@ -68,6 +68,14 @@ class IPCHandler:
             return self._handle_check_recordings(params)
         elif command == 'get_latest':
             return self._handle_get_latest(params)
+        elif command == 'list_scripts':
+            return self._handle_list_scripts(params)
+        elif command == 'load_script':
+            return self._handle_load_script(params)
+        elif command == 'save_script':
+            return self._handle_save_script(params)
+        elif command == 'delete_script':
+            return self._handle_delete_script(params)
         else:
             return {
                 'success': False,
@@ -390,3 +398,206 @@ class IPCHandler:
             return "File system error: Cannot write to read-only file system. Please check directory permissions."
         else:
             return f"File system error: {error_msg}. Please check directory permissions and available disk space."
+    
+    def _handle_list_scripts(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle list_scripts command.
+        
+        Returns a list of all available script files with their metadata.
+        """
+        try:
+            scripts = self.storage.list_scripts()
+            script_info = []
+            
+            for script_path in scripts:
+                try:
+                    # Load script to get metadata
+                    script_file = self.storage.load_script(script_path)
+                    script_info.append({
+                        'path': str(script_path),
+                        'filename': script_path.name,
+                        'created_at': script_file.metadata.created_at.isoformat(),
+                        'duration': script_file.metadata.duration,
+                        'action_count': script_file.metadata.action_count,
+                    })
+                except Exception as e:
+                    # Skip corrupted files
+                    self._log_error(f"Failed to load script {script_path}: {str(e)}")
+                    continue
+            
+            return {
+                'success': True,
+                'data': {
+                    'scripts': script_info
+                }
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f"Failed to list scripts: {str(e)}"
+            }
+    
+    def _handle_load_script(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle load_script command.
+        
+        Loads a specific script file and returns its complete data.
+        """
+        try:
+            script_path_str = params.get('scriptPath')
+            if not script_path_str:
+                return {
+                    'success': False,
+                    'error': "Missing required parameter: scriptPath"
+                }
+            
+            script_path = Path(script_path_str)
+            
+            # Load the script
+            try:
+                script_file = self.storage.load_script(script_path)
+            except FileNotFoundError:
+                return {
+                    'success': False,
+                    'error': f"Script file not found: {script_path.name}"
+                }
+            except json.JSONDecodeError:
+                return {
+                    'success': False,
+                    'error': f"Script file corrupted: Invalid JSON format"
+                }
+            except Exception as e:
+                return {
+                    'success': False,
+                    'error': f"Failed to load script: {str(e)}"
+                }
+            
+            # Convert to dict for JSON serialization
+            script_dict = {
+                'metadata': {
+                    'version': script_file.metadata.version,
+                    'created_at': script_file.metadata.created_at.isoformat(),
+                    'duration': script_file.metadata.duration,
+                    'action_count': script_file.metadata.action_count,
+                    'platform': script_file.metadata.platform,
+                },
+                'actions': [action.model_dump() for action in script_file.actions]
+            }
+            
+            return {
+                'success': True,
+                'data': {
+                    'script': script_dict
+                }
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f"Failed to load script: {str(e)}"
+            }
+    
+    def _handle_save_script(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle save_script command.
+        
+        Saves modified script data back to the file.
+        """
+        try:
+            script_path_str = params.get('scriptPath')
+            script_data = params.get('scriptData')
+            
+            if not script_path_str:
+                return {
+                    'success': False,
+                    'error': "Missing required parameter: scriptPath"
+                }
+            
+            if not script_data:
+                return {
+                    'success': False,
+                    'error': "Missing required parameter: scriptData"
+                }
+            
+            script_path = Path(script_path_str)
+            
+            # Validate and parse the script data
+            try:
+                script_file = ScriptFile.model_validate(script_data)
+            except Exception as e:
+                return {
+                    'success': False,
+                    'error': f"Invalid script data: {str(e)}"
+                }
+            
+            # Save the script
+            try:
+                with open(script_path, 'w') as f:
+                    json.dump(script_file.model_dump(mode='json'), f, indent=2, default=str)
+            except PermissionError:
+                return {
+                    'success': False,
+                    'error': "Permission denied: Unable to save script file"
+                }
+            except OSError as e:
+                return {
+                    'success': False,
+                    'error': self._format_filesystem_error(str(e))
+                }
+            
+            return {
+                'success': True,
+                'data': {
+                    'scriptPath': str(script_path)
+                }
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f"Failed to save script: {str(e)}"
+            }
+    
+    def _handle_delete_script(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle delete_script command.
+        
+        Deletes a script file from the recordings directory.
+        """
+        try:
+            script_path_str = params.get('scriptPath')
+            
+            if not script_path_str:
+                return {
+                    'success': False,
+                    'error': "Missing required parameter: scriptPath"
+                }
+            
+            script_path = Path(script_path_str)
+            
+            # Check if file exists
+            if not script_path.exists():
+                return {
+                    'success': False,
+                    'error': f"Script file not found: {script_path.name}"
+                }
+            
+            # Delete the file
+            try:
+                script_path.unlink()
+            except PermissionError:
+                return {
+                    'success': False,
+                    'error': "Permission denied: Unable to delete script file"
+                }
+            except OSError as e:
+                return {
+                    'success': False,
+                    'error': self._format_filesystem_error(str(e))
+                }
+            
+            return {
+                'success': True,
+                'data': {
+                    'deleted': str(script_path)
+                }
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f"Failed to delete script: {str(e)}"
+            }

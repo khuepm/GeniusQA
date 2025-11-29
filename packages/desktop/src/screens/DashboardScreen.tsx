@@ -29,6 +29,10 @@ const DashboardScreen: React.FC = () => {
     navigation.navigate('Recorder');
   };
 
+  const handleNavigateToScriptEditor = () => {
+    navigation.navigate('ScriptEditor');
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header Section */}
@@ -59,6 +63,23 @@ const DashboardScreen: React.FC = () => {
             <AuthButton
               title="Open Recorder"
               onPress={handleNavigateToRecorder}
+              loading={false}
+              disabled={false}
+              variant="primary"
+            />
+          </View>
+        </View>
+
+        {/* Script Editor Feature Card */}
+        <View style={styles.featureCard}>
+          <Text style={styles.featureTitle}>Script Editor</Text>
+          <Text style={styles.featureDescription}>
+            View, edit, and manage your recorded automation scripts
+          </Text>
+          <View style={styles.featureButtonContainer}>
+            <AuthButton
+              title="Open Script Editor"
+              onPress={handleNavigateToScriptEditor}
               loading={false}
               disabled={false}
               variant="primary"
