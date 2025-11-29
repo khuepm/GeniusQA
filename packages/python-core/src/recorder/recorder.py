@@ -2,6 +2,7 @@
 
 import time
 from typing import Optional
+from pathlib import Path
 from pynput import mouse, keyboard
 from storage.models import Action
 
@@ -9,18 +10,29 @@ from storage.models import Action
 class Recorder:
     """Captures mouse and keyboard events during recording."""
     
-    def __init__(self):
-        """Initialize the recorder."""
+    def __init__(self, screenshots_dir: Optional[Path] = None, capture_screenshots: bool = True):
+        """Initialize the recorder.
+        
+        Args:
+            screenshots_dir: Directory to save screenshots (default: None, will be set by storage)
+            capture_screenshots: Whether to capture screenshots on mouse clicks (default: True)
+        """
         self.actions: list[Action] = []
         self.start_time: Optional[float] = None
         self.is_recording: bool = False
         self.mouse_listener: Optional[mouse.Listener] = None
         self.keyboard_listener: Optional[keyboard.Listener] = None
+        self.screenshots_dir: Optional[Path] = screenshots_dir
+        self.capture_screenshots: bool = capture_screenshots
+        self.screenshot_counter: int = 0
     
     @staticmethod
-    def check_dependencies() -> tuple[bool, str]:
+    def check_dependencies(check_pillow: bool = True) -> tuple[bool, str]:
         """
-        Check if PyAutoGUI and pynput are available.
+        Check if PyAutoGUI, pynput, and optionally Pillow are available.
+        
+        Args:
+            check_pillow: Whether to check for Pillow (required for screenshots)
         
         Returns:
             tuple: (is_available, error_message)
@@ -39,6 +51,12 @@ class Recorder:
         except ImportError:
             missing_libs.append("pynput")
         
+        if check_pillow:
+            try:
+                import PIL
+            except ImportError:
+                missing_libs.append("Pillow")
+        
         if missing_libs:
             libs_str = ", ".join(missing_libs)
             error_msg = f"Required libraries not installed: {libs_str}. Please run: pip install {' '.join(missing_libs)}"
@@ -52,7 +70,7 @@ class Recorder:
             raise RuntimeError("Recording already in progress")
         
         # Check if dependencies are available
-        is_available, error_msg = self.check_dependencies()
+        is_available, error_msg = self.check_dependencies(check_pillow=self.capture_screenshots)
         if not is_available:
             raise RuntimeError(error_msg)
         
@@ -60,6 +78,11 @@ class Recorder:
         self.actions = []
         self.start_time = time.time()
         self.is_recording = True
+        self.screenshot_counter = 0
+        
+        # Create screenshots directory if needed
+        if self.capture_screenshots and self.screenshots_dir:
+            self.screenshots_dir.mkdir(parents=True, exist_ok=True)
         
         # Start listeners
         self.mouse_listener = mouse.Listener(
@@ -125,14 +148,49 @@ class Recorder:
         }
         button_str = button_map.get(button, 'left')
         
+        # Capture screenshot if enabled
+        screenshot_filename = None
+        if self.capture_screenshots and self.screenshots_dir:
+            screenshot_filename = self._capture_screenshot()
+        
         action = Action(
             type='mouse_click',
             timestamp=timestamp,
             x=x,
             y=y,
-            button=button_str
+            button=button_str,
+            screenshot=screenshot_filename
         )
         self.actions.append(action)
+    
+    def _capture_screenshot(self) -> Optional[str]:
+        """Capture a screenshot and save it to the screenshots directory.
+        
+        Returns:
+            Filename of the saved screenshot, or None if capture failed
+        """
+        try:
+            import pyautogui
+            from PIL import Image
+            
+            # Capture screenshot
+            screenshot = pyautogui.screenshot()
+            
+            # Generate filename
+            self.screenshot_counter += 1
+            filename = f"screenshot_{self.screenshot_counter:04d}.png"
+            filepath = self.screenshots_dir / filename
+            
+            # Save screenshot
+            screenshot.save(filepath)
+            
+            return filename
+        except Exception as e:
+            # Log error but don't fail the recording
+            import sys
+            sys.stderr.write(f"Warning: Failed to capture screenshot: {str(e)}\n")
+            sys.stderr.flush()
+            return None
     
     def _on_key_event(self, key, pressed: bool) -> None:
         """Callback for keyboard events."""

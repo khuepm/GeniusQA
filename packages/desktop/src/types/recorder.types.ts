@@ -131,8 +131,9 @@ export interface IPCResponse {
  * - progress: Playback progress update
  * - complete: Operation completed successfully
  * - error: Error occurred during operation
+ * - action_preview: Preview of action about to be executed
  */
-export type IPCEventType = 'progress' | 'complete' | 'error';
+export type IPCEventType = 'progress' | 'complete' | 'error' | 'action_preview';
 
 /**
  * IPC event message from Python Core
@@ -191,11 +192,55 @@ export interface RecordingResult {
  * @interface PlaybackProgress
  * @property {number} currentAction - Index of action currently being executed (0-based)
  * @property {number} totalActions - Total number of actions in the script
+ * @property {number} currentLoop - Current loop iteration (1-indexed)
+ * @property {number} totalLoops - Total number of loops (0 = infinite)
  * 
  * @example
- * { "currentAction": 25, "totalActions": 100 } // 25% complete
+ * { "currentAction": 25, "totalActions": 100, "currentLoop": 1, "totalLoops": 3 } // Loop 1 of 3, 25% complete
  */
 export interface PlaybackProgress {
   currentAction: number;
   totalActions: number;
+  currentLoop: number;
+  totalLoops: number;
+}
+
+/**
+ * Action data structure for preview
+ * 
+ * Represents a single recorded action with all its properties.
+ * Used for visual preview during playback.
+ * 
+ * @interface ActionData
+ * @property {string} type - Type of action (mouse_move, mouse_click, key_press, key_release)
+ * @property {number} timestamp - Time in seconds since recording start
+ * @property {number | null} x - X coordinate for mouse actions
+ * @property {number | null} y - Y coordinate for mouse actions
+ * @property {string | null} button - Mouse button for click actions
+ * @property {string | null} key - Key identifier for keyboard actions
+ * @property {string | null} screenshot - Screenshot filename if available
+ */
+export interface ActionData {
+  type: 'mouse_move' | 'mouse_click' | 'key_press' | 'key_release';
+  timestamp: number;
+  x: number | null;
+  y: number | null;
+  button: 'left' | 'right' | 'middle' | null;
+  key: string | null;
+  screenshot: string | null;
+}
+
+/**
+ * Action preview event data
+ * 
+ * Sent before each action is executed during playback.
+ * Allows UI to show visual preview of what's happening.
+ * 
+ * @interface ActionPreviewData
+ * @property {number} index - Index of the action (0-based)
+ * @property {ActionData} action - The action about to be executed
+ */
+export interface ActionPreviewData {
+  index: number;
+  action: ActionData;
 }

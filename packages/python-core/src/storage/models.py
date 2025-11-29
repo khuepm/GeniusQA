@@ -37,6 +37,7 @@ class Action(BaseModel):
         y: Y screen coordinate for mouse actions (None for keyboard)
         button: Mouse button identifier for clicks (None for other actions)
         key: Key identifier for keyboard actions (None for mouse actions)
+        screenshot: Optional filename of screenshot captured with this action
     
     Examples:
         >>> Action(type='mouse_move', timestamp=0.5, x=100, y=200)
@@ -53,6 +54,7 @@ class Action(BaseModel):
     y: Optional[int] = Field(None, description="Y coordinate for mouse actions")
     button: Optional[Literal['left', 'right', 'middle']] = Field(None, description="Mouse button for click actions")
     key: Optional[str] = Field(None, description="Key identifier for keyboard actions")
+    screenshot: Optional[str] = Field(None, description="Filename of screenshot captured with this action")
     
     @field_validator('x', 'y')
     @classmethod
@@ -174,6 +176,7 @@ class ScriptFile(BaseModel):
     Attributes:
         metadata: Recording session metadata
         actions: List of captured user actions in chronological order
+        variables: Optional dictionary of variable names to default values for substitution
     
     Examples:
         >>> script = ScriptFile(
@@ -189,3 +192,4 @@ class ScriptFile(BaseModel):
     
     metadata: ScriptMetadata
     actions: list[Action]
+    variables: Optional[dict[str, str]] = Field(default_factory=dict, description="Variable definitions for substitution")

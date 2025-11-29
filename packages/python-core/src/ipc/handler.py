@@ -91,7 +91,18 @@ class IPCHandler:
                     'error': "Recording already in progress"
                 }
             
-            self.recorder = Recorder()
+            # Get screenshot capture preference from params (default: True)
+            capture_screenshots = params.get('captureScreenshots', True)
+            
+            # Generate a temporary screenshots directory name
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            screenshots_dir = self.storage.base_dir / f"script_{timestamp}_screenshots"
+            
+            self.recorder = Recorder(
+                screenshots_dir=screenshots_dir if capture_screenshots else None,
+                capture_screenshots=capture_screenshots
+            )
             self.recorder.start_recording()
             
             return {
@@ -125,19 +136,23 @@ class IPCHandler:
                 }
             
             actions = self.recorder.stop_recording()
-            script_path = self.storage.save_script(actions)
+            screenshots_dir = self.recorder.screenshots_dir
+            script_path = self.storage.save_script(actions, screenshots_dir=screenshots_dir)
             
-            # Calculate duration
+            # Calculate duration and screenshot count
             duration = 0.0
+            screenshot_count = 0
             if actions:
                 duration = max(action.timestamp for action in actions)
+                screenshot_count = sum(1 for action in actions if action.screenshot is not None)
             
             return {
                 'success': True,
                 'data': {
                     'scriptPath': str(script_path),
                     'actionCount': len(actions),
-                    'duration': duration
+                    'duration': duration,
+                    'screenshotCount': screenshot_count
                 }
             }
         except PermissionError as e:
@@ -202,15 +217,34 @@ class IPCHandler:
                     'error': f"Failed to load script: {error_msg}"
                 }
             
-            # Start playback with progress callback
-            self.player = Player(script_file.actions, progress_callback=self._emit_progress)
+            # Get variable overrides from params, merge with script defaults
+            variables = dict(script_file.variables) if script_file.variables else {}
+            variable_overrides = params.get('variables', {})
+            variables.update(variable_overrides)
+            
+            # Get playback speed from params (default: 1.0)
+            speed = params.get('speed', 1.0)
+            
+            # Get loop count from params (default: 1, 0 = infinite)
+            loop_count = params.get('loopCount', 1)
+            
+            # Start playback with progress callback, action callback, variables, speed, and loop count
+            self.player = Player(
+                script_file.actions, 
+                progress_callback=self._emit_progress, 
+                action_callback=self._emit_action_preview,
+                variables=variables,
+                speed=speed,
+                loop_count=loop_count
+            )
             self.player.start_playback()
             
             return {
                 'success': True,
                 'data': {
                     'status': 'playing',
-                    'actionCount': len(script_file.actions)
+                    'actionCount': len(script_file.actions),
+                    'variables': variables
                 }
             }
         except PermissionError as e:
@@ -328,18 +362,22 @@ class IPCHandler:
         sys.stderr.write(f"ERROR: {message}\n")
         sys.stderr.flush()
     
-    def _emit_progress(self, current: int, total: int) -> None:
+    def _emit_progress(self, current: int, total: int, current_loop: int = 1, total_loops: int = 1) -> None:
         """Emit progress event during playback.
         
         Args:
             current: Current action number (1-indexed)
             total: Total number of actions
+            current_loop: Current loop iteration (1-indexed)
+            total_loops: Total number of loops (0 = infinite)
         """
         event = {
             'type': 'progress',
             'data': {
                 'currentAction': current,
-                'totalActions': total
+                'totalActions': total,
+                'currentLoop': current_loop,
+                'totalLoops': total_loops
             }
         }
         try:
@@ -348,6 +386,35 @@ class IPCHandler:
             sys.stdout.flush()
         except Exception as e:
             self._log_error(f"Failed to emit progress event: {str(e)}")
+    
+    def _emit_action_preview(self, action, index: int) -> None:
+        """Emit action preview event before executing an action.
+        
+        Args:
+            action: The action about to be executed
+            index: The index of the action (0-based)
+        """
+        event = {
+            'type': 'action_preview',
+            'data': {
+                'index': index,
+                'action': {
+                    'type': action.type,
+                    'timestamp': action.timestamp,
+                    'x': action.x,
+                    'y': action.y,
+                    'button': action.button,
+                    'key': action.key,
+                    'screenshot': action.screenshot
+                }
+            }
+        }
+        try:
+            json_str = json.dumps(event)
+            sys.stdout.write(json_str + '\n')
+            sys.stdout.flush()
+        except Exception as e:
+            self._log_error(f"Failed to emit action preview event: {str(e)}")
     
     def _format_permission_error(self, error_msg: str) -> str:
         """Format permission error with platform-specific guidance.

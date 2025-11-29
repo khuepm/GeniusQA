@@ -543,3 +543,227 @@ def test_multiple_error_types_in_sequence():
     assert 'error' in response1
     assert 'error' in response2
     assert 'error' in response3
+
+
+def test_playback_speed_parameter():
+    """
+    Test that playback speed parameter is properly passed to Player.
+    """
+    handler = IPCHandler()
+    
+    from storage.models import Action, ScriptFile, ScriptMetadata
+    from datetime import datetime
+    
+    actions = [
+        Action(type='mouse_click', timestamp=0.0, x=100, y=200, button='left'),
+        Action(type='mouse_click', timestamp=1.0, x=200, y=300, button='left')
+    ]
+    metadata = ScriptMetadata(
+        created_at=datetime.now(),
+        duration=1.0,
+        action_count=2,
+        platform='darwin'
+    )
+    script_file = ScriptFile(metadata=metadata, actions=actions)
+    
+    with patch.object(handler.storage, 'get_latest_script', return_value=Path('/fake/script.json')):
+        with patch.object(handler.storage, 'load_script', return_value=script_file):
+            with patch('ipc.handler.Player') as MockPlayer:
+                mock_player = Mock()
+                mock_player.is_playing = False
+                MockPlayer.return_value = mock_player
+                
+                # Test with speed parameter
+                response = handler._handle_start_playback({'speed': 2.0})
+                
+                assert response['success'] is True
+                # Verify Player was created with speed parameter
+                MockPlayer.assert_called_once()
+                call_kwargs = MockPlayer.call_args[1]
+                assert 'speed' in call_kwargs
+                assert call_kwargs['speed'] == 2.0
+
+
+def test_playback_speed_default():
+    """
+    Test that playback defaults to 1.0x speed when not specified.
+    """
+    handler = IPCHandler()
+    
+    from storage.models import Action, ScriptFile, ScriptMetadata
+    from datetime import datetime
+    
+    actions = [Action(type='mouse_click', timestamp=0.0, x=100, y=200, button='left')]
+    metadata = ScriptMetadata(
+        created_at=datetime.now(),
+        duration=0.0,
+        action_count=1,
+        platform='darwin'
+    )
+    script_file = ScriptFile(metadata=metadata, actions=actions)
+    
+    with patch.object(handler.storage, 'get_latest_script', return_value=Path('/fake/script.json')):
+        with patch.object(handler.storage, 'load_script', return_value=script_file):
+            with patch('ipc.handler.Player') as MockPlayer:
+                mock_player = Mock()
+                mock_player.is_playing = False
+                MockPlayer.return_value = mock_player
+                
+                # Test without speed parameter
+                response = handler._handle_start_playback({})
+                
+                assert response['success'] is True
+                # Verify Player was created with default speed
+                MockPlayer.assert_called_once()
+                call_kwargs = MockPlayer.call_args[1]
+                assert 'speed' in call_kwargs
+                assert call_kwargs['speed'] == 1.0
+
+
+def test_loop_count_parameter():
+    """
+    Test that loop count parameter is properly passed to Player.
+    """
+    handler = IPCHandler()
+    
+    from storage.models import Action, ScriptFile, ScriptMetadata
+    from datetime import datetime
+    
+    actions = [
+        Action(type='mouse_click', timestamp=0.0, x=100, y=200, button='left'),
+        Action(type='mouse_click', timestamp=1.0, x=200, y=300, button='left')
+    ]
+    metadata = ScriptMetadata(
+        created_at=datetime.now(),
+        duration=1.0,
+        action_count=2,
+        platform='darwin'
+    )
+    script_file = ScriptFile(metadata=metadata, actions=actions)
+    
+    with patch.object(handler.storage, 'get_latest_script', return_value=Path('/fake/script.json')):
+        with patch.object(handler.storage, 'load_script', return_value=script_file):
+            with patch('ipc.handler.Player') as MockPlayer:
+                mock_player = Mock()
+                mock_player.is_playing = False
+                MockPlayer.return_value = mock_player
+                
+                # Test with loop_count parameter
+                response = handler._handle_start_playback({'loopCount': 3})
+                
+                assert response['success'] is True
+                # Verify Player was created with loop_count parameter
+                MockPlayer.assert_called_once()
+                call_kwargs = MockPlayer.call_args[1]
+                assert 'loop_count' in call_kwargs
+                assert call_kwargs['loop_count'] == 3
+
+
+def test_loop_count_default():
+    """
+    Test that playback defaults to loop_count=1 (play once) when not specified.
+    """
+    handler = IPCHandler()
+    
+    from storage.models import Action, ScriptFile, ScriptMetadata
+    from datetime import datetime
+    
+    actions = [Action(type='mouse_click', timestamp=0.0, x=100, y=200, button='left')]
+    metadata = ScriptMetadata(
+        created_at=datetime.now(),
+        duration=0.0,
+        action_count=1,
+        platform='darwin'
+    )
+    script_file = ScriptFile(metadata=metadata, actions=actions)
+    
+    with patch.object(handler.storage, 'get_latest_script', return_value=Path('/fake/script.json')):
+        with patch.object(handler.storage, 'load_script', return_value=script_file):
+            with patch('ipc.handler.Player') as MockPlayer:
+                mock_player = Mock()
+                mock_player.is_playing = False
+                MockPlayer.return_value = mock_player
+                
+                # Test without loop_count parameter
+                response = handler._handle_start_playback({})
+                
+                assert response['success'] is True
+                # Verify Player was created with default loop_count
+                MockPlayer.assert_called_once()
+                call_kwargs = MockPlayer.call_args[1]
+                assert 'loop_count' in call_kwargs
+                assert call_kwargs['loop_count'] == 1
+
+
+def test_infinite_loop_parameter():
+    """
+    Test that loop_count=0 (infinite loop) is properly passed to Player.
+    """
+    handler = IPCHandler()
+    
+    from storage.models import Action, ScriptFile, ScriptMetadata
+    from datetime import datetime
+    
+    actions = [Action(type='mouse_click', timestamp=0.0, x=100, y=200, button='left')]
+    metadata = ScriptMetadata(
+        created_at=datetime.now(),
+        duration=0.0,
+        action_count=1,
+        platform='darwin'
+    )
+    script_file = ScriptFile(metadata=metadata, actions=actions)
+    
+    with patch.object(handler.storage, 'get_latest_script', return_value=Path('/fake/script.json')):
+        with patch.object(handler.storage, 'load_script', return_value=script_file):
+            with patch('ipc.handler.Player') as MockPlayer:
+                mock_player = Mock()
+                mock_player.is_playing = False
+                MockPlayer.return_value = mock_player
+                
+                # Test with infinite loop
+                response = handler._handle_start_playback({'loopCount': 0})
+                
+                assert response['success'] is True
+                # Verify Player was created with loop_count=0
+                MockPlayer.assert_called_once()
+                call_kwargs = MockPlayer.call_args[1]
+                assert 'loop_count' in call_kwargs
+                assert call_kwargs['loop_count'] == 0
+
+
+def test_combined_speed_and_loop_parameters():
+    """
+    Test that both speed and loop_count parameters can be used together.
+    """
+    handler = IPCHandler()
+    
+    from storage.models import Action, ScriptFile, ScriptMetadata
+    from datetime import datetime
+    
+    actions = [Action(type='mouse_click', timestamp=0.0, x=100, y=200, button='left')]
+    metadata = ScriptMetadata(
+        created_at=datetime.now(),
+        duration=0.0,
+        action_count=1,
+        platform='darwin'
+    )
+    script_file = ScriptFile(metadata=metadata, actions=actions)
+    
+    with patch.object(handler.storage, 'get_latest_script', return_value=Path('/fake/script.json')):
+        with patch.object(handler.storage, 'load_script', return_value=script_file):
+            with patch('ipc.handler.Player') as MockPlayer:
+                mock_player = Mock()
+                mock_player.is_playing = False
+                MockPlayer.return_value = mock_player
+                
+                # Test with both parameters
+                response = handler._handle_start_playback({'speed': 2.0, 'loopCount': 5})
+                
+                assert response['success'] is True
+                # Verify Player was created with both parameters
+                MockPlayer.assert_called_once()
+                call_kwargs = MockPlayer.call_args[1]
+                assert 'speed' in call_kwargs
+                assert call_kwargs['speed'] == 2.0
+                assert 'loop_count' in call_kwargs
+                assert call_kwargs['loop_count'] == 5

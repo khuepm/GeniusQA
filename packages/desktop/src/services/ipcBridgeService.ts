@@ -385,6 +385,10 @@ export class IPCBridgeService {
    * 
    * @param {string} [scriptPath] - Optional path to specific script file. If omitted,
    *   plays the most recent recording
+   * @param {number} [speed] - Optional playback speed multiplier (0.5 = half speed, 2.0 = double speed).
+   *   Default is 1.0. Valid range: 0.1x to 10x
+   * @param {number} [loopCount] - Optional number of times to repeat playback (1 = play once, 0 = infinite loop).
+   *   Default is 1
    * 
    * @throws {Error} If Python Core is unavailable or playback fails to start
    * @throws {Error} If no recordings exist (when scriptPath not provided)
@@ -393,20 +397,33 @@ export class IPCBridgeService {
    * @throws {Error} If a playback is already in progress
    * 
    * @example
-   * // Play most recent recording
+   * // Play most recent recording at normal speed once
    * await ipcBridge.startPlayback();
    * 
    * @example
-   * // Play specific recording
-   * await ipcBridge.startPlayback('/path/to/script_20240101_120000.json');
+   * // Play specific recording at double speed, repeat 3 times
+   * await ipcBridge.startPlayback('/path/to/script_20240101_120000.json', 2.0, 3);
+   * 
+   * @example
+   * // Play at half speed for debugging, infinite loop
+   * await ipcBridge.startPlayback(undefined, 0.5, 0);
    * 
    * Requirements: 2.1, 2.2, 5.1, 5.3
    * Validates: Property 3 (Playback executes actions in order)
    * Validates: Property 4 (Timing preservation during playback)
    */
-  public async startPlayback(scriptPath?: string): Promise<void> {
+  public async startPlayback(scriptPath?: string, speed?: number, loopCount?: number): Promise<void> {
     try {
-      const params = scriptPath ? { scriptPath } : {};
+      const params: Record<string, any> = {};
+      if (scriptPath) {
+        params.scriptPath = scriptPath;
+      }
+      if (speed !== undefined) {
+        params.speed = speed;
+      }
+      if (loopCount !== undefined) {
+        params.loopCount = loopCount;
+      }
       const response = await this.sendCommand('start_playback', params);
       
       if (!response.success) {

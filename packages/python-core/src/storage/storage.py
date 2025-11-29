@@ -71,6 +71,18 @@ class Storage:
             base_dir = Path.home() / "GeniusQA" / "recordings"
         self.base_dir = Path(base_dir)
     
+    def get_screenshots_dir(self, script_name: str) -> Path:
+        """
+        Get the screenshots directory for a specific script.
+        
+        Args:
+            script_name: Name of the script file (without extension)
+            
+        Returns:
+            Path to the screenshots directory for this script
+        """
+        return self.base_dir / f"{script_name}_screenshots"
+    
     def _ensure_directory_exists(self) -> None:
         """
         Create the storage directory if it doesn't exist.
@@ -90,7 +102,7 @@ class Storage:
         """
         self.base_dir.mkdir(parents=True, exist_ok=True)
     
-    def save_script(self, actions: list[Action]) -> Path:
+    def save_script(self, actions: list[Action], screenshots_dir: Optional[Path] = None) -> Path:
         """
         Save actions to a JSON file with timestamp-based filename.
         
@@ -107,6 +119,7 @@ class Storage:
         
         Args:
             actions: List of Action objects to save. Can be empty.
+            screenshots_dir: Optional path to screenshots directory (for cleanup if save fails)
             
         Returns:
             Path object pointing to the saved script file
