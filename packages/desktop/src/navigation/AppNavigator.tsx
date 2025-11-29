@@ -12,12 +12,14 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import DashboardScreen from '../screens/DashboardScreen';
+import RecorderScreen from '../screens/RecorderScreen';
 
 // Define navigation param list
 export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   Dashboard: undefined;
+  Recorder: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -47,13 +49,22 @@ const AppNavigator: React.FC = () => {
     >
       {user ? (
         // User is authenticated - show main app screens
-        <Stack.Screen
-          name="Dashboard"
-          component={DashboardScreen}
-          options={{
-            animationEnabled: true,
-          }}
-        />
+        <>
+          <Stack.Screen
+            name="Dashboard"
+            component={DashboardScreen}
+            options={{
+              animationEnabled: true,
+            }}
+          />
+          <Stack.Screen
+            name="Recorder"
+            component={RecorderScreen}
+            options={{
+              animationEnabled: true,
+            }}
+          />
+        </>
       ) : (
         // User is not authenticated - show auth screens
         <>

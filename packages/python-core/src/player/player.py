@@ -14,11 +14,17 @@ except ImportError:
 class Player:
     """Executes recorded actions with timing."""
     
-    def __init__(self, actions: List):
-        """Initialize the player with actions."""
+    def __init__(self, actions: List, progress_callback=None):
+        """Initialize the player with actions.
+        
+        Args:
+            actions: List of actions to play back
+            progress_callback: Optional callback function(current, total) for progress updates
+        """
         self.actions = actions
         self.is_playing = False
         self._playback_thread = None
+        self.progress_callback = progress_callback
     
     def start_playback(self) -> None:
         """Execute actions with timing in a separate thread."""
@@ -38,6 +44,14 @@ class Player:
                 
                 # Execute the current action
                 self._execute_action(action)
+                
+                # Report progress if callback is provided
+                if self.progress_callback:
+                    try:
+                        self.progress_callback(i + 1, len(self.actions))
+                    except Exception:
+                        # Don't let callback errors stop playback
+                        pass
                 
                 # Calculate and apply delay before next action
                 if i < len(self.actions) - 1:

@@ -1,7 +1,7 @@
 """Main entry point for Python Core IPC communication."""
 
 import sys
-from ipc import IPCHandler
+from ipc.handler import IPCHandler
 
 
 def main():
