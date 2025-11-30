@@ -8,6 +8,8 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
   onAuthStateChanged as firebaseOnAuthStateChanged,
@@ -33,6 +35,13 @@ class FirebaseAuthService {
 
     try {
       this.initialized = true;
+      
+      // Check for pending redirect result (after OAuth redirect)
+      const result = await getRedirectResult(this.auth);
+      if (result) {
+        console.log('OAuth redirect completed successfully:', result.user.email);
+      }
+      
       console.log('Firebase Auth Service initialized');
     } catch (error) {
       console.error('Failed to initialize Firebase Auth Service:', error);
@@ -98,21 +107,44 @@ class FirebaseAuthService {
   }
 
   /**
-   * Sign in with Google OAuth using popup
-   * @returns User credential
+   * Sign in with Google OAuth using redirect (Tauri-compatible)
+   * @returns User credential (or throws to indicate redirect in progress)
    */
   async signInWithGoogle(): Promise<UserCredential> {
     try {
-      const userCredential = await signInWithPopup(this.auth, this.googleProvider);
-      return userCredential;
+      // Check if running in Tauri environment
+      const isTauri = '__TAURI__' in window;
+      
+      if (isTauri) {
+        // Configure Google provider for redirect
+        this.googleProvider.setCustomParameters({
+          prompt: 'select_account'
+        });
+        
+        // Use signInWithRedirect for Tauri (opens in system browser)
+        await signInWithRedirect(this.auth, this.googleProvider);
+        
+        // This will redirect the app, so we throw to indicate redirect in progress
+        // The actual result will be handled in initialize() after redirect
+        throw new Error('REDIRECT_IN_PROGRESS');
+      } else {
+        // Fallback to popup for web environment
+        const userCredential = await signInWithPopup(this.auth, this.googleProvider);
+        return userCredential;
+      }
     } catch (error: any) {
       console.error('Google sign in error:', error);
+      
+      // Don't treat redirect as an error
+      if (error.message === 'REDIRECT_IN_PROGRESS') {
+        throw error;
+      }
       
       // Handle specific Google Sign-In errors
       if (error.code === 'auth/popup-closed-by-user') {
         throw new Error(getAuthErrorMessage({ code: 'auth/cancelled-popup-request' }));
       } else if (error.code === 'auth/popup-blocked') {
-        throw new Error('Popup was blocked by browser. Please allow popups for this site.');
+        throw new Error('Popup bị chặn. Vui lòng cho phép popup hoặc thử lại.');
       }
       
       throw new Error(getAuthErrorMessage(error));

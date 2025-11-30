@@ -296,3 +296,53 @@ The Desktop Recorder MVP has complete and tested Python Core automation function
     - Verify UI matches requirements: three buttons, minimal interface
     - Test in Tauri dev mode: `pnpm --filter @geniusqa/desktop dev`
     - _Requirements: All_
+
+## Phase 17: Replace Demo App.tsx with Actual UI Implementation
+
+- [x] 17: Replace Demo App.tsx with Actual UI Implementation
+  - [x] 17.1 Update App.tsx to use AppNavigator
+    - Remove demo content from App.tsx (current "Tauri + React application is running!" message)
+    - Import AuthProvider from contexts/AuthContext
+    - Import AppNavigator from navigation/AppNavigator
+    - Wrap AppNavigator with AuthProvider to provide authentication context
+    - Ensure proper component hierarchy: App → AuthProvider → AppNavigator → Routes
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+
+  - [x] 17.2 Verify authentication flow works
+    - Test that unauthenticated users are redirected to /login
+    - Test that authenticated users can access /dashboard
+    - Test that login redirects to dashboard after successful authentication
+    - Test that logout returns to login screen
+    - Verify AuthContext properly manages user state
+    - _Requirements: 5.1_
+
+  - [x] 17.3 Verify navigation between screens
+    - Test navigation from Dashboard to Recorder screen
+    - Test navigation from Recorder to Script Editor screen
+    - Test navigation back to Dashboard
+    - Verify all routes are accessible when authenticated
+    - Verify protected routes redirect to login when not authenticated
+    - _Requirements: 4.1_
+
+  - [x] 17.4 Test complete user workflow
+    - Start app → Login → Dashboard → Recorder → Record session → Stop → View in Script Editor
+    - Test playback from Recorder screen
+    - Test script management (load, save, delete)
+    - Verify all UI components render correctly
+    - Verify no console errors or warnings
+    - _Requirements: All_
+
+  - [x] 17.5 Update App.css for proper layout
+    - Ensure App.css provides proper container styling
+    - Remove demo-specific styles
+    - Add any necessary global styles for navigation
+    - Ensure responsive layout works correctly
+    - _Requirements: 4.4_
+
+  - [x] 17.6 Final integration test
+    - Run all tests: `pnpm --filter @geniusqa/desktop test`
+    - Run type checking: `pnpm --filter @geniusqa/desktop type-check`
+    - Run linting: `pnpm --filter @geniusqa/desktop lint`
+    - Test in Tauri dev mode: `pnpm --filter @geniusqa/desktop dev`
+    - Verify complete end-to-end functionality
+    - _Requirements: All_

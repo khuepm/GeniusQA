@@ -116,10 +116,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // User state will be updated by onAuthStateChanged listener
     } catch (err: any) {
       console.error('Google sign in failed:', err);
+
+      // Don't show error if redirect is in progress
+      if (err.message === 'REDIRECT_IN_PROGRESS') {
+        // Keep loading state while redirecting
+        return;
+      }
+
       setError(err.message || 'Đăng nhập Google thất bại');
-      throw err;
-    } finally {
       setLoading(false);
+      throw err;
     }
   };
 
