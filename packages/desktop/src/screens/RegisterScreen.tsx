@@ -11,7 +11,7 @@ const RegisterScreen: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [validationError, setValidationError] = useState('');
   const navigate = useNavigate();
-  const { signUpWithEmail, loading, error } = useAuth();
+  const { signUpWithEmail, loading, error, resetAuthState } = useAuth();
 
   const handleRegister = async () => {
     // Clear previous validation errors
@@ -35,17 +35,46 @@ const RegisterScreen: React.FC = () => {
       return;
     }
 
-    await signUpWithEmail(email, password);
+    try {
+      console.log('Attempting to register with email:', email);
+      await signUpWithEmail(email, password);
+      console.log('Registration successful');
+    } catch (err: any) {
+      console.error('Registration failed:', err);
+      setValidationError(err.message || 'Đăng ký thất bại');
+    }
   };
 
   const navigateToLogin = () => {
     navigate('/login');
   };
 
+  const handleReset = () => {
+    resetAuthState();
+    setValidationError('');
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+  };
+
   const displayError = validationError || error;
 
   return (
     <div className="register-container">
+      {/* Header with Reset Button */}
+      {(displayError || loading) && (
+        <div className="register-header">
+          <button
+            className="register-back-button"
+            onClick={handleReset}
+            disabled={false}
+            title="Reset và quay lại"
+          >
+            ← Quay lại
+          </button>
+        </div>
+      )}
+
       <div className="register-scroll-content">
         <div className="register-content">
           {/* Logo/Branding */}

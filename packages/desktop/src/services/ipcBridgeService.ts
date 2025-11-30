@@ -59,17 +59,23 @@ export class IPCBridgeService {
    */
   private async initializeEventListeners(): Promise<void> {
     try {
-      // Listen for progress events
-      const unlistenProgress = await listen<TauriEventPayload>('python-event', (event) => {
-        const payload = event.payload;
-        this.emitEvent({
-          type: payload.type as any,
-          data: payload.data,
+      // Listen for all Python events (progress, action_preview, complete, error)
+      const eventTypes = ['progress', 'action_preview', 'complete', 'error'];
+      
+      for (const eventType of eventTypes) {
+        const unlisten = await listen<any>(eventType, (event) => {
+          console.log(`[IPC Bridge] Received ${eventType} event:`, event.payload);
+          this.emitEvent({
+            type: eventType as any,
+            data: event.payload,
+          });
         });
-      });
-      this.unlistenFunctions.push(unlistenProgress);
+        this.unlistenFunctions.push(unlisten);
+      }
+      
+      console.log('[IPC Bridge] Event listeners initialized');
     } catch (error) {
-      console.error('Failed to initialize Tauri event listeners:', error);
+      console.error('[IPC Bridge] Failed to initialize Tauri event listeners:', error);
     }
   }
 
@@ -139,8 +145,11 @@ export class IPCBridgeService {
    */
   public async startRecording(): Promise<void> {
     try {
+      console.log('[IPC Bridge] Invoking start_recording command...');
       await invoke('start_recording');
+      console.log('[IPC Bridge] start_recording command successful');
     } catch (error) {
+      console.error('[IPC Bridge] start_recording command failed:', error);
       throw new Error(this.formatErrorMessage(error as Error));
     }
   }

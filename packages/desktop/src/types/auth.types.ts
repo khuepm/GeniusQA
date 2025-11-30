@@ -40,6 +40,8 @@ export interface AuthContextType {
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  clearError: () => void;
+  resetAuthState: () => void;
 }
 
 // Component prop interfaces

@@ -184,6 +184,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  /**
+   * Clear error state
+   */
+  const clearError = (): void => {
+    setError(null);
+  };
+
+  /**
+   * Reset auth state (clear error and loading)
+   * Useful for resetting the flow when navigating back
+   */
+  const resetAuthState = (): void => {
+    setError(null);
+    setLoading(false);
+  };
+
   const value: AuthContextType = {
     user,
     loading,
@@ -192,6 +208,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signInWithEmail,
     signUpWithEmail,
     signOut,
+    clearError,
+    resetAuthState,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

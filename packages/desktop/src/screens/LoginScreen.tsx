@@ -9,7 +9,7 @@ const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const navigate = useNavigate();
-  const { signInWithEmail, signInWithGoogle, loading, error } = useAuth();
+  const { signInWithEmail, signInWithGoogle, loading, error, resetAuthState } = useAuth();
 
   const handleEmailSignIn = async () => {
     if (!email || !password) {
@@ -26,8 +26,28 @@ const LoginScreen: React.FC = () => {
     navigate('/register');
   };
 
+  const handleReset = () => {
+    resetAuthState();
+    setEmail('');
+    setPassword('');
+  };
+
   return (
     <div className="login-container">
+      {/* Header with Reset Button */}
+      {(error || loading) && (
+        <div className="login-header">
+          <button
+            className="login-back-button"
+            onClick={handleReset}
+            disabled={false}
+            title="Reset và quay lại"
+          >
+            ← Quay lại
+          </button>
+        </div>
+      )}
+
       <div className="login-scroll-content">
         <div className="login-content">
           {/* Logo/Branding */}
