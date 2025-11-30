@@ -1,3 +1,4 @@
+import { initializeApp, FirebaseApp } from 'firebase/app';
 import { getEnvVar } from '../utils/env';
 
 /**
@@ -37,7 +38,6 @@ export interface FirebaseConfig {
   storageBucket: string;
   messagingSenderId: string;
   appId: string;
-  webClientId: string;
   measurementId: string;
 }
 
@@ -49,7 +49,9 @@ const firebaseConfig: FirebaseConfig = {
   messagingSenderId: getEnvVar('FIREBASE_MESSAGING_SENDER_ID'),
   appId: getEnvVar('FIREBASE_APP_ID'),
   measurementId: getEnvVar('FIREBASE_MEASUREMENT_ID'),
-  webClientId: getEnvVar('FIREBASE_WEB_CLIENT_ID'),
 };
+
+// Initialize Firebase app
+export const app: FirebaseApp = initializeApp(firebaseConfig);
 
 export default firebaseConfig;

@@ -3,47 +3,48 @@
  */
 
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { render } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import { LoadingSpinner } from '../LoadingSpinner';
 
 describe('LoadingSpinner', () => {
   it('should render with default props', () => {
-    const { UNSAFE_getByType } = render(<LoadingSpinner />);
+    const { container } = render(<LoadingSpinner />);
 
-    const spinner = UNSAFE_getByType('ActivityIndicator');
-    expect(spinner).toBeTruthy();
-    expect(spinner.props.size).toBe('large');
-    expect(spinner.props.color).toBe('#007AFF');
+    const spinner = container.querySelector('.loading-spinner');
+    expect(spinner).toBeInTheDocument();
+    expect(spinner).toHaveClass('loading-spinner-large');
+    expect(spinner).toHaveStyle({ borderTopColor: '#007AFF' });
   });
 
   it('should render with small size', () => {
-    const { UNSAFE_getByType } = render(<LoadingSpinner size="small" />);
+    const { container } = render(<LoadingSpinner size="small" />);
 
-    const spinner = UNSAFE_getByType('ActivityIndicator');
-    expect(spinner.props.size).toBe('small');
+    const spinner = container.querySelector('.loading-spinner');
+    expect(spinner).toHaveClass('loading-spinner-small');
   });
 
   it('should render with large size', () => {
-    const { UNSAFE_getByType } = render(<LoadingSpinner size="large" />);
+    const { container } = render(<LoadingSpinner size="large" />);
 
-    const spinner = UNSAFE_getByType('ActivityIndicator');
-    expect(spinner.props.size).toBe('large');
+    const spinner = container.querySelector('.loading-spinner');
+    expect(spinner).toHaveClass('loading-spinner-large');
   });
 
   it('should render with custom color', () => {
-    const { UNSAFE_getByType } = render(<LoadingSpinner color="#FF0000" />);
+    const { container } = render(<LoadingSpinner color="#FF0000" />);
 
-    const spinner = UNSAFE_getByType('ActivityIndicator');
-    expect(spinner.props.color).toBe('#FF0000');
+    const spinner = container.querySelector('.loading-spinner');
+    expect(spinner).toHaveStyle({ borderTopColor: '#FF0000' });
   });
 
   it('should render with custom size and color', () => {
-    const { UNSAFE_getByType } = render(
+    const { container } = render(
       <LoadingSpinner size="small" color="#00FF00" />
     );
 
-    const spinner = UNSAFE_getByType('ActivityIndicator');
-    expect(spinner.props.size).toBe('small');
-    expect(spinner.props.color).toBe('#00FF00');
+    const spinner = container.querySelector('.loading-spinner');
+    expect(spinner).toHaveClass('loading-spinner-small');
+    expect(spinner).toHaveStyle({ borderTopColor: '#00FF00' });
   });
 });

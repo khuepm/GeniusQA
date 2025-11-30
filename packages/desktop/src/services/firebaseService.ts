@@ -1,19 +1,29 @@
 /**
  * Firebase Authentication Service for GeniusQA Desktop
- * Provides authentication methods using Firebase
+ * Provides authentication methods using Firebase Web SDK
  */
 
-import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import firebaseConfig from '../config/firebase.config';
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut as firebaseSignOut,
+  onAuthStateChanged as firebaseOnAuthStateChanged,
+  User as FirebaseUser,
+  UserCredential
+} from 'firebase/auth';
+import { app } from '../config/firebase.config';
 import { User, getAuthErrorMessage } from '../types/auth.types';
 
 class FirebaseAuthService {
+  private auth = getAuth(app);
+  private googleProvider = new GoogleAuthProvider();
   private initialized = false;
 
   /**
-   * Initialize Firebase and Google Sign-In
+   * Initialize Firebase Auth
    * Must be called before using any auth methods
    */
   async initialize(): Promise<void> {
@@ -22,11 +32,6 @@ class FirebaseAuthService {
     }
 
     try {
-      // Configure Google Sign-In
-      GoogleSignin.configure({
-        webClientId: firebaseConfig.webClientId,
-      });
-
       this.initialized = true;
       console.log('Firebase Auth Service initialized');
     } catch (error) {
@@ -39,8 +44,8 @@ class FirebaseAuthService {
    * Get the currently authenticated user
    * @returns Current user or null if not authenticated
    */
-  getCurrentUser(): FirebaseAuthTypes.User | null {
-    return auth().currentUser;
+  getCurrentUser(): FirebaseUser | null {
+    return this.auth.currentUser;
   }
 
   /**
@@ -49,9 +54,9 @@ class FirebaseAuthService {
    * @returns Unsubscribe function
    */
   onAuthStateChanged(
-    callback: (user: FirebaseAuthTypes.User | null) => void
+    callback: (user: FirebaseUser | null) => void
   ): () => void {
-    return auth().onAuthStateChanged(callback);
+    return firebaseOnAuthStateChanged(this.auth, callback);
   }
 
   /**
@@ -63,9 +68,9 @@ class FirebaseAuthService {
   async signInWithEmail(
     email: string,
     password: string
-  ): Promise<FirebaseAuthTypes.UserCredential> {
+  ): Promise<UserCredential> {
     try {
-      const userCredential = await auth().signInWithEmailAndPassword(email, password);
+      const userCredential = await signInWithEmailAndPassword(this.auth, email, password);
       return userCredential;
     } catch (error) {
       console.error('Email sign in error:', error);
@@ -82,9 +87,9 @@ class FirebaseAuthService {
   async signUpWithEmail(
     email: string,
     password: string
-  ): Promise<FirebaseAuthTypes.UserCredential> {
+  ): Promise<UserCredential> {
     try {
-      const userCredential = await auth().createUserWithEmailAndPassword(email, password);
+      const userCredential = await createUserWithEmailAndPassword(this.auth, email, password);
       return userCredential;
     } catch (error) {
       console.error('Email sign up error:', error);
@@ -93,33 +98,21 @@ class FirebaseAuthService {
   }
 
   /**
-   * Sign in with Google OAuth
+   * Sign in with Google OAuth using popup
    * @returns User credential
    */
-  async signInWithGoogle(): Promise<FirebaseAuthTypes.UserCredential> {
+  async signInWithGoogle(): Promise<UserCredential> {
     try {
-      // Check if device supports Google Play services
-      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-
-      // Get user's ID token
-      const { idToken } = await GoogleSignin.signIn();
-
-      // Create a Google credential with the token
-      const googleCredential = auth.GoogleAuthProvider.credential(idToken);
-
-      // Sign in with the credential
-      const userCredential = await auth().signInWithCredential(googleCredential);
+      const userCredential = await signInWithPopup(this.auth, this.googleProvider);
       return userCredential;
     } catch (error: any) {
       console.error('Google sign in error:', error);
       
       // Handle specific Google Sign-In errors
-      if (error.code === 'SIGN_IN_CANCELLED') {
+      if (error.code === 'auth/popup-closed-by-user') {
         throw new Error(getAuthErrorMessage({ code: 'auth/cancelled-popup-request' }));
-      } else if (error.code === 'IN_PROGRESS') {
-        throw new Error('Đăng nhập đang được xử lý');
-      } else if (error.code === 'PLAY_SERVICES_NOT_AVAILABLE') {
-        throw new Error('Google Play Services không khả dụng');
+      } else if (error.code === 'auth/popup-blocked') {
+        throw new Error('Popup was blocked by browser. Please allow popups for this site.');
       }
       
       throw new Error(getAuthErrorMessage(error));
@@ -132,17 +125,11 @@ class FirebaseAuthService {
    */
   async signOut(): Promise<void> {
     try {
-      // Sign out from Google if user was signed in with Google
-      const isSignedIn = await GoogleSignin.isSignedIn();
-      if (isSignedIn) {
-        await GoogleSignin.signOut();
-      }
-
       // Sign out from Firebase
-      await auth().signOut();
+      await firebaseSignOut(this.auth);
 
       // Clear local storage
-      await AsyncStorage.clear();
+      localStorage.clear();
 
       console.log('User signed out successfully');
     } catch (error) {
@@ -154,7 +141,7 @@ class FirebaseAuthService {
   /**
    * Convert Firebase user to app User type
    */
-  private mapFirebaseUser(firebaseUser: FirebaseAuthTypes.User | null): User | null {
+  private mapFirebaseUser(firebaseUser: FirebaseUser | null): User | null {
     if (!firebaseUser) {
       return null;
     }

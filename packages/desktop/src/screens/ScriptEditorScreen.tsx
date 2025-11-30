@@ -11,22 +11,10 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-} from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { useNavigate } from 'react-router-dom';
 import { AuthButton } from '../components/AuthButton';
 import { getIPCBridge } from '../services/ipcBridgeService';
-import { RootStackParamList } from '../navigation/AppNavigator';
-
-type ScriptEditorNavigationProp = StackNavigationProp<RootStackParamList, 'ScriptEditor'>;
+import './ScriptEditorScreen.css';
 
 interface ScriptInfo {
   path: string;
@@ -64,7 +52,7 @@ const ScriptEditorScreen: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [editMode, setEditMode] = useState<boolean>(false);
 
-  const navigation = useNavigation<ScriptEditorNavigationProp>();
+  const navigate = useNavigate();
   const ipcBridge = getIPCBridge();
 
   /**
@@ -123,12 +111,12 @@ const ScriptEditorScreen: React.FC = () => {
       setError(null);
       await ipcBridge.saveScript(selectedScript.path, scriptData);
       setEditMode(false);
-      Alert.alert('Success', 'Script saved successfully');
+      alert('Script saved successfully');
       await loadScripts(); // Refresh list
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save script';
       setError(errorMessage);
-      Alert.alert('Error', errorMessage);
+      alert(`Error: ${errorMessage}`);
       console.error('Save script error:', err);
     } finally {
       setLoading(false);
@@ -139,36 +127,27 @@ const ScriptEditorScreen: React.FC = () => {
    * Delete a script
    */
   const deleteScript = async (script: ScriptInfo) => {
-    Alert.alert(
-      'Delete Script',
-      `Are you sure you want to delete ${script.filename}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setLoading(true);
-              setError(null);
-              await ipcBridge.deleteScript(script.path);
-              if (selectedScript?.path === script.path) {
-                setSelectedScript(null);
-                setScriptData(null);
-              }
-              await loadScripts();
-            } catch (err) {
-              const errorMessage = err instanceof Error ? err.message : 'Failed to delete script';
-              setError(errorMessage);
-              Alert.alert('Error', errorMessage);
-              console.error('Delete script error:', err);
-            } finally {
-              setLoading(false);
-            }
-          },
-        },
-      ]
-    );
+    if (!confirm(`Are you sure you want to delete ${script.filename}?`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      await ipcBridge.deleteScript(script.path);
+      if (selectedScript?.path === script.path) {
+        setSelectedScript(null);
+        setScriptData(null);
+      }
+      await loadScripts();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete script';
+      setError(errorMessage);
+      alert(`Error: ${errorMessage}`);
+      console.error('Delete script error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   /**
@@ -214,39 +193,39 @@ const ScriptEditorScreen: React.FC = () => {
    * Render script list
    */
   const renderScriptList = () => (
-    <View style={styles.scriptList}>
-      <Text style={styles.sectionTitle}>Available Scripts</Text>
+    <div className="script-list">
+      <h2 className="section-title">Available Scripts</h2>
       {scripts.length === 0 ? (
-        <Text style={styles.emptyText}>No scripts found. Record a session first.</Text>
+        <p className="empty-text">No scripts found. Record a session first.</p>
       ) : (
         scripts.map((script, index) => (
-          <TouchableOpacity
+          <div
             key={index}
-            style={[
-              styles.scriptItem,
-              selectedScript?.path === script.path && styles.scriptItemSelected,
-            ]}
-            onPress={() => loadScript(script)}
+            className={`script-item ${selectedScript?.path === script.path ? 'selected' : ''}`}
+            onClick={() => loadScript(script)}
           >
-            <View style={styles.scriptItemHeader}>
-              <Text style={styles.scriptFilename}>{script.filename}</Text>
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={() => deleteScript(script)}
+            <div className="script-item-header">
+              <span className="script-filename">{script.filename}</span>
+              <button
+                className="delete-button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteScript(script);
+                }}
               >
-                <Text style={styles.deleteButtonText}>Delete</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.scriptInfo}>
+                Delete
+              </button>
+            </div>
+            <p className="script-info">
               Created: {new Date(script.created_at).toLocaleString()}
-            </Text>
-            <Text style={styles.scriptInfo}>
+            </p>
+            <p className="script-info">
               Duration: {script.duration.toFixed(2)}s | Actions: {script.action_count}
-            </Text>
-          </TouchableOpacity>
+            </p>
+          </div>
         ))
       )}
-    </View>
+    </div>
   );
 
   /**
@@ -255,30 +234,30 @@ const ScriptEditorScreen: React.FC = () => {
   const renderScriptEditor = () => {
     if (!selectedScript || !scriptData) {
       return (
-        <View style={styles.editorPlaceholder}>
-          <Text style={styles.placeholderText}>
+        <div className="editor-placeholder">
+          <p className="placeholder-text">
             Select a script from the list to view or edit
-          </Text>
-        </View>
+          </p>
+        </div>
       );
     }
 
     return (
-      <View style={styles.editor}>
-        <View style={styles.editorHeader}>
-          <Text style={styles.editorTitle}>{selectedScript.filename}</Text>
-          <View style={styles.editorActions}>
+      <div className="editor">
+        <div className="editor-header">
+          <h2 className="editor-title">{selectedScript.filename}</h2>
+          <div className="editor-actions">
             {editMode ? (
               <>
-                <View style={styles.actionButton}>
+                <div className="action-button">
                   <AuthButton
                     title="Save"
                     onPress={saveScript}
                     loading={loading}
                     variant="primary"
                   />
-                </View>
-                <View style={styles.actionButton}>
+                </div>
+                <div className="action-button">
                   <AuthButton
                     title="Cancel"
                     onPress={() => {
@@ -287,362 +266,127 @@ const ScriptEditorScreen: React.FC = () => {
                     }}
                     variant="secondary"
                   />
-                </View>
+                </div>
               </>
             ) : (
-              <View style={styles.actionButton}>
+              <div className="action-button">
                 <AuthButton
                   title="Edit"
                   onPress={() => setEditMode(true)}
                   variant="primary"
                 />
-              </View>
+              </div>
             )}
-          </View>
-        </View>
+          </div>
+        </div>
 
-        <ScrollView style={styles.editorContent}>
+        <div className="editor-content">
           {/* Metadata Section */}
-          <View style={styles.metadataSection}>
-            <Text style={styles.subsectionTitle}>Metadata</Text>
-            <View style={styles.metadataGrid}>
-              <Text style={styles.metadataLabel}>Version:</Text>
-              <Text style={styles.metadataValue}>{scriptData.metadata.version}</Text>
+          <div className="metadata-section">
+            <h3 className="subsection-title">Metadata</h3>
+            <div className="metadata-grid">
+              <span className="metadata-label">Version:</span>
+              <span className="metadata-value">{scriptData.metadata.version}</span>
 
-              <Text style={styles.metadataLabel}>Created:</Text>
-              <Text style={styles.metadataValue}>
+              <span className="metadata-label">Created:</span>
+              <span className="metadata-value">
                 {new Date(scriptData.metadata.created_at).toLocaleString()}
-              </Text>
+              </span>
 
-              <Text style={styles.metadataLabel}>Duration:</Text>
-              <Text style={styles.metadataValue}>
+              <span className="metadata-label">Duration:</span>
+              <span className="metadata-value">
                 {scriptData.metadata.duration.toFixed(2)}s
-              </Text>
+              </span>
 
-              <Text style={styles.metadataLabel}>Actions:</Text>
-              <Text style={styles.metadataValue}>{scriptData.metadata.action_count}</Text>
+              <span className="metadata-label">Actions:</span>
+              <span className="metadata-value">{scriptData.metadata.action_count}</span>
 
-              <Text style={styles.metadataLabel}>Platform:</Text>
-              <Text style={styles.metadataValue}>{scriptData.metadata.platform}</Text>
-            </View>
-          </View>
+              <span className="metadata-label">Platform:</span>
+              <span className="metadata-value">{scriptData.metadata.platform}</span>
+            </div>
+          </div>
 
           {/* Actions Section */}
-          <View style={styles.actionsSection}>
-            <Text style={styles.subsectionTitle}>
+          <div className="actions-section">
+            <h3 className="subsection-title">
               Actions ({scriptData.actions.length})
-            </Text>
+            </h3>
             {scriptData.actions.map((action, index) => (
-              <View key={index} style={styles.actionItem}>
-                <View style={styles.actionHeader}>
-                  <Text style={styles.actionIndex}>#{index + 1}</Text>
-                  <Text style={styles.actionType}>{action.type}</Text>
+              <div key={index} className="action-item">
+                <div className="action-header">
+                  <span className="action-index">#{index + 1}</span>
+                  <span className="action-type">{action.type}</span>
                   {editMode && (
-                    <TouchableOpacity
-                      style={styles.actionDeleteButton}
-                      onPress={() => deleteAction(index)}
+                    <button
+                      className="action-delete-button"
+                      onClick={() => deleteAction(index)}
                     >
-                      <Text style={styles.actionDeleteText}>×</Text>
-                    </TouchableOpacity>
+                      ×
+                    </button>
                   )}
-                </View>
-                <View style={styles.actionDetails}>
-                  <Text style={styles.actionDetail}>
+                </div>
+                <div className="action-details">
+                  <span className="action-detail">
                     Time: {action.timestamp.toFixed(3)}s
-                  </Text>
+                  </span>
                   {action.x !== undefined && (
-                    <Text style={styles.actionDetail}>X: {action.x}</Text>
+                    <span className="action-detail">X: {action.x}</span>
                   )}
                   {action.y !== undefined && (
-                    <Text style={styles.actionDetail}>Y: {action.y}</Text>
+                    <span className="action-detail">Y: {action.y}</span>
                   )}
                   {action.button && (
-                    <Text style={styles.actionDetail}>Button: {action.button}</Text>
+                    <span className="action-detail">Button: {action.button}</span>
                   )}
                   {action.key && (
-                    <Text style={styles.actionDetail}>Key: {action.key}</Text>
+                    <span className="action-detail">Key: {action.key}</span>
                   )}
-                </View>
-              </View>
+                </div>
+              </div>
             ))}
-          </View>
-        </ScrollView>
-      </View>
+          </div>
+        </div>
+      </div>
     );
   };
 
   return (
-    <View style={styles.container}>
+    <div className="script-editor-container">
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
+      <div className="header">
+        <button
+          className="back-button"
+          onClick={() => navigate(-1)}
         >
-          <Text style={styles.backButtonText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Script Editor</Text>
-        <TouchableOpacity
-          style={styles.refreshButton}
-          onPress={loadScripts}
+          ← Back
+        </button>
+        <h1 className="header-title">Script Editor</h1>
+        <button
+          className="refresh-button"
+          onClick={loadScripts}
         >
-          <Text style={styles.refreshButtonText}>Refresh</Text>
-        </TouchableOpacity>
-      </View>
+          Refresh
+        </button>
+      </div>
 
       {/* Error Message */}
       {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
+        <div className="error-container">
+          <p className="error-text">{error}</p>
+        </div>
       )}
 
       {/* Main Content */}
-      <View style={styles.content}>
-        <View style={styles.leftPanel}>
+      <div className="content">
+        <div className="left-panel">
           {renderScriptList()}
-        </View>
-        <View style={styles.rightPanel}>
+        </div>
+        <div className="right-panel">
           {renderScriptEditor()}
-        </View>
-      </View>
-    </View>
+        </div>
+      </div>
+    </div>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#ffffff',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#dadce0',
-  },
-  backButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#1a73e8',
-    fontWeight: '500',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#202124',
-  },
-  refreshButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  refreshButtonText: {
-    fontSize: 16,
-    color: '#1a73e8',
-    fontWeight: '500',
-  },
-  errorContainer: {
-    backgroundColor: '#fce8e6',
-    padding: 12,
-    margin: 16,
-    borderRadius: 8,
-  },
-  errorText: {
-    color: '#d93025',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  content: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  leftPanel: {
-    width: '35%',
-    borderRightWidth: 1,
-    borderRightColor: '#dadce0',
-    backgroundColor: '#ffffff',
-  },
-  rightPanel: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  scriptList: {
-    padding: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#202124',
-    marginBottom: 16,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#5f6368',
-    textAlign: 'center',
-    marginTop: 32,
-  },
-  scriptItem: {
-    padding: 12,
-    marginBottom: 8,
-    borderRadius: 8,
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#dadce0',
-  },
-  scriptItemSelected: {
-    backgroundColor: '#e8f0fe',
-    borderColor: '#1a73e8',
-  },
-  scriptItemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  scriptFilename: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#202124',
-    flex: 1,
-  },
-  deleteButton: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    backgroundColor: '#d93025',
-    borderRadius: 4,
-  },
-  deleteButtonText: {
-    fontSize: 12,
-    color: '#ffffff',
-    fontWeight: '500',
-  },
-  scriptInfo: {
-    fontSize: 12,
-    color: '#5f6368',
-    marginTop: 2,
-  },
-  editorPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-  },
-  placeholderText: {
-    fontSize: 16,
-    color: '#5f6368',
-    textAlign: 'center',
-  },
-  editor: {
-    flex: 1,
-  },
-  editorHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#dadce0',
-  },
-  editorTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#202124',
-    flex: 1,
-  },
-  editorActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    minWidth: 80,
-  },
-  editorContent: {
-    flex: 1,
-    padding: 16,
-  },
-  metadataSection: {
-    marginBottom: 24,
-  },
-  subsectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#202124',
-    marginBottom: 12,
-  },
-  metadataGrid: {
-    backgroundColor: '#f8f9fa',
-    padding: 16,
-    borderRadius: 8,
-  },
-  metadataLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#5f6368',
-    marginTop: 8,
-  },
-  metadataValue: {
-    fontSize: 14,
-    color: '#202124',
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  actionsSection: {
-    marginBottom: 24,
-  },
-  actionItem: {
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    marginBottom: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#dadce0',
-  },
-  actionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  actionIndex: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#5f6368',
-    marginRight: 8,
-  },
-  actionType: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1a73e8',
-    flex: 1,
-  },
-  actionDeleteButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#d93025',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  actionDeleteText: {
-    fontSize: 18,
-    color: '#ffffff',
-    fontWeight: 'bold',
-  },
-  actionDetails: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  actionDetail: {
-    fontSize: 12,
-    color: '#5f6368',
-    fontFamily: 'monospace',
-  },
-});
 
 export default ScriptEditorScreen;

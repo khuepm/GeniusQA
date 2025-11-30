@@ -216,3 +216,83 @@ All 12 correctness properties from design.md have been implemented as property-b
 ## Summary
 
 The Desktop Recorder MVP has complete and tested Python Core automation functionality, a fully functional React UI with all features including script editing, playback speed control, loop/repeat, and visual preview. The only remaining work is migrating the IPC layer from Node.js child_process to Tauri's command/event system to enable proper desktop app packaging and distribution.
+
+
+## Phase 16: Remove React Native References and Ensure React + Vite Compliance
+
+- [x] 16: Remove React Native References and Ensure React + Vite Compliance
+  - [x] 16.1 Update documentation to remove React Native references
+    - Update design.md to remove "React Native" mentions, replace with "React + Vite"
+    - Update requirements.md Glossary to clarify "React + Vite + Tauri" (already correct)
+    - Update type definitions comments to remove "React Native" references
+    - Update all code comments that mention "React Native" to say "React"
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+
+  - [x] 16.2 Verify RecorderScreen uses only React + HTML/CSS
+    - Confirm RecorderScreen.tsx uses standard React (already done)
+    - Confirm RecorderScreen.css uses standard CSS (already done)
+    - Verify no React Native components are imported
+    - Verify button components use standard HTML elements
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+
+  - [x] 16.3 Remove React Native dependencies from authentication (if not needed)
+    - Evaluate if Firebase authentication needs React Native packages
+    - If desktop uses web Firebase SDK, remove @react-native-firebase packages
+    - Update firebaseService.ts to use web Firebase SDK if applicable
+    - Update AuthContext to use localStorage instead of AsyncStorage
+    - Remove @react-native-async-storage/async-storage dependency
+    - Remove @react-native-google-signin/google-signin if not needed
+    - _Requirements: 5.1_
+
+  - [x] 16.4 Update ScriptEditorScreen to use React + HTML/CSS
+    - Remove React Native imports (View, Text, ScrollView, TextInput, Alert, etc.)
+    - Replace with standard HTML elements (div, span, input, etc.)
+    - Create ScriptEditorScreen.css for styling
+    - Update navigation to use react-router-dom instead of @react-navigation/native
+    - _Requirements: 4.1, 4.2, 4.3, 4.4_
+
+  - [x] 16.5 Update package.json dependencies
+    - Remove React Native dependencies if not needed:
+      - @react-native-firebase/auth
+      - @react-native-google-signin/google-signin
+      - @react-native-async-storage/async-storage
+      - @react-navigation/native
+      - @react-navigation/stack
+      - react-native (if present)
+    - Ensure React + Vite dependencies are present:
+      - react >= 18.2.0
+      - react-dom >= 18.2.0
+      - react-router-dom >= 6.20.0
+      - vite >= 5.0.0
+      - @vitejs/plugin-react
+    - _Requirements: 4.1_
+
+  - [x] 16.6 Create minimal three-button interface as per requirements
+    - Verify RecorderScreen has exactly three main buttons: Record, Start, Stop
+    - Ensure buttons have clear, intuitive labels
+    - Verify disabled state visual indication
+    - Confirm clean, minimal aesthetic
+    - Verify status display shows: Idle, Recording, Playing
+    - Remove or make optional: script selector, speed control, loop control, preview
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+
+  - [x] 16.7 Update test files to use @testing-library/react
+    - Replace @testing-library/react-native with @testing-library/react
+    - Update all test files that import from react-native testing library
+    - Update mocks to use web APIs instead of React Native APIs
+    - Files to update:
+      - src/components/__tests__/AuthButton.test.tsx
+      - src/components/__tests__/AuthInput.test.tsx
+      - src/components/__tests__/LoadingSpinner.test.tsx
+      - src/screens/__tests__/RecorderScreen.test.tsx
+      - src/contexts/__tests__/AuthContext.test.tsx
+      - src/__tests__/integration/*.test.tsx
+    - _Requirements: 4.1_
+
+  - [x] 16.8 Final verification
+    - Run type checking: `pnpm --filter @geniusqa/desktop type-check`
+    - Run linting: `pnpm --filter @geniusqa/desktop lint`
+    - Verify no React Native imports remain in src/
+    - Verify UI matches requirements: three buttons, minimal interface
+    - Test in Tauri dev mode: `pnpm --filter @geniusqa/desktop dev`
+    - _Requirements: All_

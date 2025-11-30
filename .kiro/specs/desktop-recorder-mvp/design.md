@@ -364,7 +364,7 @@ class Storage:
 
 ### IPC Message Protocol
 
-**Command Message (React Native → Python):**
+**Command Message (React UI → Python):**
 ```json
 {
   "command": "start_recording",
@@ -372,7 +372,7 @@ class Storage:
 }
 ```
 
-**Response Message (Python → React Native):**
+**Response Message (Python → React UI):**
 ```json
 {
   "success": true,
@@ -384,7 +384,7 @@ class Storage:
 }
 ```
 
-**Event Message (Python → React Native):**
+**Event Message (Python → React UI):**
 ```json
 {
   "type": "progress",
@@ -492,7 +492,7 @@ class Storage:
 - Log errors to stderr for debugging
 - Provide actionable error messages
 
-**React Native App:**
+**React App:**
 - Display user-friendly error messages
 - Reset to idle state on errors
 - Provide guidance for common issues (permissions, installation)
@@ -580,7 +580,7 @@ def test_script_roundtrip(actions):
 ### Integration Testing
 
 - End-to-end recording and playback flow
-- IPC communication between React Native and Python
+- IPC communication between React and Python
 - File system operations
 - Error scenarios (missing permissions, corrupted files)
 

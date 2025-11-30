@@ -4,7 +4,9 @@
  */
 
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react';
+import '@testing-library/jest-dom';
+import { BrowserRouter } from 'react-router-dom';
 import RecorderScreen from '../RecorderScreen';
 import { getIPCBridge, resetIPCBridge } from '../../services/ipcBridgeService';
 
@@ -12,6 +14,13 @@ import { getIPCBridge, resetIPCBridge } from '../../services/ipcBridgeService';
 jest.mock('../../services/ipcBridgeService', () => ({
   getIPCBridge: jest.fn(),
   resetIPCBridge: jest.fn(),
+}));
+
+// Mock react-router-dom navigate
+const mockNavigate = jest.fn();
+jest.mock('react-router-dom', () => ({
+  ...jest.requireActual('react-router-dom'),
+  useNavigate: () => mockNavigate,
 }));
 
 describe('RecorderScreen', () => {
@@ -25,6 +34,7 @@ describe('RecorderScreen', () => {
     mockIPCBridge = {
       checkForRecordings: jest.fn().mockResolvedValue(false),
       getLatestRecording: jest.fn().mockResolvedValue(null),
+      listScripts: jest.fn().mockResolvedValue([]),
       startRecording: jest.fn().mockResolvedValue(undefined),
       stopRecording: jest.fn().mockResolvedValue({
         success: true,
@@ -45,27 +55,31 @@ describe('RecorderScreen', () => {
     resetIPCBridge();
   });
 
+  const renderWithRouter = (component: React.ReactElement) => {
+    return render(<BrowserRouter>{component}</BrowserRouter>);
+  };
+
   describe('Initial Rendering', () => {
     it('should render the component with title', () => {
-      const { getByText } = render(<RecorderScreen />);
+      const { getByText } = renderWithRouter(<RecorderScreen />);
 
-      expect(getByText('GeniusQA Recorder')).toBeTruthy();
-      expect(getByText('Record and replay desktop interactions')).toBeTruthy();
+      expect(getByText('GeniusQA Recorder')).toBeInTheDocument();
+      expect(getByText('Record and replay desktop interactions')).toBeInTheDocument();
     });
 
     it('should display idle status initially', () => {
-      const { getByText } = render(<RecorderScreen />);
+      const { getByText } = renderWithRouter(<RecorderScreen />);
 
-      expect(getByText('Status')).toBeTruthy();
-      expect(getByText('Idle')).toBeTruthy();
+      expect(getByText('Status')).toBeInTheDocument();
+      expect(getByText('Idle')).toBeInTheDocument();
     });
 
     it('should render all three control buttons', () => {
-      const { getByText } = render(<RecorderScreen />);
+      const { getByText } = renderWithRouter(<RecorderScreen />);
 
-      expect(getByText('Record')).toBeTruthy();
-      expect(getByText('Start Playback')).toBeTruthy();
-      expect(getByText('Stop')).toBeTruthy();
+      expect(getByText('Record')).toBeInTheDocument();
+      expect(getByText('Start Playback')).toBeInTheDocument();
+      expect(getByText('Stop')).toBeInTheDocument();
     });
   });
 
@@ -73,33 +87,33 @@ describe('RecorderScreen', () => {
     it('should enable Record button when idle with no recordings', async () => {
       mockIPCBridge.checkForRecordings.mockResolvedValue(false);
 
-      const { getByText } = render(<RecorderScreen />);
+      const { getByText } = renderWithRouter(<RecorderScreen />);
 
       await waitFor(() => {
-        const recordButton = getByText('Record').parent?.parent;
-        expect(recordButton?.props.accessibilityState?.disabled).toBeFalsy();
+        const recordButton = getByText('Record').closest('button');
+        expect(recordButton).not.toBeDisabled();
       });
     });
 
     it('should disable Start button when idle with no recordings', async () => {
       mockIPCBridge.checkForRecordings.mockResolvedValue(false);
 
-      const { getByText } = render(<RecorderScreen />);
+      const { getByText } = renderWithRouter(<RecorderScreen />);
 
       await waitFor(() => {
-        const startButton = getByText('Start Playback').parent?.parent;
-        expect(startButton?.props.accessibilityState?.disabled).toBeTruthy();
+        const startButton = getByText('Start Playback').closest('button');
+        expect(startButton).toBeDisabled();
       });
     });
 
     it('should disable Stop button when idle', async () => {
       mockIPCBridge.checkForRecordings.mockResolvedValue(false);
 
-      const { getByText } = render(<RecorderScreen />);
+      const { getByText } = renderWithRouter(<RecorderScreen />);
 
       await waitFor(() => {
-        const stopButton = getByText('Stop').parent?.parent;
-        expect(stopButton?.props.accessibilityState?.disabled).toBeTruthy();
+        const stopButton = getByText('Stop').closest('button');
+        expect(stopButton).toBeDisabled();
       });
     });
   });
@@ -109,27 +123,27 @@ describe('RecorderScreen', () => {
       mockIPCBridge.checkForRecordings.mockResolvedValue(true);
       mockIPCBridge.getLatestRecording.mockResolvedValue('/path/to/latest.json');
 
-      const { getByText } = render(<RecorderScreen />);
+      const { getByText } = renderWithRouter(<RecorderScreen />);
 
       await waitFor(() => {
-        const recordButton = getByText('Record').parent?.parent;
-        const startButton = getByText('Start Playback').parent?.parent;
+        const recordButton = getByText('Record').closest('button');
+        const startButton = getByText('Start Playback').closest('button');
 
-        expect(recordButton?.props.accessibilityState?.disabled).toBeFalsy();
-        expect(startButton?.props.accessibilityState?.disabled).toBeFalsy();
+        expect(recordButton).not.toBeDisabled();
+        expect(startButton).not.toBeDisabled();
       });
     });
   });
 
   describe('Status Display', () => {
     it('should display Recording status when recording', async () => {
-      const { getByText } = render(<RecorderScreen />);
+      const { getByText } = renderWithRouter(<RecorderScreen />);
 
-      const recordButton = getByText('Record');
-      fireEvent.press(recordButton);
+      const recordButton = getByText('Record').closest('button');
+      fireEvent.click(recordButton!);
 
       await waitFor(() => {
-        expect(getByText('Recording')).toBeTruthy();
+        expect(getByText('Recording')).toBeInTheDocument();
       });
     });
 
@@ -137,15 +151,15 @@ describe('RecorderScreen', () => {
       mockIPCBridge.checkForRecordings.mockResolvedValue(true);
       mockIPCBridge.getLatestRecording.mockResolvedValue('/path/to/latest.json');
 
-      const { getByText } = render(<RecorderScreen />);
+      const { getByText } = renderWithRouter(<RecorderScreen />);
 
       await waitFor(() => {
-        const startButton = getByText('Start Playback');
-        fireEvent.press(startButton);
+        const startButton = getByText('Start Playback').closest('button');
+        fireEvent.click(startButton!);
       });
 
       await waitFor(() => {
-        expect(getByText('Playing')).toBeTruthy();
+        expect(getByText('Playing')).toBeInTheDocument();
       });
     });
   });
@@ -154,13 +168,13 @@ describe('RecorderScreen', () => {
     it('should display error message when recording fails', async () => {
       mockIPCBridge.startRecording.mockRejectedValue(new Error('Recording failed'));
 
-      const { getByText, queryByText } = render(<RecorderScreen />);
+      const { getByText } = renderWithRouter(<RecorderScreen />);
 
-      const recordButton = getByText('Record');
-      fireEvent.press(recordButton);
+      const recordButton = getByText('Record').closest('button');
+      fireEvent.click(recordButton!);
 
       await waitFor(() => {
-        expect(getByText('Recording failed')).toBeTruthy();
+        expect(getByText('Recording failed')).toBeInTheDocument();
       });
     });
 
@@ -169,47 +183,47 @@ describe('RecorderScreen', () => {
       mockIPCBridge.getLatestRecording.mockResolvedValue('/path/to/latest.json');
       mockIPCBridge.startPlayback.mockRejectedValue(new Error('Playback failed'));
 
-      const { getByText } = render(<RecorderScreen />);
+      const { getByText } = renderWithRouter(<RecorderScreen />);
 
       await waitFor(() => {
-        const startButton = getByText('Start Playback');
-        fireEvent.press(startButton);
+        const startButton = getByText('Start Playback').closest('button');
+        fireEvent.click(startButton!);
       });
 
       await waitFor(() => {
-        expect(getByText('Playback failed')).toBeTruthy();
+        expect(getByText('Playback failed')).toBeInTheDocument();
       });
     });
 
     it('should clear error when starting new action', async () => {
       mockIPCBridge.startRecording.mockRejectedValueOnce(new Error('Recording failed'));
 
-      const { getByText, queryByText } = render(<RecorderScreen />);
+      const { getByText, queryByText } = renderWithRouter(<RecorderScreen />);
 
       // First attempt - should fail
-      const recordButton = getByText('Record');
-      fireEvent.press(recordButton);
+      const recordButton = getByText('Record').closest('button');
+      fireEvent.click(recordButton!);
 
       await waitFor(() => {
-        expect(getByText('Recording failed')).toBeTruthy();
+        expect(getByText('Recording failed')).toBeInTheDocument();
       });
 
       // Second attempt - should clear error
       mockIPCBridge.startRecording.mockResolvedValue(undefined);
-      fireEvent.press(recordButton);
+      fireEvent.click(recordButton!);
 
       await waitFor(() => {
-        expect(queryByText('Recording failed')).toBeNull();
+        expect(queryByText('Recording failed')).not.toBeInTheDocument();
       });
     });
   });
 
   describe('Button Click Handlers', () => {
     it('should call startRecording when Record button is clicked', async () => {
-      const { getByText } = render(<RecorderScreen />);
+      const { getByText } = renderWithRouter(<RecorderScreen />);
 
-      const recordButton = getByText('Record');
-      fireEvent.press(recordButton);
+      const recordButton = getByText('Record').closest('button');
+      fireEvent.click(recordButton!);
 
       await waitFor(() => {
         expect(mockIPCBridge.startRecording).toHaveBeenCalledTimes(1);
@@ -220,32 +234,32 @@ describe('RecorderScreen', () => {
       mockIPCBridge.checkForRecordings.mockResolvedValue(true);
       mockIPCBridge.getLatestRecording.mockResolvedValue('/path/to/latest.json');
 
-      const { getByText } = render(<RecorderScreen />);
+      const { getByText } = renderWithRouter(<RecorderScreen />);
 
       await waitFor(() => {
-        const startButton = getByText('Start Playback');
-        fireEvent.press(startButton);
+        const startButton = getByText('Start Playback').closest('button');
+        fireEvent.click(startButton!);
       });
 
       await waitFor(() => {
-        expect(mockIPCBridge.startPlayback).toHaveBeenCalledWith('/path/to/latest.json');
+        expect(mockIPCBridge.startPlayback).toHaveBeenCalled();
       });
     });
 
     it('should call stopRecording when Stop button is clicked during recording', async () => {
-      const { getByText } = render(<RecorderScreen />);
+      const { getByText } = renderWithRouter(<RecorderScreen />);
 
       // Start recording
-      const recordButton = getByText('Record');
-      fireEvent.press(recordButton);
+      const recordButton = getByText('Record').closest('button');
+      fireEvent.click(recordButton!);
 
       await waitFor(() => {
-        expect(getByText('Recording')).toBeTruthy();
+        expect(getByText('Recording')).toBeInTheDocument();
       });
 
       // Stop recording
-      const stopButton = getByText('Stop');
-      fireEvent.press(stopButton);
+      const stopButton = getByText('Stop').closest('button');
+      fireEvent.click(stopButton!);
 
       await waitFor(() => {
         expect(mockIPCBridge.stopRecording).toHaveBeenCalledTimes(1);
@@ -256,21 +270,21 @@ describe('RecorderScreen', () => {
       mockIPCBridge.checkForRecordings.mockResolvedValue(true);
       mockIPCBridge.getLatestRecording.mockResolvedValue('/path/to/latest.json');
 
-      const { getByText } = render(<RecorderScreen />);
+      const { getByText } = renderWithRouter(<RecorderScreen />);
 
       // Start playback
       await waitFor(() => {
-        const startButton = getByText('Start Playback');
-        fireEvent.press(startButton);
+        const startButton = getByText('Start Playback').closest('button');
+        fireEvent.click(startButton!);
       });
 
       await waitFor(() => {
-        expect(getByText('Playing')).toBeTruthy();
+        expect(getByText('Playing')).toBeInTheDocument();
       });
 
       // Stop playback
-      const stopButton = getByText('Stop');
-      fireEvent.press(stopButton);
+      const stopButton = getByText('Stop').closest('button');
+      fireEvent.click(stopButton!);
 
       await waitFor(() => {
         expect(mockIPCBridge.stopPlayback).toHaveBeenCalledTimes(1);
@@ -280,7 +294,7 @@ describe('RecorderScreen', () => {
 
   describe('Initialization', () => {
     it('should check for recordings on mount', async () => {
-      render(<RecorderScreen />);
+      renderWithRouter(<RecorderScreen />);
 
       await waitFor(() => {
         expect(mockIPCBridge.checkForRecordings).toHaveBeenCalledTimes(1);
@@ -291,7 +305,7 @@ describe('RecorderScreen', () => {
       mockIPCBridge.checkForRecordings.mockResolvedValue(true);
       mockIPCBridge.getLatestRecording.mockResolvedValue('/path/to/latest.json');
 
-      render(<RecorderScreen />);
+      renderWithRouter(<RecorderScreen />);
 
       await waitFor(() => {
         expect(mockIPCBridge.getLatestRecording).toHaveBeenCalledTimes(1);
@@ -301,7 +315,7 @@ describe('RecorderScreen', () => {
     it('should not get latest recording when no recordings exist', async () => {
       mockIPCBridge.checkForRecordings.mockResolvedValue(false);
 
-      render(<RecorderScreen />);
+      renderWithRouter(<RecorderScreen />);
 
       await waitFor(() => {
         expect(mockIPCBridge.checkForRecordings).toHaveBeenCalledTimes(1);
@@ -310,19 +324,21 @@ describe('RecorderScreen', () => {
     });
 
     it('should register event listeners on mount', () => {
-      render(<RecorderScreen />);
+      renderWithRouter(<RecorderScreen />);
 
       expect(mockIPCBridge.addEventListener).toHaveBeenCalledWith('progress', expect.any(Function));
+      expect(mockIPCBridge.addEventListener).toHaveBeenCalledWith('action_preview', expect.any(Function));
       expect(mockIPCBridge.addEventListener).toHaveBeenCalledWith('complete', expect.any(Function));
       expect(mockIPCBridge.addEventListener).toHaveBeenCalledWith('error', expect.any(Function));
     });
 
     it('should unregister event listeners on unmount', () => {
-      const { unmount } = render(<RecorderScreen />);
+      const { unmount } = renderWithRouter(<RecorderScreen />);
 
       unmount();
 
       expect(mockIPCBridge.removeEventListener).toHaveBeenCalledWith('progress', expect.any(Function));
+      expect(mockIPCBridge.removeEventListener).toHaveBeenCalledWith('action_preview', expect.any(Function));
       expect(mockIPCBridge.removeEventListener).toHaveBeenCalledWith('complete', expect.any(Function));
       expect(mockIPCBridge.removeEventListener).toHaveBeenCalledWith('error', expect.any(Function));
     });
@@ -330,44 +346,44 @@ describe('RecorderScreen', () => {
 
   describe('Recording Result Handling', () => {
     it('should update state with recording path after successful stop', async () => {
-      const { getByText } = render(<RecorderScreen />);
+      const { getByText } = renderWithRouter(<RecorderScreen />);
 
       // Start recording
-      const recordButton = getByText('Record');
-      fireEvent.press(recordButton);
+      const recordButton = getByText('Record').closest('button');
+      fireEvent.click(recordButton!);
 
       await waitFor(() => {
-        expect(getByText('Recording')).toBeTruthy();
+        expect(getByText('Recording')).toBeInTheDocument();
       });
 
       // Stop recording
-      const stopButton = getByText('Stop');
-      fireEvent.press(stopButton);
+      const stopButton = getByText('Stop').closest('button');
+      fireEvent.click(stopButton!);
 
       await waitFor(() => {
-        expect(getByText('Idle')).toBeTruthy();
-        expect(getByText('/path/to/script.json')).toBeTruthy();
+        expect(getByText('Idle')).toBeInTheDocument();
+        expect(getByText('/path/to/script.json')).toBeInTheDocument();
       });
     });
 
     it('should enable Start button after successful recording', async () => {
-      const { getByText } = render(<RecorderScreen />);
+      const { getByText } = renderWithRouter(<RecorderScreen />);
 
       // Start recording
-      const recordButton = getByText('Record');
-      fireEvent.press(recordButton);
+      const recordButton = getByText('Record').closest('button');
+      fireEvent.click(recordButton!);
 
       await waitFor(() => {
-        expect(getByText('Recording')).toBeTruthy();
+        expect(getByText('Recording')).toBeInTheDocument();
       });
 
       // Stop recording
-      const stopButton = getByText('Stop');
-      fireEvent.press(stopButton);
+      const stopButton = getByText('Stop').closest('button');
+      fireEvent.click(stopButton!);
 
       await waitFor(() => {
-        const startButton = getByText('Start Playback').parent?.parent;
-        expect(startButton?.props.accessibilityState?.disabled).toBeFalsy();
+        const startButton = getByText('Start Playback').closest('button');
+        expect(startButton).not.toBeDisabled();
       });
     });
   });

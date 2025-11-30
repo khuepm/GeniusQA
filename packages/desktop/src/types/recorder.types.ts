@@ -3,7 +3,7 @@
  * 
  * This module defines all TypeScript interfaces and types used in the recorder feature.
  * It provides type safety for IPC communication, UI state management, and data exchange
- * between the React Native frontend and Python Core backend.
+ * between the React frontend and Python Core backend.
  * 
  * Requirements: 4.1, 4.2
  */
