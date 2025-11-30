@@ -246,6 +246,61 @@ Recordings are saved as JSON files in `~/GeniusQA/recordings/` with timestamp-ba
 - Delete the corrupted file from `~/GeniusQA/recordings/`
 - Record a new session
 
+### Tauri-Specific Issues
+
+**Problem:** Tauri commands fail with "Command not found" error
+
+**Solution:**
+1. Ensure you're running the built application, not just the web preview
+2. Verify Tauri backend is properly compiled: `pnpm --filter @geniusqa/desktop tauri build`
+3. Check Rust toolchain is installed: `rustc --version`
+4. Restart the application in development mode: `pnpm --filter @geniusqa/desktop dev`
+
+---
+
+**Problem:** Python subprocess fails to start
+
+**Solution:**
+1. Verify Python is in system PATH: `which python3` (macOS/Linux) or `where python` (Windows)
+2. Check Tauri backend logs in the console for detailed error messages
+3. Ensure Python Core dependencies are installed:
+   ```bash
+   cd packages/python-core
+   pip install -r requirements.txt
+   ```
+4. Try running Python Core manually to verify it works:
+   ```bash
+   cd packages/python-core
+   python -m src
+   ```
+
+---
+
+**Problem:** Events not received in frontend
+
+**Solution:**
+1. Check browser console for event listener errors
+2. Verify Tauri event emission in Rust backend logs
+3. Ensure event listeners are registered before commands are invoked
+4. Restart the application to reset event handlers
+
+---
+
+**Problem:** Application won't build or start
+
+**Solution:**
+1. Verify all dependencies are installed: `pnpm install`
+2. Check Rust toolchain: `rustc --version` (should be 1.70+)
+3. Clean build artifacts:
+   ```bash
+   cd packages/desktop
+   rm -rf dist src-tauri/target
+   pnpm run build
+   ```
+4. Check for port conflicts (Vite dev server uses port 1420 by default)
+
+---
+
 ### Python Core Issues
 
 **Problem:** "Python Core unavailable" error
@@ -257,7 +312,8 @@ Recordings are saved as JSON files in `~/GeniusQA/recordings/` with timestamp-ba
    cd packages/python-core
    pip install -r requirements.txt
    ```
-3. Restart the application
+3. Check that Python is in system PATH
+4. Restart the application
 
 ---
 
@@ -361,18 +417,150 @@ For issues not covered in this guide:
 
 ## Technical Details
 
-**Architecture:**
-- React Native Desktop UI (TypeScript)
-- Python Core automation backend (Python 3.9+)
-- IPC communication via stdin/stdout
-- JSON-based script format
+### Architecture
 
-**Dependencies:**
-- PyAutoGUI: Cross-platform GUI automation
-- pynput: Event listening and capture
-- Pydantic: Data validation
+The Desktop Recorder uses a three-tier architecture:
 
-**Storage:**
-- Location: `~/GeniusQA/recordings/`
-- Format: JSON with schema validation
-- Naming: Timestamp-based for uniqueness
+```
+┌─────────────────────────────────────┐
+│   React + Vite Desktop UI           │
+│   - TypeScript/React components     │
+│   - Tauri API integration           │
+└──────────────┬──────────────────────┘
+               │ Tauri Commands/Events
+               ▼
+┌─────────────────────────────────────┐
+│   Tauri Backend (Rust)              │
+│   - Command handlers                │
+│   - Python subprocess management    │
+│   - Event emission                  │
+└──────────────┬──────────────────────┘
+               │ stdin/stdout/stderr
+               ▼
+┌─────────────────────────────────────┐
+│   Python Core (Automation)          │
+│   - PyAutoGUI/pynput integration    │
+│   - Recording/playback logic        │
+│   - JSON script storage             │
+└─────────────────────────────────────┘
+```
+
+**Frontend (React + Vite):**
+- Modern React 18 with TypeScript
+- Vite for fast development and building
+- Tauri API for native desktop integration
+- Event-driven UI updates
+
+**Tauri Backend (Rust):**
+- Manages Python subprocess lifecycle
+- Exposes commands for frontend invocation
+- Handles JSON message serialization
+- Emits events for async operations
+- Provides native OS integration
+
+**Python Core:**
+- Cross-platform automation with PyAutoGUI
+- Event capture with pynput
+- Pydantic v2 for data validation
+- JSON-based script storage
+
+### Tauri Command Interface
+
+The frontend communicates with Python Core through Tauri commands:
+
+**Recording Commands:**
+- `start_recording` - Begin capturing user actions
+- `stop_recording` - End recording and save to file
+
+**Playback Commands:**
+- `start_playback` - Execute recorded script
+- `stop_playback` - Interrupt playback
+
+**Script Management Commands:**
+- `check_recordings` - Check if recordings exist
+- `get_latest` - Get path to most recent recording
+- `list_scripts` - List all available scripts
+- `load_script` - Load script data from file
+- `save_script` - Save modified script to file
+- `delete_script` - Delete a script file
+
+**Event Types:**
+- `python-event` - Async events from Python Core
+  - `progress` - Playback progress updates
+  - `action_preview` - Preview of action being executed
+  - `complete` - Operation completed successfully
+  - `error` - Error occurred during operation
+
+### Python Subprocess Management
+
+The Tauri backend manages a long-lived Python process:
+
+**Process Lifecycle:**
+1. Python process spawned on first command
+2. Process kept alive for app session duration
+3. Commands sent via stdin as JSON messages
+4. Responses received via stdout as JSON
+5. Errors logged to stderr
+6. Process terminated on app exit
+
+**Communication Protocol:**
+- JSON-based message format
+- Request/response pattern for commands
+- Event emission for async notifications
+- Automatic error propagation to frontend
+
+**Error Handling:**
+- Process crashes detected and reported
+- Automatic restart on recoverable errors
+- Timeout handling for long operations
+- Structured error messages for user display
+
+### Dependencies
+
+**Frontend:**
+- react >= 18.2.0
+- react-dom >= 18.2.0
+- typescript >= 5.3.3
+- vite >= 5.0.0
+- @tauri-apps/api >= 1.5.0
+
+**Tauri:**
+- @tauri-apps/cli >= 1.5.0
+- Rust toolchain (for building)
+
+**Python Core:**
+- python >= 3.9
+- pyautogui >= 0.9.53
+- pynput >= 1.7.6
+- pydantic >= 2.0.0
+
+### Storage
+
+- **Location:** `~/GeniusQA/recordings/`
+- **Format:** JSON with schema validation
+- **Naming:** `script_YYYYMMDD_HHMMSS.json`
+- **Validation:** Pydantic models ensure data integrity
+
+### Building and Distribution
+
+**Development:**
+```bash
+# Start development server with hot reload
+pnpm --filter @geniusqa/desktop dev
+```
+
+**Production Build:**
+```bash
+# Build optimized bundle and native executable
+pnpm --filter @geniusqa/desktop build
+```
+
+**Platform-Specific Outputs:**
+- **macOS:** `.app` bundle in `src-tauri/target/release/bundle/macos/`
+- **Windows:** `.exe` installer in `src-tauri/target/release/bundle/msi/`
+- **Linux:** `.AppImage` or `.deb` in `src-tauri/target/release/bundle/`
+
+**Python Bundling:**
+- Python Core bundled with application
+- Dependencies included in distribution
+- No separate Python installation required (when bundled)

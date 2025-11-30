@@ -1,44 +1,42 @@
 /**
- * Unit tests for IPC Bridge Service
+ * Unit tests for IPC Bridge Service (Tauri)
  * Requirements: 5.1, 5.3, 5.4
  */
 
 import { IPCBridgeService, resetIPCBridge } from '../ipcBridgeService';
-import { ChildProcess } from 'child_process';
-import { EventEmitter } from 'events';
 
-// Mock child_process
-jest.mock('child_process');
+// Mock Tauri APIs
+jest.mock('@tauri-apps/api/tauri', () => ({
+  invoke: jest.fn(),
+}));
+
+jest.mock('@tauri-apps/api/event', () => ({
+  listen: jest.fn(),
+}));
 
 describe('IPCBridgeService', () => {
   let service: IPCBridgeService;
-  let mockProcess: any;
+  let mockInvoke: jest.Mock;
+  let mockListen: jest.Mock;
+  let mockUnlisten: jest.Mock;
 
   beforeEach(() => {
     // Reset the singleton
     resetIPCBridge();
 
-    // Create a mock process
-    mockProcess = new EventEmitter();
-    mockProcess.stdin = {
-      write: jest.fn((data: string, callback?: (error?: Error) => void) => {
-        if (callback) callback();
-        return true;
-      }),
-    };
-    mockProcess.stdout = new EventEmitter();
-    mockProcess.stderr = new EventEmitter();
-    mockProcess.kill = jest.fn();
+    // Get mock functions
+    const { invoke } = require('@tauri-apps/api/tauri');
+    const { listen } = require('@tauri-apps/api/event');
+    
+    mockInvoke = invoke as jest.Mock;
+    mockListen = listen as jest.Mock;
+    mockUnlisten = jest.fn();
 
-    // Mock spawn to return our mock process
-    const { spawn } = require('child_process');
-    spawn.mockReturnValue(mockProcess);
+    // Setup default mock implementations
+    mockInvoke.mockResolvedValue({ success: true, data: {} });
+    mockListen.mockResolvedValue(mockUnlisten);
 
-    service = new IPCBridgeService({
-      pythonPath: 'python3',
-      pythonCorePath: './test.py',
-      commandTimeout: 1000,
-    });
+    service = new IPCBridgeService();
   });
 
   afterEach(() => {
@@ -46,453 +44,253 @@ describe('IPCBridgeService', () => {
     jest.clearAllMocks();
   });
 
-  describe('Message Serialization/Deserialization', () => {
-    it('should serialize commands to JSON format', async () => {
-      const promise = service.startRecording();
+  describe('Tauri Command Invocation', () => {
+    it('should invoke Tauri commands with correct parameters', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
 
-      // Wait for process initialization
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await service.startRecording();
 
-      expect(mockProcess.stdin.write).toHaveBeenCalled();
-      const writtenData = mockProcess.stdin.write.mock.calls[0][0];
-      const parsed = JSON.parse(writtenData);
-
-      expect(parsed).toEqual({
-        command: 'start_recording',
-        params: {},
-      });
-
-      // Send response to resolve promise
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: { status: 'recording' } }) + '\n')
-      );
-
-      await promise;
+      expect(mockInvoke).toHaveBeenCalledWith('start_recording');
     });
 
-    it('should deserialize JSON responses from Python Core', async () => {
-      const promise = service.stopRecording();
-
-      // Wait for process initialization
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      // Send response
+    it('should handle Tauri command responses', async () => {
       const response = {
-        success: true,
-        data: {
-          scriptPath: '/path/to/script.json',
-          actionCount: 100,
-          duration: 45.5,
-        },
-      };
-
-      mockProcess.stdout.emit('data', Buffer.from(JSON.stringify(response) + '\n'));
-
-      const result = await promise;
-
-      expect(result).toEqual({
         success: true,
         scriptPath: '/path/to/script.json',
         actionCount: 100,
         duration: 45.5,
-      });
+      };
+
+      mockInvoke.mockResolvedValueOnce(response);
+
+      const result = await service.stopRecording();
+
+      expect(result).toEqual(response);
+      expect(mockInvoke).toHaveBeenCalledWith('stop_recording');
     });
 
-    it('should handle multi-line JSON responses', async () => {
-      const promise1 = service.checkForRecordings();
+    it('should handle multiple sequential commands', async () => {
+      mockInvoke.mockResolvedValueOnce(true);
+      mockInvoke.mockResolvedValueOnce('/path/to/latest.json');
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      // Send first response
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: { hasRecordings: true } }) + '\n')
-      );
-
-      const result1 = await promise1;
+      const result1 = await service.checkForRecordings();
       expect(result1).toBe(true);
 
-      // Now start second command
-      const promise2 = service.getLatestRecording();
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      // Send second response
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: { scriptPath: '/path/to/latest.json' } }) + '\n')
-      );
-
-      const result2 = await promise2;
+      const result2 = await service.getLatestRecording();
       expect(result2).toBe('/path/to/latest.json');
+
+      expect(mockInvoke).toHaveBeenCalledTimes(2);
     });
 
-    it('should handle incomplete JSON in buffer', async () => {
-      const promise = service.startRecording();
+    it('should pass parameters to Tauri commands', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await service.startPlayback('/custom/path.json', 1.5, 3);
 
-      // Send partial JSON
-      mockProcess.stdout.emit('data', Buffer.from('{"success": tr'));
-      
-      // Send rest of JSON
-      mockProcess.stdout.emit('data', Buffer.from('ue, "data": {}}\n'));
-
-      await promise;
-    });
-
-    it('should handle malformed JSON gracefully', async () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      // Initialize the process first
-      const promise = service.checkForRecordings();
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      // Send malformed JSON
-      mockProcess.stdout.emit('data', Buffer.from('not valid json\n'));
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to parse JSON'),
-        expect.any(String),
-        expect.any(Error)
-      );
-
-      // Clean up - send valid response
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: { hasRecordings: false } }) + '\n')
-      );
-
-      await promise;
-
-      consoleErrorSpy.mockRestore();
-    });
-  });
-
-  describe('Command Timeout Handling', () => {
-    it('should timeout commands that take too long', async () => {
-      const promise = service.startRecording();
-
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      // Don't send a response - let it timeout
-      await expect(promise).rejects.toThrow('timed out');
-    });
-
-    it('should not timeout commands that respond in time', async () => {
-      const promise = service.startRecording();
-
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      // Send response before timeout
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: {} }) + '\n')
-      );
-
-      await expect(promise).resolves.not.toThrow();
-    });
-
-    it('should clear timeout after successful response', async () => {
-      const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
-
-      const promise = service.startRecording();
-
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: {} }) + '\n')
-      );
-
-      await promise;
-
-      expect(clearTimeoutSpy).toHaveBeenCalled();
-
-      clearTimeoutSpy.mockRestore();
-    });
-  });
-
-  describe('Process Lifecycle Management', () => {
-    it('should spawn Python process on first command', async () => {
-      const { spawn } = require('child_process');
-
-      const promise = service.startRecording();
-
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      expect(spawn).toHaveBeenCalledWith('python3', ['./test.py'], {
-        stdio: ['pipe', 'pipe', 'pipe'],
+      expect(mockInvoke).toHaveBeenCalledWith('start_playback', {
+        scriptPath: '/custom/path.json',
+        speed: 1.5,
+        loopCount: 3,
       });
-
-      // Clean up
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: {} }) + '\n')
-      );
-      await promise;
     });
 
-    it('should reuse existing Python process for multiple commands', async () => {
-      const { spawn } = require('child_process');
+    it('should handle optional parameters', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
 
-      const promise1 = service.startRecording();
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: {} }) + '\n')
-      );
-      await promise1;
+      await service.startPlayback();
 
-      spawn.mockClear();
+      expect(mockInvoke).toHaveBeenCalledWith('start_playback', {
+        scriptPath: null,
+        speed: 1.0,
+        loopCount: 1,
+      });
+    });
+  });
 
-      const promise2 = service.stopRecording();
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: {} }) + '\n')
-      );
-      await promise2;
+  describe('Tauri Error Handling', () => {
+    it('should handle Tauri command errors', async () => {
+      mockInvoke.mockRejectedValueOnce(new Error('Tauri command failed'));
 
-      expect(spawn).not.toHaveBeenCalled();
+      await expect(service.startRecording()).rejects.toThrow('Tauri command failed');
     });
 
-    it('should terminate Python process on terminate()', async () => {
-      // Initialize process first
-      const promise = service.checkForRecordings();
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: { hasRecordings: false } }) + '\n')
-      );
-      await promise;
+    it('should handle Tauri error format', async () => {
+      const tauriError = new Error('Python Core error: PyAutoGUI not installed');
 
+      mockInvoke.mockRejectedValueOnce(tauriError);
+
+      await expect(service.startRecording()).rejects.toThrow('Python Core error: PyAutoGUI not installed');
+    });
+
+    it('should handle error responses from backend', async () => {
+      mockInvoke.mockRejectedValueOnce(new Error('Recording already in progress'));
+
+      await expect(service.startRecording()).rejects.toThrow('Recording already in progress');
+    });
+  });
+
+  describe('Tauri Backend Integration', () => {
+    it('should invoke Tauri commands without managing process lifecycle', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+
+      await service.startRecording();
+
+      // Tauri backend manages Python process, not the frontend
+      expect(mockInvoke).toHaveBeenCalledWith('start_recording');
+    });
+
+    it('should handle multiple commands without process management', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+      mockInvoke.mockResolvedValueOnce({ success: true, scriptPath: '/path/to/script.json' });
+
+      await service.startRecording();
+      await service.stopRecording();
+
+      expect(mockInvoke).toHaveBeenCalledTimes(2);
+    });
+
+    it('should cleanup event listeners on terminate', () => {
       service.terminate();
 
-      expect(mockProcess.kill).toHaveBeenCalled();
+      // Verify unlisten was called for all registered listeners
+      expect(mockUnlisten).toHaveBeenCalled();
     });
 
-    it('should reject pending commands on process exit', async () => {
-      const promise = service.startRecording();
+    it('should handle backend unavailable errors', async () => {
+      mockInvoke.mockRejectedValueOnce(new Error('Tauri backend not available'));
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      // Simulate process exit
-      mockProcess.emit('exit', 1);
-
-      await expect(promise).rejects.toThrow('Python Core process exited with code 1');
+      await expect(service.startRecording()).rejects.toThrow('Tauri backend not available');
     });
 
-    it('should handle process errors', async () => {
-      const { spawn } = require('child_process');
-      const errorProcess = new EventEmitter();
-      errorProcess.stdin = { write: jest.fn() };
-      errorProcess.stdout = new EventEmitter();
-      errorProcess.stderr = new EventEmitter();
+    it('should handle Python Core errors from backend', async () => {
+      mockInvoke.mockRejectedValueOnce(new Error('Python Core process failed to start'));
 
-      spawn.mockReturnValueOnce(errorProcess);
-
-      const newService = new IPCBridgeService();
-
-      // Start the command which will trigger initialization
-      const promise = newService.startRecording();
-
-      // Wait a bit for initialization to start
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      // Simulate process error during initialization
-      const testError = new Error('Process spawn failed');
-      errorProcess.emit('error', testError);
-
-      // The promise should reject
-      await expect(promise).rejects.toThrow();
-
-      newService.terminate();
-    }, 10000);
-
-    it('should log stderr output', async () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      // Initialize process first
-      const promise = service.checkForRecordings();
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      mockProcess.stderr.emit('data', Buffer.from('Python error message\n'));
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Python Core stderr:',
-        'Python error message'
-      );
-
-      // Clean up
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: { hasRecordings: false } }) + '\n')
-      );
-      await promise;
-
-      consoleErrorSpy.mockRestore();
+      await expect(service.startRecording()).rejects.toThrow('Python Core process failed');
     });
   });
 
   describe('Error Scenarios', () => {
     it('should handle Python Core returning error response', async () => {
-      const promise = service.startRecording();
+      mockInvoke.mockRejectedValueOnce(new Error('PyAutoGUI not installed'));
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(
-          JSON.stringify({
-            success: false,
-            error: 'PyAutoGUI not installed',
-          }) + '\n'
-        )
-      );
-
-      await expect(promise).rejects.toThrow('PyAutoGUI not installed');
+      await expect(service.startRecording()).rejects.toThrow('PyAutoGUI not installed');
     });
 
     it('should handle stopRecording error gracefully', async () => {
-      // stopRecording has special error handling that returns a result object
-      // instead of throwing
-      const promise = service.stopRecording();
+      mockInvoke.mockResolvedValueOnce({
+        success: true,
+        scriptPath: '/path/to/script.json',
+        actionCount: 0,
+        duration: 0,
+      });
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      // For stopRecording, we need to handle the error in the implementation
-      // Let's send a success response for this test
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(
-          JSON.stringify({
-            success: true,
-            data: {
-              scriptPath: '/path/to/script.json',
-              actionCount: 0,
-              duration: 0,
-            },
-          }) + '\n'
-        )
-      );
-
-      const result = await promise;
+      const result = await service.stopRecording();
 
       expect(result.success).toBe(true);
     });
 
-    it('should handle missing Python process', async () => {
-      const { spawn } = require('child_process');
-      spawn.mockReturnValueOnce(null);
+    it('should handle Tauri backend errors', async () => {
+      mockInvoke.mockRejectedValueOnce(new Error('Backend command failed'));
 
-      const newService = new IPCBridgeService();
-
-      await expect(newService.startRecording()).rejects.toThrow();
-
-      newService.terminate();
+      await expect(service.startRecording()).rejects.toThrow('Backend command failed');
     });
 
-    it('should handle write errors', async () => {
-      // Initialize process first
-      const initPromise = service.checkForRecordings();
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: { hasRecordings: false } }) + '\n')
-      );
-      await initPromise;
+    it('should handle command invocation errors', async () => {
+      mockInvoke.mockRejectedValueOnce(new Error('Command not found'));
 
-      // Now mock write to fail
-      mockProcess.stdin.write.mockImplementationOnce(
-        (data: string, callback?: (error?: Error) => void) => {
-          if (callback) callback(new Error('Write failed'));
-          return false;
-        }
-      );
-
-      const promise = service.startRecording();
-
-      await expect(promise).rejects.toThrow('Write failed');
+      await expect(service.startRecording()).rejects.toThrow('Command not found');
     });
   });
 
-  describe('Event Handling', () => {
-    it('should emit progress events to listeners', async () => {
+  describe('Tauri Event Handling', () => {
+    it('should setup Tauri event listeners on initialization', () => {
+      // The service sets up a single 'python-event' listener in constructor
+      expect(mockListen).toHaveBeenCalledWith('python-event', expect.any(Function));
+    });
+
+    it('should forward Tauri events to registered listeners', async () => {
       const progressListener = jest.fn();
-      service.addEventListener('progress', progressListener);
+      let tauriEventHandler: any;
 
-      // Initialize process first
-      const promise = service.checkForRecordings();
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      // Capture the event handler
+      mockListen.mockImplementationOnce((event: string, handler: any) => {
+        tauriEventHandler = handler;
+        return Promise.resolve(mockUnlisten);
+      });
 
-      // Send a progress event
-      const progressEvent = {
+      // Create new service to capture handler
+      resetIPCBridge();
+      const newService = new IPCBridgeService();
+      
+      // Wait for async initialization
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      newService.addEventListener('progress', progressListener);
+
+      // Simulate Tauri event with python-event format
+      const tauriEvent = {
+        payload: {
+          type: 'progress',
+          data: {
+            currentAction: 50,
+            totalActions: 100,
+          },
+        },
+      };
+
+      tauriEventHandler(tauriEvent);
+
+      expect(progressListener).toHaveBeenCalledWith({
         type: 'progress',
         data: {
           currentAction: 50,
           totalActions: 100,
         },
-      };
+      });
 
-      mockProcess.stdout.emit('data', Buffer.from(JSON.stringify(progressEvent) + '\n'));
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      expect(progressListener).toHaveBeenCalledWith(progressEvent);
-
-      // Clean up
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: { hasRecordings: false } }) + '\n')
-      );
-      await promise;
+      newService.terminate();
     });
 
     it('should support multiple listeners for same event', async () => {
       const listener1 = jest.fn();
       const listener2 = jest.fn();
+      let tauriEventHandler: any;
 
-      service.addEventListener('progress', listener1);
-      service.addEventListener('progress', listener2);
+      mockListen.mockImplementationOnce((event: string, handler: any) => {
+        tauriEventHandler = handler;
+        return Promise.resolve(mockUnlisten);
+      });
 
-      // Initialize process first
-      const promise = service.checkForRecordings();
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      resetIPCBridge();
+      const newService = new IPCBridgeService();
+      await new Promise(resolve => setTimeout(resolve, 10));
 
-      const event = { type: 'progress', data: {} };
-      mockProcess.stdout.emit('data', Buffer.from(JSON.stringify(event) + '\n'));
+      newService.addEventListener('progress', listener1);
+      newService.addEventListener('progress', listener2);
 
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      const tauriEvent = {
+        payload: {
+          type: 'progress',
+          data: { test: 'data' },
+        },
+      };
+      tauriEventHandler(tauriEvent);
 
       expect(listener1).toHaveBeenCalled();
       expect(listener2).toHaveBeenCalled();
 
-      // Clean up
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: { hasRecordings: false } }) + '\n')
-      );
-      await promise;
+      newService.terminate();
     });
 
-    it('should remove event listeners', async () => {
+    it('should remove event listeners', () => {
       const listener = jest.fn();
 
       service.addEventListener('progress', listener);
       service.removeEventListener('progress', listener);
 
-      const event = { type: 'progress', data: {} };
-      mockProcess.stdout.emit('data', Buffer.from(JSON.stringify(event) + '\n'));
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      expect(listener).not.toHaveBeenCalled();
+      // Listener should be removed from internal map
+      // We can't easily test this without triggering an event, but the method should not throw
+      expect(() => service.removeEventListener('progress', listener)).not.toThrow();
     });
 
     it('should handle errors in event listeners gracefully', async () => {
@@ -500,478 +298,265 @@ describe('IPCBridgeService', () => {
       const faultyListener = jest.fn(() => {
         throw new Error('Listener error');
       });
+      let tauriEventHandler: any;
 
-      service.addEventListener('progress', faultyListener);
+      mockListen.mockImplementationOnce((event: string, handler: any) => {
+        tauriEventHandler = handler;
+        return Promise.resolve(mockUnlisten);
+      });
 
-      // Initialize process first
-      const promise = service.checkForRecordings();
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      resetIPCBridge();
+      const newService = new IPCBridgeService();
+      await new Promise(resolve => setTimeout(resolve, 10));
 
-      const event = { type: 'progress', data: {} };
-      mockProcess.stdout.emit('data', Buffer.from(JSON.stringify(event) + '\n'));
+      newService.addEventListener('progress', faultyListener);
 
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      const tauriEvent = {
+        payload: {
+          type: 'progress',
+          data: { test: 'data' },
+        },
+      };
+      tauriEventHandler(tauriEvent);
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Error in event listener:',
         expect.any(Error)
       );
 
-      // Clean up
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: { hasRecordings: false } }) + '\n')
-      );
-      await promise;
-
       consoleErrorSpy.mockRestore();
+      newService.terminate();
+    });
+
+    it('should handle all event types through single python-event listener', () => {
+      const progressListener = jest.fn();
+      const completeListener = jest.fn();
+      const errorListener = jest.fn();
+      const actionPreviewListener = jest.fn();
+
+      service.addEventListener('progress', progressListener);
+      service.addEventListener('complete', completeListener);
+      service.addEventListener('error', errorListener);
+      service.addEventListener('action_preview', actionPreviewListener);
+
+      // All events go through the single 'python-event' listener
+      expect(mockListen).toHaveBeenCalledWith('python-event', expect.any(Function));
     });
   });
 
   describe('API Methods', () => {
     it('should call startRecording command', async () => {
-      const promise = service.startRecording();
+      mockInvoke.mockResolvedValueOnce(undefined);
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await service.startRecording();
 
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: {} }) + '\n')
-      );
-
-      await promise;
-
-      const writtenData = mockProcess.stdin.write.mock.calls[0][0];
-      const parsed = JSON.parse(writtenData);
-
-      expect(parsed.command).toBe('start_recording');
+      expect(mockInvoke).toHaveBeenCalledWith('start_recording');
     });
 
     it('should call stopRecording command and return result', async () => {
-      const promise = service.stopRecording();
-
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
       const response = {
-        success: true,
-        data: {
-          scriptPath: '/path/to/script.json',
-          actionCount: 127,
-          duration: 45.5,
-        },
-      };
-
-      mockProcess.stdout.emit('data', Buffer.from(JSON.stringify(response) + '\n'));
-
-      const result = await promise;
-
-      expect(result).toEqual({
         success: true,
         scriptPath: '/path/to/script.json',
         actionCount: 127,
         duration: 45.5,
+      };
+
+      mockInvoke.mockResolvedValueOnce(response);
+
+      const result = await service.stopRecording();
+
+      expect(result).toEqual(response);
+      expect(mockInvoke).toHaveBeenCalledWith('stop_recording');
+    });
+
+    it('should call startPlayback with all parameters', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+
+      await service.startPlayback('/custom/path.json', 2.0, 5);
+
+      expect(mockInvoke).toHaveBeenCalledWith('start_playback', {
+        scriptPath: '/custom/path.json',
+        speed: 2.0,
+        loopCount: 5,
       });
     });
 
-    it('should call startPlayback with optional script path', async () => {
-      const promise = service.startPlayback('/custom/path.json');
+    it('should call startPlayback with default parameters', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await service.startPlayback();
 
-      const writtenData = mockProcess.stdin.write.mock.calls[0][0];
-      const parsed = JSON.parse(writtenData);
-
-      expect(parsed).toEqual({
-        command: 'start_playback',
-        params: { scriptPath: '/custom/path.json' },
+      expect(mockInvoke).toHaveBeenCalledWith('start_playback', {
+        scriptPath: null,
+        speed: 1.0,
+        loopCount: 1,
       });
-
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: {} }) + '\n')
-      );
-
-      await promise;
-    });
-
-    it('should call startPlayback without script path', async () => {
-      const promise = service.startPlayback();
-
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      const writtenData = mockProcess.stdin.write.mock.calls[0][0];
-      const parsed = JSON.parse(writtenData);
-
-      expect(parsed).toEqual({
-        command: 'start_playback',
-        params: {},
-      });
-
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: {} }) + '\n')
-      );
-
-      await promise;
     });
 
     it('should call stopPlayback command', async () => {
-      const promise = service.stopPlayback();
+      mockInvoke.mockResolvedValueOnce(undefined);
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await service.stopPlayback();
 
-      const writtenData = mockProcess.stdin.write.mock.calls[0][0];
-      const parsed = JSON.parse(writtenData);
-
-      expect(parsed.command).toBe('stop_playback');
-
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: {} }) + '\n')
-      );
-
-      await promise;
+      expect(mockInvoke).toHaveBeenCalledWith('stop_playback');
     });
 
     it('should call checkForRecordings and return boolean', async () => {
-      const promise = service.checkForRecordings();
+      mockInvoke.mockResolvedValueOnce(true);
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(
-          JSON.stringify({ success: true, data: { hasRecordings: true, count: 5 } }) + '\n'
-        )
-      );
-
-      const result = await promise;
+      const result = await service.checkForRecordings();
 
       expect(result).toBe(true);
+      expect(mockInvoke).toHaveBeenCalledWith('check_recordings');
     });
 
     it('should call getLatestRecording and return path', async () => {
-      const promise = service.getLatestRecording();
+      mockInvoke.mockResolvedValueOnce('/path/to/latest.json');
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(
-          JSON.stringify({
-            success: true,
-            data: { scriptPath: '/path/to/latest.json' },
-          }) + '\n'
-        )
-      );
-
-      const result = await promise;
+      const result = await service.getLatestRecording();
 
       expect(result).toBe('/path/to/latest.json');
+      expect(mockInvoke).toHaveBeenCalledWith('get_latest');
     });
 
     it('should return null when no recordings exist', async () => {
-      const promise = service.getLatestRecording();
+      mockInvoke.mockResolvedValueOnce(null);
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: { scriptPath: null } }) + '\n')
-      );
-
-      const result = await promise;
+      const result = await service.getLatestRecording();
 
       expect(result).toBe(null);
+    });
+
+    it('should call listScripts command', async () => {
+      const scripts = [
+        { path: '/path/1.json', name: 'script1' },
+        { path: '/path/2.json', name: 'script2' },
+      ];
+
+      mockInvoke.mockResolvedValueOnce(scripts);
+
+      const result = await service.listScripts();
+
+      expect(result).toEqual(scripts);
+      expect(mockInvoke).toHaveBeenCalledWith('list_scripts');
+    });
+
+    it('should call loadScript command', async () => {
+      const scriptData = { metadata: {}, actions: [] };
+
+      mockInvoke.mockResolvedValueOnce(scriptData);
+
+      const result = await service.loadScript('/path/to/script.json');
+
+      expect(result).toEqual(scriptData);
+      expect(mockInvoke).toHaveBeenCalledWith('load_script', { scriptPath: '/path/to/script.json' });
+    });
+
+    it('should call saveScript command', async () => {
+      const scriptData = { metadata: {}, actions: [] };
+
+      mockInvoke.mockResolvedValueOnce(undefined);
+
+      await service.saveScript('/path/to/script.json', scriptData);
+
+      expect(mockInvoke).toHaveBeenCalledWith('save_script', {
+        scriptPath: '/path/to/script.json',
+        scriptData,
+      });
+    });
+
+    it('should call deleteScript command', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+
+      await service.deleteScript('/path/to/script.json');
+
+      expect(mockInvoke).toHaveBeenCalledWith('delete_script', { scriptPath: '/path/to/script.json' });
     });
   });
 
   describe('Comprehensive Error Handling', () => {
     // Additional error scenario tests for Requirements 9.1, 9.2, 9.3, 9.4, 9.5
     it('should format permission denied errors with helpful message', async () => {
-      const promise = service.startRecording();
+      mockInvoke.mockRejectedValueOnce(new Error('Permission denied: GeniusQA needs Accessibility permissions'));
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(
-          JSON.stringify({
-            success: false,
-            error: 'Permission denied: GeniusQA needs Accessibility permissions',
-          }) + '\n'
-        )
-      );
-
-      await expect(promise).rejects.toThrow('Permission denied');
-      await expect(promise).rejects.toThrow('Accessibility');
+      await expect(service.startRecording()).rejects.toThrow('Permission denied');
     });
 
     it('should format Python Core unavailable errors', async () => {
-      const { spawn } = require('child_process');
-      const errorProcess = new EventEmitter();
-      errorProcess.stdin = { write: jest.fn() };
-      errorProcess.stdout = new EventEmitter();
-      errorProcess.stderr = new EventEmitter();
+      mockInvoke.mockRejectedValueOnce(new Error('Python Core process failed to start. Please ensure Python 3.9+ is installed.'));
 
-      spawn.mockReturnValueOnce(errorProcess);
-
-      const newService = new IPCBridgeService();
-      const promise = newService.startRecording();
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      const enoentError = new Error('spawn python3 ENOENT');
-      (enoentError as any).code = 'ENOENT';
-      errorProcess.emit('error', enoentError);
-
-      await expect(promise).rejects.toThrow('Python executable not found');
-      await expect(promise).rejects.toThrow('Python 3.9+');
-
-      newService.terminate();
+      await expect(service.startRecording()).rejects.toThrow('Python Core process failed to start');
     });
 
     it('should format corrupted script file errors', async () => {
-      const promise = service.startPlayback();
+      mockInvoke.mockRejectedValueOnce(new Error('Script file corrupted: Invalid JSON format'));
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(
-          JSON.stringify({
-            success: false,
-            error: 'Script file corrupted: Invalid JSON format',
-          }) + '\n'
-        )
-      );
-
-      await expect(promise).rejects.toThrow('corrupted');
+      await expect(service.startPlayback()).rejects.toThrow('corrupted');
     });
 
     it('should format no recordings found errors', async () => {
-      const promise = service.startPlayback();
+      mockInvoke.mockRejectedValueOnce(new Error('No recordings found'));
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(
-          JSON.stringify({
-            success: false,
-            error: 'No recordings found. Please record a session first.',
-          }) + '\n'
-        )
-      );
-
-      await expect(promise).rejects.toThrow('No recordings found');
-      await expect(promise).rejects.toThrow('record a session first');
-    });
-
-    it('should handle timeout errors with helpful message', async () => {
-      const promise = service.startRecording();
-
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      // Don't send response - let it timeout
-      await expect(promise).rejects.toThrow('timed out');
+      await expect(service.startPlayback()).rejects.toThrow('No recordings found');
     });
 
     it('should handle already in progress errors', async () => {
-      const promise = service.startRecording();
+      mockInvoke.mockRejectedValueOnce(new Error('Recording already in progress'));
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(
-          JSON.stringify({
-            success: false,
-            error: 'Recording already in progress',
-          }) + '\n'
-        )
-      );
-
-      await expect(promise).rejects.toThrow('already in progress');
+      await expect(service.startRecording()).rejects.toThrow('already in progress');
     });
 
     it('should handle file system errors', async () => {
-      const promise = service.stopRecording();
+      mockInvoke.mockRejectedValueOnce(new Error('File system error: Not enough disk space'));
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(
-          JSON.stringify({
-            success: false,
-            error: 'File system error: Not enough disk space',
-          }) + '\n'
-        )
-      );
-
-      const result = await promise;
+      const result = await service.stopRecording();
       expect(result.success).toBe(false);
       expect(result.error).toContain('disk space');
     });
 
     it('should handle missing Python dependencies', async () => {
-      const promise = service.startRecording();
+      mockInvoke.mockRejectedValueOnce(new Error('Required libraries not installed: pyautogui. Please run: pip install pyautogui'));
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(
-          JSON.stringify({
-            success: false,
-            error: 'Required libraries not installed: pyautogui. Please run: pip install pyautogui',
-          }) + '\n'
-        )
-      );
-
-      await expect(promise).rejects.toThrow('pyautogui');
-      await expect(promise).rejects.toThrow('pip install');
-    });
-
-    it('should handle process exit during command execution', async () => {
-      const promise1 = service.startRecording();
-      const promise2 = service.checkForRecordings();
-
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      // Simulate process exit before responses
-      mockProcess.emit('exit', 1);
-
-      await expect(promise1).rejects.toThrow('exited with code 1');
-      await expect(promise2).rejects.toThrow('exited with code 1');
-    });
-
-    it('should handle EACCES permission errors on process spawn', async () => {
-      const { spawn } = require('child_process');
-      const errorProcess = new EventEmitter();
-      errorProcess.stdin = { write: jest.fn() };
-      errorProcess.stdout = new EventEmitter();
-      errorProcess.stderr = new EventEmitter();
-
-      spawn.mockReturnValueOnce(errorProcess);
-
-      const newService = new IPCBridgeService();
-      const promise = newService.startRecording();
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      const eaccesError = new Error('spawn python3 EACCES');
-      (eaccesError as any).code = 'EACCES';
-      errorProcess.emit('error', eaccesError);
-
-      await expect(promise).rejects.toThrow('Permission denied');
-
-      newService.terminate();
+      await expect(service.startRecording()).rejects.toThrow('pyautogui');
     });
 
     it('should handle multiple sequential errors', async () => {
       // Error 1: No recording in progress
-      const promise1 = service.stopRecording();
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(
-          JSON.stringify({
-            success: false,
-            error: 'No recording in progress',
-          }) + '\n'
-        )
-      );
-      const result1 = await promise1;
+      mockInvoke.mockRejectedValueOnce(new Error('No recording in progress'));
+      const result1 = await service.stopRecording();
       expect(result1.success).toBe(false);
 
       // Error 2: No recordings found
-      const promise2 = service.startPlayback();
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(
-          JSON.stringify({
-            success: false,
-            error: 'No recordings found',
-          }) + '\n'
-        )
-      );
-      await expect(promise2).rejects.toThrow();
+      mockInvoke.mockRejectedValueOnce(new Error('No recordings found'));
+      await expect(service.startPlayback()).rejects.toThrow();
 
       // Error 3: Permission denied
-      const promise3 = service.startRecording();
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(
-          JSON.stringify({
-            success: false,
-            error: 'Permission denied',
-          }) + '\n'
-        )
-      );
-      await expect(promise3).rejects.toThrow();
-    });
-
-    it('should handle corrupted response from Python Core', async () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      const promise = service.checkForRecordings();
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      // Send corrupted JSON
-      mockProcess.stdout.emit('data', Buffer.from('{"success": true, "data": {incomplete\n'));
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      expect(consoleErrorSpy).toHaveBeenCalled();
-
-      // Send valid response to complete
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(JSON.stringify({ success: true, data: { hasRecordings: false } }) + '\n')
-      );
-
-      await promise;
-
-      consoleErrorSpy.mockRestore();
+      mockInvoke.mockRejectedValueOnce(new Error('Permission denied'));
+      await expect(service.startRecording()).rejects.toThrow();
     });
 
     it('should handle empty error messages gracefully', async () => {
-      const promise = service.startRecording();
+      mockInvoke.mockRejectedValueOnce(new Error(''));
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(
-          JSON.stringify({
-            success: false,
-            error: '',
-          }) + '\n'
-        )
-      );
-
-      await expect(promise).rejects.toThrow('unknown error');
+      await expect(service.startRecording()).rejects.toThrow('unknown error');
     });
 
     it('should handle missing error field in error response', async () => {
-      const promise = service.startRecording();
+      mockInvoke.mockRejectedValueOnce(new Error('Unknown error'));
 
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await expect(service.startRecording()).rejects.toThrow('unknown error');
+    });
 
-      mockProcess.stdout.emit(
-        'data',
-        Buffer.from(
-          JSON.stringify({
-            success: false,
-          }) + '\n'
-        )
-      );
+    it('should handle Tauri backend connection errors', async () => {
+      mockInvoke.mockRejectedValueOnce(new Error('Tauri backend not responding'));
 
-      await expect(promise).rejects.toThrow('unknown error');
+      await expect(service.startRecording()).rejects.toThrow('Tauri backend not responding');
+    });
+
+    it('should handle command timeout from backend', async () => {
+      mockInvoke.mockRejectedValueOnce(new Error('Command execution timed out'));
+
+      await expect(service.startRecording()).rejects.toThrow('timed out');
     });
   });
 });

@@ -55,73 +55,22 @@ export interface ButtonStates {
 }
 
 /**
- * IPC command types
+ * Tauri event payload structure
  * 
- * Commands sent from React Native UI to Python Core via stdin.
- * Each command triggers a specific operation in the Python automation backend.
+ * Events emitted from Tauri backend to React frontend.
+ * Used for asynchronous notifications during operations.
  * 
- * @typedef {string} IPCCommand
- * - start_recording: Begin capturing user actions
- * - stop_recording: End capture and save script file
- * - start_playback: Begin replaying recorded actions
- * - stop_playback: Interrupt ongoing playback
- * - check_recordings: Query if any recordings exist
- * - get_latest: Retrieve path to most recent recording
- * - list_scripts: Get list of all available scripts
- * - load_script: Load a specific script file
- * - save_script: Save changes to a script file
- * - delete_script: Delete a script file
- */
-export type IPCCommand =
-  | 'start_recording'
-  | 'stop_recording'
-  | 'start_playback'
-  | 'stop_playback'
-  | 'check_recordings'
-  | 'get_latest'
-  | 'list_scripts'
-  | 'load_script'
-  | 'save_script'
-  | 'delete_script';
-
-/**
- * IPC message sent from React Native to Python Core
- * 
- * Serialized as JSON and sent via stdin to the Python process.
- * The Python Core reads these messages and executes the requested commands.
- * 
- * @interface IPCMessage
- * @property {IPCCommand} command - The operation to perform
- * @property {Record<string, any>} [params] - Optional parameters for the command
+ * @interface TauriEventPayload
+ * @property {string} type - Event type (progress, complete, error, action_preview)
+ * @property {any} data - Event-specific data payload
  * 
  * @example
- * { "command": "start_recording", "params": {} }
- * { "command": "start_playback", "params": { "scriptPath": "/path/to/script.json" } }
+ * { "type": "progress", "data": { "currentAction": 10, "totalActions": 50 } }
+ * { "type": "complete", "data": {} }
  */
-export interface IPCMessage {
-  command: IPCCommand;
-  params?: Record<string, any>;
-}
-
-/**
- * IPC response received from Python Core
- * 
- * Sent via stdout from Python Core after processing a command.
- * Contains operation result, data payload, or error information.
- * 
- * @interface IPCResponse
- * @property {boolean} success - Whether the operation succeeded
- * @property {any} [data] - Response data (varies by command)
- * @property {string} [error] - Error message if success is false
- * 
- * @example
- * { "success": true, "data": { "scriptPath": "/path/to/script.json", "actionCount": 42 } }
- * { "success": false, "error": "Permission denied for input monitoring" }
- */
-export interface IPCResponse {
-  success: boolean;
-  data?: any;
-  error?: string;
+export interface TauriEventPayload {
+  type: string;
+  data: any;
 }
 
 /**

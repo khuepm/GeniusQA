@@ -1,257 +1,76 @@
 /**
  * IPC Bridge Service for Desktop Recorder MVP
  * 
- * This service manages all communication between the React Native UI and the Python Core
- * automation backend. It spawns and maintains a Python process, sends commands via stdin,
- * receives responses via stdout, and handles errors via stderr.
+ * This service manages all communication between the React UI and the Python Core
+ * automation backend via Tauri commands and events. It uses Tauri's IPC mechanism
+ * to invoke backend commands and listen for events from the Rust backend.
  * 
- * The service implements a command-response pattern with timeout handling and event
- * emission for asynchronous operations like playback progress updates.
+ * The service implements a command-response pattern with event handling for
+ * asynchronous operations like playback progress updates.
  * 
  * Architecture:
- * - Spawns Python process on first command
- * - Maintains single long-lived process for app session
- * - JSON-based message protocol over stdin/stdout
+ * - Uses Tauri commands for request/response operations
+ * - Uses Tauri events for async notifications (progress, complete, error)
+ * - Python process managed by Rust backend
  * - Event-driven architecture for async operations
  * - Automatic error propagation and formatting
  * 
- * Requirements: 5.1, 5.3, 5.4
+ * Requirements: 5.1, 5.2, 5.3, 5.4
  * Validates: Property 10 (IPC error propagation)
  */
 
-import { spawn, ChildProcess } from 'child_process';
+import { invoke } from '@tauri-apps/api/tauri';
+import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import {
-  IPCMessage,
-  IPCResponse,
   IPCEvent,
   RecordingResult,
-  IPCCommand,
 } from '../types/recorder.types';
 
 /**
  * Configuration for IPC Bridge
  */
 interface IPCBridgeConfig {
-  pythonPath?: string;
-  pythonCorePath?: string;
-  commandTimeout?: number;
+  // Configuration options can be added here if needed in the future
+}
+
+/**
+ * Tauri event payload structure
+ */
+interface TauriEventPayload {
+  type: string;
+  data: any;
 }
 
 /**
  * IPC Bridge Service
- * Handles all communication with Python Core process
+ * Handles all communication with Python Core via Tauri backend
  */
 export class IPCBridgeService {
-  private pythonProcess: ChildProcess | null = null;
-  private pythonPath: string;
-  private pythonCorePath: string;
-  private commandTimeout: number;
-  private stdoutBuffer: string = '';
-  private stderrBuffer: string = '';
-  private pendingCommands: Map<
-    string,
-    {
-      resolve: (value: any) => void;
-      reject: (error: Error) => void;
-      timeout: NodeJS.Timeout;
-    }
-  > = new Map();
   private eventListeners: Map<string, ((event: IPCEvent) => void)[]> = new Map();
+  private unlistenFunctions: UnlistenFn[] = [];
 
   constructor(config: IPCBridgeConfig = {}) {
-    this.pythonPath = config.pythonPath || 'python3';
-    this.pythonCorePath =
-      config.pythonCorePath || '../python-core/src/__main__.py';
-    this.commandTimeout = config.commandTimeout || 30000; // 30 seconds default
+    // Initialize event listeners for Tauri events
+    this.initializeEventListeners();
   }
 
   /**
-   * Initialize the Python Core process
+   * Initialize Tauri event listeners
    */
-  private async initializePythonProcess(): Promise<void> {
-    if (this.pythonProcess) {
-      return; // Already initialized
-    }
-
-    return new Promise((resolve, reject) => {
-      try {
-        this.pythonProcess = spawn(this.pythonPath, [this.pythonCorePath], {
-          stdio: ['pipe', 'pipe', 'pipe'],
+  private async initializeEventListeners(): Promise<void> {
+    try {
+      // Listen for progress events
+      const unlistenProgress = await listen<TauriEventPayload>('python-event', (event) => {
+        const payload = event.payload;
+        this.emitEvent({
+          type: payload.type as any,
+          data: payload.data,
         });
-
-        if (!this.pythonProcess) {
-          reject(new Error(
-            'Python Core unavailable: Failed to start Python process. ' +
-            'Please ensure Python 3.9+ is installed and accessible.'
-          ));
-          return;
-        }
-
-        if (!this.pythonProcess.stdin || !this.pythonProcess.stdout || !this.pythonProcess.stderr) {
-          reject(new Error(
-            'Python Core unavailable: Failed to initialize process communication. ' +
-            'Please restart the application.'
-          ));
-          return;
-        }
-
-        // Set up stdout handler
-        this.pythonProcess.stdout.on('data', (data: Buffer) => {
-          this.handleStdout(data);
-        });
-
-        // Set up stderr handler
-        this.pythonProcess.stderr.on('data', (data: Buffer) => {
-          this.handleStderr(data);
-        });
-
-        // Handle process exit
-        this.pythonProcess.on('exit', (code: number | null) => {
-          console.error(`Python Core process exited with code ${code}`);
-          this.pythonProcess = null;
-          this.rejectAllPendingCommands(
-            new Error(`Python Core process exited with code ${code}`)
-          );
-        });
-
-        // Handle process errors
-        this.pythonProcess.on('error', (error: Error) => {
-          console.error('Python Core process error:', error);
-          this.pythonProcess = null;
-          
-          // Format error message based on error type
-          let errorMessage = 'Python Core unavailable: ';
-          if (error.message.includes('ENOENT')) {
-            errorMessage += 'Python executable not found. Please ensure Python 3.9+ is installed and in your PATH.';
-          } else if (error.message.includes('EACCES')) {
-            errorMessage += 'Permission denied. Please check Python Core file permissions.';
-          } else {
-            errorMessage += `${error.message}. Please ensure Python 3.9+ is installed.`;
-          }
-          
-          reject(new Error(errorMessage));
-        });
-
-        // Give the process a moment to start
-        setTimeout(() => resolve(), 100);
-      } catch (error) {
-        reject(error);
-      }
-    });
-  }
-
-  /**
-   * Handle stdout data from Python Core
-   */
-  private handleStdout(data: Buffer): void {
-    this.stdoutBuffer += data.toString();
-
-    // Process complete JSON messages
-    const lines = this.stdoutBuffer.split('\n');
-    this.stdoutBuffer = lines.pop() || ''; // Keep incomplete line in buffer
-
-    for (const line of lines) {
-      if (line.trim()) {
-        try {
-          const message = JSON.parse(line);
-          this.processMessage(message);
-        } catch (error) {
-          console.error('Failed to parse JSON from Python Core:', line, error);
-        }
-      }
-    }
-  }
-
-  /**
-   * Handle stderr data from Python Core
-   */
-  private handleStderr(data: Buffer): void {
-    this.stderrBuffer += data.toString();
-    const lines = this.stderrBuffer.split('\n');
-    this.stderrBuffer = lines.pop() || '';
-
-    for (const line of lines) {
-      if (line.trim()) {
-        console.error('Python Core stderr:', line);
-      }
-    }
-  }
-
-  /**
-   * Process a message from Python Core
-   */
-  private processMessage(message: IPCResponse | IPCEvent): void {
-    // Check if it's an event message
-    if ('type' in message && message.type) {
-      this.emitEvent(message as IPCEvent);
-      return;
-    }
-
-    // It's a response message - resolve the pending command
-    const response = message as IPCResponse;
-    
-    // Find and resolve the first pending command (FIFO)
-    const entries = Array.from(this.pendingCommands.entries());
-    if (entries.length > 0) {
-      const [commandId, pending] = entries[0];
-      clearTimeout(pending.timeout);
-      this.pendingCommands.delete(commandId);
-
-      if (response.success) {
-        pending.resolve(response);
-      } else {
-        pending.reject(new Error(response.error || 'Unknown error'));
-      }
-    }
-  }
-
-  /**
-   * Send a command to Python Core
-   */
-  private async sendCommand(
-    command: IPCCommand,
-    params: Record<string, any> = {}
-  ): Promise<IPCResponse> {
-    await this.initializePythonProcess();
-
-    if (!this.pythonProcess || !this.pythonProcess.stdin) {
-      throw new Error('Python Core process not available');
-    }
-
-    return new Promise((resolve, reject) => {
-      const commandId = `${command}_${Date.now()}`;
-      const message: IPCMessage = { command, params };
-
-      // Set up timeout
-      const timeout = setTimeout(() => {
-        this.pendingCommands.delete(commandId);
-        reject(new Error(`Command ${command} timed out after ${this.commandTimeout}ms`));
-      }, this.commandTimeout);
-
-      // Store pending command
-      this.pendingCommands.set(commandId, { resolve, reject, timeout });
-
-      // Send command
-      const messageStr = JSON.stringify(message) + '\n';
-      this.pythonProcess!.stdin!.write(messageStr, (error: Error | null | undefined) => {
-        if (error) {
-          clearTimeout(timeout);
-          this.pendingCommands.delete(commandId);
-          reject(error);
-        }
       });
-    });
-  }
-
-  /**
-   * Reject all pending commands with an error
-   */
-  private rejectAllPendingCommands(error: Error): void {
-    for (const [commandId, pending] of this.pendingCommands.entries()) {
-      clearTimeout(pending.timeout);
-      pending.reject(error);
+      this.unlistenFunctions.push(unlistenProgress);
+    } catch (error) {
+      console.error('Failed to initialize Tauri event listeners:', error);
     }
-    this.pendingCommands.clear();
   }
 
   /**
@@ -300,7 +119,7 @@ export class IPCBridgeService {
   /**
    * Start recording user interactions
    * 
-   * Sends a start_recording command to Python Core, which begins capturing all
+   * Invokes the Tauri start_recording command, which begins capturing all
    * mouse movements, clicks, and keyboard inputs. The recording continues until
    * stopRecording() is called.
    * 
@@ -320,10 +139,7 @@ export class IPCBridgeService {
    */
   public async startRecording(): Promise<void> {
     try {
-      const response = await this.sendCommand('start_recording');
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to start recording');
-      }
+      await invoke('start_recording');
     } catch (error) {
       throw new Error(this.formatErrorMessage(error as Error));
     }
@@ -332,7 +148,7 @@ export class IPCBridgeService {
   /**
    * Stop recording and save to file
    * 
-   * Sends a stop_recording command to Python Core, which terminates the active
+   * Invokes the Tauri stop_recording command, which terminates the active
    * recording session and saves all captured actions to a JSON script file in
    * the local recordings directory (~/ GeniusQA/recordings/).
    * 
@@ -353,21 +169,8 @@ export class IPCBridgeService {
    */
   public async stopRecording(): Promise<RecordingResult> {
     try {
-      const response = await this.sendCommand('stop_recording');
-      
-      if (!response.success) {
-        return {
-          success: false,
-          error: response.error || 'Failed to stop recording',
-        };
-      }
-
-      return {
-        success: true,
-        scriptPath: response.data?.scriptPath,
-        actionCount: response.data?.actionCount,
-        duration: response.data?.duration,
-      };
+      const result = await invoke<RecordingResult>('stop_recording');
+      return result;
     } catch (error) {
       return {
         success: false,
@@ -379,7 +182,7 @@ export class IPCBridgeService {
   /**
    * Start playback of a recorded script
    * 
-   * Sends a start_playback command to Python Core, which loads the specified script
+   * Invokes the Tauri start_playback command, which loads the specified script
    * file (or the most recent one if no path provided) and begins executing the
    * recorded actions with accurate timing preservation.
    * 
@@ -414,21 +217,11 @@ export class IPCBridgeService {
    */
   public async startPlayback(scriptPath?: string, speed?: number, loopCount?: number): Promise<void> {
     try {
-      const params: Record<string, any> = {};
-      if (scriptPath) {
-        params.scriptPath = scriptPath;
-      }
-      if (speed !== undefined) {
-        params.speed = speed;
-      }
-      if (loopCount !== undefined) {
-        params.loopCount = loopCount;
-      }
-      const response = await this.sendCommand('start_playback', params);
-      
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to start playback');
-      }
+      await invoke('start_playback', {
+        scriptPath: scriptPath || null,
+        speed: speed || 1.0,
+        loopCount: loopCount || 1,
+      });
     } catch (error) {
       throw new Error(this.formatErrorMessage(error as Error));
     }
@@ -437,7 +230,7 @@ export class IPCBridgeService {
   /**
    * Stop current playback
    * 
-   * Sends a stop_playback command to Python Core, which immediately interrupts
+   * Invokes the Tauri stop_playback command, which immediately interrupts
    * the active playback session. Any remaining actions in the script are not executed.
    * 
    * @throws {Error} If Python Core is unavailable
@@ -451,11 +244,7 @@ export class IPCBridgeService {
    */
   public async stopPlayback(): Promise<void> {
     try {
-      const response = await this.sendCommand('stop_playback');
-      
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to stop playback');
-      }
+      await invoke('stop_playback');
     } catch (error) {
       throw new Error(this.formatErrorMessage(error as Error));
     }
@@ -464,8 +253,8 @@ export class IPCBridgeService {
   /**
    * Check if any recordings exist
    * 
-   * Queries Python Core to determine if any script files exist in the recordings
-   * directory. Used to enable/disable the Start button in the UI.
+   * Invokes the Tauri check_recordings command to determine if any script files
+   * exist in the recordings directory. Used to enable/disable the Start button in the UI.
    * 
    * @returns {Promise<boolean>} True if at least one recording exists, false otherwise
    * 
@@ -484,13 +273,8 @@ export class IPCBridgeService {
    */
   public async checkForRecordings(): Promise<boolean> {
     try {
-      const response = await this.sendCommand('check_recordings');
-      
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to check for recordings');
-      }
-
-      return response.data?.hasRecordings || false;
+      const result = await invoke<boolean>('check_recordings');
+      return result;
     } catch (error) {
       throw new Error(this.formatErrorMessage(error as Error));
     }
@@ -499,9 +283,9 @@ export class IPCBridgeService {
   /**
    * Get the path to the latest recording
    * 
-   * Queries Python Core for the path to the most recently created script file.
-   * Used to determine which recording to play when startPlayback() is called
-   * without a specific path.
+   * Invokes the Tauri get_latest command for the path to the most recently created
+   * script file. Used to determine which recording to play when startPlayback() is
+   * called without a specific path.
    * 
    * @returns {Promise<string | null>} Absolute path to latest script file, or null
    *   if no recordings exist
@@ -523,13 +307,8 @@ export class IPCBridgeService {
    */
   public async getLatestRecording(): Promise<string | null> {
     try {
-      const response = await this.sendCommand('get_latest');
-      
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to get latest recording');
-      }
-
-      return response.data?.scriptPath || null;
+      const result = await invoke<string | null>('get_latest');
+      return result;
     } catch (error) {
       throw new Error(this.formatErrorMessage(error as Error));
     }
@@ -578,9 +357,9 @@ export class IPCBridgeService {
   /**
    * List all available scripts
    * 
-   * Queries Python Core for a list of all script files in the recordings directory.
-   * Returns metadata for each script including filename, path, creation date, duration,
-   * and action count.
+   * Invokes the Tauri list_scripts command for a list of all script files in the
+   * recordings directory. Returns metadata for each script including filename, path,
+   * creation date, duration, and action count.
    * 
    * @returns {Promise<Array>} Array of script information objects
    * 
@@ -595,13 +374,8 @@ export class IPCBridgeService {
    */
   public async listScripts(): Promise<any[]> {
     try {
-      const response = await this.sendCommand('list_scripts');
-      
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to list scripts');
-      }
-
-      return response.data?.scripts || [];
+      const result = await invoke<any[]>('list_scripts');
+      return result;
     } catch (error) {
       throw new Error(this.formatErrorMessage(error as Error));
     }
@@ -626,13 +400,8 @@ export class IPCBridgeService {
    */
   public async loadScript(scriptPath: string): Promise<any> {
     try {
-      const response = await this.sendCommand('load_script', { scriptPath });
-      
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to load script');
-      }
-
-      return response.data?.script;
+      const result = await invoke<any>('load_script', { scriptPath });
+      return result;
     } catch (error) {
       throw new Error(this.formatErrorMessage(error as Error));
     }
@@ -657,11 +426,7 @@ export class IPCBridgeService {
    */
   public async saveScript(scriptPath: string, scriptData: any): Promise<void> {
     try {
-      const response = await this.sendCommand('save_script', { scriptPath, scriptData });
-      
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to save script');
-      }
+      await invoke('save_script', { scriptPath, scriptData });
     } catch (error) {
       throw new Error(this.formatErrorMessage(error as Error));
     }
@@ -685,25 +450,22 @@ export class IPCBridgeService {
    */
   public async deleteScript(scriptPath: string): Promise<void> {
     try {
-      const response = await this.sendCommand('delete_script', { scriptPath });
-      
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to delete script');
-      }
+      await invoke('delete_script', { scriptPath });
     } catch (error) {
       throw new Error(this.formatErrorMessage(error as Error));
     }
   }
 
   /**
-   * Terminate the Python Core process
+   * Cleanup event listeners
    */
   public terminate(): void {
-    if (this.pythonProcess) {
-      this.pythonProcess.kill();
-      this.pythonProcess = null;
+    // Unlisten from all Tauri events
+    for (const unlisten of this.unlistenFunctions) {
+      unlisten();
     }
-    this.rejectAllPendingCommands(new Error('IPC Bridge terminated'));
+    this.unlistenFunctions = [];
+    this.eventListeners.clear();
   }
 }
 

@@ -72,109 +72,114 @@ The Python Core and React UI are complete and functional. However, the current i
 ## Remaining Work - Tauri Migration
 
 ### Phase 12: Implement Tauri Backend Commands
-- [ ] 12.1 Create Tauri command handlers in Rust (src-tauri/src/main.rs)
-  - Implement `start_recording` command that spawns Python and sends start_recording message
-  - Implement `stop_recording` command that sends stop_recording message and returns result
-  - Implement `start_playback` command with scriptPath, speed, and loopCount parameters
-  - Implement `stop_playback` command
-  - Implement `check_recordings` command
-  - Implement `get_latest` command
-  - Implement `list_scripts` command
-  - Implement `load_script` command
-  - Implement `save_script` command
-  - Implement `delete_script` command
-  - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
-- [ ] 12.2 Implement Python subprocess management in Rust
-  - Create Python process manager struct to maintain single long-lived process
-  - Spawn Python process on first command using std::process::Command
-  - Maintain process lifecycle throughout app session
-  - Handle stdin/stdout/stderr communication with proper buffering
-  - Implement JSON message protocol (serialize commands, deserialize responses)
-  - Handle process errors and restarts
-  - _Requirements: 5.1, 5.2, 5.3_
+- [x] 12 Implement Tauri Backend Commands
+  - [x] 12.1 Create Tauri command handlers in Rust (src-tauri/src/main.rs)
+    - Implement `start_recording` command that spawns Python and sends start_recording message
+    - Implement `stop_recording` command that sends stop_recording message and returns result
+    - Implement `start_playback` command with scriptPath, speed, and loopCount parameters
+    - Implement `stop_playback` command
+    - Implement `check_recordings` command
+    - Implement `get_latest` command
+    - Implement `list_scripts` command
+    - Implement `load_script` command
+    - Implement `save_script` command
+    - Implement `delete_script` command
+    - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
-- [ ] 12.3 Implement Tauri event emission for Python events
-  - Parse Python stdout for event messages (type: 'progress', 'action_preview', 'complete', 'error')
-  - Use tauri::Manager::emit() to forward events to frontend
-  - Emit `progress` events with currentAction/totalActions data
-  - Emit `action_preview` events with action data and index
-  - Emit `complete` events when playback finishes
-  - Emit `error` events with error messages
-  - _Requirements: 5.4_
+  - [x] 12.2 Implement Python subprocess management in Rust
+    - Create Python process manager struct to maintain single long-lived process
+    - Spawn Python process on first command using std::process::Command
+    - Maintain process lifecycle throughout app session
+    - Handle stdin/stdout/stderr communication with proper buffering
+    - Implement JSON message protocol (serialize commands, deserialize responses)
+    - Handle process errors and restarts
+    - _Requirements: 5.1, 5.2, 5.3_
+
+  - [x] 12.3 Implement Tauri event emission for Python events
+    - Parse Python stdout for event messages (type: 'progress', 'action_preview', 'complete', 'error')
+    - Use tauri::Manager::emit() to forward events to frontend
+    - Emit `progress` events with currentAction/totalActions data
+    - Emit `action_preview` events with action data and index
+    - Emit `complete` events when playback finishes
+    - Emit `error` events with error messages
+    - _Requirements: 5.4_
 
 ### Phase 13: Update Frontend IPC Bridge Service
-- [ ] 13.1 Replace Node.js child_process with Tauri API
-  - Remove all imports from 'child_process' module
-  - Import `invoke` from '@tauri-apps/api/tauri' for commands
-  - Import `listen` from '@tauri-apps/api/event' for events
-  - Replace spawn() calls with invoke() calls to Tauri commands
-  - Replace process.stdin.write() with invoke() calls
-  - Replace stdout/stderr listeners with Tauri event listeners
-  - Remove Python process management code (now handled by Rust)
-  - _Requirements: 5.1, 5.3, 5.4_
+- [x] 13: Update Frontend IPC Bridge Service
+  - [x] 13.1 Replace Node.js child_process with Tauri API
+    - Remove all imports from 'child_process' module
+    - Import `invoke` from '@tauri-apps/api/tauri' for commands
+    - Import `listen` from '@tauri-apps/api/event' for events
+    - Replace spawn() calls with invoke() calls to Tauri commands
+    - Replace process.stdin.write() with invoke() calls
+    - Replace stdout/stderr listeners with Tauri event listeners
+    - Remove Python process management code (now handled by Rust)
+    - _Requirements: 5.1, 5.3, 5.4_
 
-- [ ] 13.2 Update IPC Bridge Service implementation
-  - Refactor sendCommand() to use invoke() instead of stdin
-  - Refactor event handling to use listen() for Tauri events
-  - Remove pendingCommands map (Tauri handles request/response)
-  - Simplify error handling (Tauri provides structured errors)
-  - Update all public methods to use invoke() pattern
-  - Keep event listener registration/removal logic
-  - _Requirements: 5.1, 5.3_
+  - [x] 13.2 Update IPC Bridge Service implementation
+    - Refactor sendCommand() to use invoke() instead of stdin
+    - Refactor event handling to use listen() for Tauri events
+    - Remove pendingCommands map (Tauri handles request/response)
+    - Simplify error handling (Tauri provides structured errors)
+    - Update all public methods to use invoke() pattern
+    - Keep event listener registration/removal logic
+    - _Requirements: 5.1, 5.3_
 
-- [ ] 13.3 Update type definitions for Tauri
-  - Add Tauri-specific event payload types
-  - Update IPCBridgeService interface to reflect Tauri patterns
-  - Remove Node.js-specific types (ChildProcess, Buffer, etc.)
-  - _Requirements: 5.1_
+  - [x] 13.3 Update type definitions for Tauri
+    - Add Tauri-specific event payload types
+    - Update IPCBridgeService interface to reflect Tauri patterns
+    - Remove Node.js-specific types (ChildProcess, Buffer, etc.)
+    - _Requirements: 5.1_
 
 ### Phase 14: Testing and Validation
-- [ ] 14.1 Update IPC Bridge Service tests
-  - Mock Tauri invoke() and listen() functions
-  - Update test assertions for Tauri API patterns
-  - Test error handling with Tauri error format
-  - _Requirements: 5.1, 5.3, 5.4_
+- [x] 14: Testing and Validation
+  - [x] 14.1 Update IPC Bridge Service tests
+    - Mock Tauri invoke() and listen() functions
+    - Update test assertions for Tauri API patterns
+    - Test error handling with Tauri error format
+    - _Requirements: 5.1, 5.3, 5.4_
 
-- [ ] 14.2 Manual testing of Tauri integration
-  - Test recording flow (start, capture actions, stop, save)
-  - Test playback flow (load script, play with timing, stop)
-  - Test script selection and management
-  - Test playback speed control (0.5x, 1x, 1.5x, 2x)
-  - Test loop/repeat functionality (1x, 2x, 3x, 5x, infinite)
-  - Test visual preview during playback
-  - Test error scenarios (no Python, no recordings, corrupted files)
-  - Test cross-platform (macOS and Windows if available)
-  - _Requirements: All_
+  - [x] 14.2 Manual testing of Tauri integration
+    - Test recording flow (start, capture actions, stop, save)
+    - Test playback flow (load script, play with timing, stop)
+    - Test script selection and management
+    - Test playback speed control (0.5x, 1x, 1.5x, 2x)
+    - Test loop/repeat functionality (1x, 2x, 3x, 5x, infinite)
+    - Test visual preview during playback
+    - Test error scenarios (no Python, no recordings, corrupted files)
+    - Test cross-platform (macOS and Windows if available)
+    - _Requirements: All_
 
-- [ ] 14.3 End-to-end integration testing
-  - Verify Python Core receives commands from Tauri backend
-  - Verify Tauri backend forwards events to frontend
-  - Verify frontend updates UI based on events
-  - Test complete recording → playback → editing workflow
-  - _Requirements: All_
+  - [x] 14.3 End-to-end integration testing
+    - Verify Python Core receives commands from Tauri backend
+    - Verify Tauri backend forwards events to frontend
+    - Verify frontend updates UI based on events
+    - Test complete recording → playback → editing workflow
+    - _Requirements: All_
 
 ### Phase 15: Final Validation and Cleanup
-- [ ] 15.1 Remove Node.js dependencies
-  - Remove any remaining Node.js-specific code
-  - Update package.json to remove child_process usage
-  - Verify no Node.js APIs are being used
-  - _Requirements: 5.1_
+- [x] 15: Final Validation and Cleanup
+  - [x] 15.1 Remove Node.js dependencies
+    - Remove any remaining Node.js-specific code
+    - Update package.json to remove child_process usage
+    - Verify no Node.js APIs are being used
+    - _Requirements: 5.1_
 
-- [ ] 15.2 Update documentation
-  - Update RECORDER_README.md with Tauri architecture details
-  - Document Tauri command interface
-  - Document Python subprocess management in Rust
-  - Add troubleshooting section for Tauri-specific issues
-  - _Requirements: All_
+  - [x] 15.2 Update documentation
+    - Update RECORDER_README.md with Tauri architecture details
+    - Document Tauri command interface
+    - Document Python subprocess management in Rust
+    - Add troubleshooting section for Tauri-specific issues
+    - _Requirements: All_
 
-- [ ] 15.3 Final checkpoint - Complete system validation
-  - Run all Python tests (should still pass)
-  - Run all TypeScript tests (update for Tauri mocks)
-  - Perform manual end-to-end testing
-  - Verify all requirements are met
-  - Verify all correctness properties are validated
-  - _Requirements: All_
+  - [x] 15.3 Final checkpoint - Complete system validation
+    - Run all Python tests (should still pass)
+    - Run all TypeScript tests (update for Tauri mocks)
+    - Perform manual end-to-end testing
+    - Verify all requirements are met
+    - Verify all correctness properties are validated
+    - _Requirements: All_
 
 ## Requirements Validation Status
 
