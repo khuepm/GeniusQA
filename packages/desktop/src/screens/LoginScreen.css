@@ -1,0 +1,135 @@
+.login-container {
+  flex: 1;
+  background-color: #ffffff;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.login-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid #e8eaed;
+  background-color: #ffffff;
+}
+
+.login-back-button {
+  background: none;
+  border: none;
+  color: #1a73e8;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.login-back-button:hover {
+  background-color: #f1f3f4;
+}
+
+.login-back-button:active {
+  background-color: #e8eaed;
+}
+
+.login-back-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.login-scroll-content {
+  flex-grow: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+}
+
+.login-content {
+  width: 100%;
+  max-width: 400px;
+}
+
+.login-branding-container {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.login-logo {
+  font-size: 36px;
+  font-weight: bold;
+  color: #1a73e8;
+  margin-bottom: 8px;
+  margin-top: 0;
+}
+
+.login-tagline {
+  font-size: 16px;
+  color: #5f6368;
+  margin: 0;
+}
+
+.login-error-container {
+  background-color: #fce8e6;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.login-error-text {
+  color: #d93025;
+  font-size: 14px;
+  text-align: center;
+  margin: 0;
+}
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  margin: 24px 0;
+}
+
+.login-divider-line {
+  flex: 1;
+  height: 1px;
+  background-color: #dadce0;
+}
+
+.login-divider-text {
+  margin: 0 16px;
+  color: #5f6368;
+  font-size: 14px;
+}
+
+.login-register-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.login-register-text {
+  font-size: 14px;
+  color: #5f6368;
+}
+
+.login-register-link {
+  font-size: 14px;
+  color: #1a73e8;
+  font-weight: 600;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.login-register-link:hover:not(.disabled) {
+  text-decoration: underline;
+}
+
+.login-register-link.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

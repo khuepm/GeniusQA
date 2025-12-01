@@ -3,7 +3,8 @@
  */
 
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import { AuthInput } from '../AuthInput';
 
 describe('AuthInput', () => {
@@ -22,7 +23,7 @@ describe('AuthInput', () => {
       />
     );
 
-    expect(getByPlaceholderText('Enter email')).toBeTruthy();
+    expect(getByPlaceholderText('Enter email')).toBeInTheDocument();
   });
 
   it('should display the current value', () => {
@@ -34,7 +35,7 @@ describe('AuthInput', () => {
       />
     );
 
-    expect(getByDisplayValue('test@example.com')).toBeTruthy();
+    expect(getByDisplayValue('test@example.com')).toBeInTheDocument();
   });
 
   it('should call onChangeText when text changes', () => {
@@ -46,8 +47,8 @@ describe('AuthInput', () => {
       />
     );
 
-    const input = getByPlaceholderText('Enter email');
-    fireEvent.changeText(input, 'new@example.com');
+    const input = getByPlaceholderText('Enter email') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'new@example.com' } });
 
     expect(mockOnChangeText).toHaveBeenCalledWith('new@example.com');
   });
@@ -62,8 +63,8 @@ describe('AuthInput', () => {
       />
     );
 
-    const input = getByPlaceholderText('Enter password');
-    expect(input.props.secureTextEntry).toBe(true);
+    const input = getByPlaceholderText('Enter password') as HTMLInputElement;
+    expect(input.type).toBe('password');
   });
 
   it('should apply email keyboard type', () => {
@@ -76,8 +77,8 @@ describe('AuthInput', () => {
       />
     );
 
-    const input = getByPlaceholderText('Enter email');
-    expect(input.props.keyboardType).toBe('email-address');
+    const input = getByPlaceholderText('Enter email') as HTMLInputElement;
+    expect(input.type).toBe('email');
   });
 
   it('should apply autoCapitalize prop', () => {
@@ -90,8 +91,8 @@ describe('AuthInput', () => {
       />
     );
 
-    const input = getByPlaceholderText('Enter text');
-    expect(input.props.autoCapitalize).toBe('none');
+    const input = getByPlaceholderText('Enter text') as HTMLInputElement;
+    expect(input.getAttribute('autocapitalize')).toBe('none');
   });
 
   it('should be disabled when editable is false', () => {
@@ -104,8 +105,8 @@ describe('AuthInput', () => {
       />
     );
 
-    const input = getByPlaceholderText('Enter email');
-    expect(input.props.editable).toBe(false);
+    const input = getByPlaceholderText('Enter email') as HTMLInputElement;
+    expect(input.disabled).toBe(true);
   });
 
   it('should render with label when provided', () => {
@@ -118,6 +119,6 @@ describe('AuthInput', () => {
       />
     );
 
-    expect(getByText('Email Address')).toBeTruthy();
+    expect(getByText('Email Address')).toBeInTheDocument();
   });
 });

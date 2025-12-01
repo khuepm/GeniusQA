@@ -4,13 +4,12 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import { User as FirebaseUser } from 'firebase/auth';
 import firebaseService from '../services/firebaseService';
 import { User, AuthContextType } from '../types/auth.types';
 
 // Storage key for persisting auth state
-const AUTH_STORAGE_KEY = '@geniusqa_auth_user';
+const AUTH_STORAGE_KEY = 'geniusqa_auth_user';
 
 // Create the context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,7 +29,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [error, setError] = useState<string | null>(null);
 
   // Helper function to convert Firebase user to app User type
-  const mapFirebaseUser = (firebaseUser: FirebaseAuthTypes.User | null): User | null => {
+  const mapFirebaseUser = (firebaseUser: FirebaseUser | null): User | null => {
     if (!firebaseUser) {
       return null;
     }
@@ -45,23 +44,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   };
 
-  // Persist user to AsyncStorage
-  const persistUser = async (userData: User | null) => {
+  // Persist user to localStorage
+  const persistUser = (userData: User | null) => {
     try {
       if (userData) {
-        await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userData));
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userData));
       } else {
-        await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
+        localStorage.removeItem(AUTH_STORAGE_KEY);
       }
     } catch (err) {
       console.error('Failed to persist user data:', err);
     }
   };
 
-  // Load persisted user from AsyncStorage
-  const loadPersistedUser = async () => {
+  // Load persisted user from localStorage
+  const loadPersistedUser = () => {
     try {
-      const userData = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
+      const userData = localStorage.getItem(AUTH_STORAGE_KEY);
       if (userData) {
         setUser(JSON.parse(userData));
       }
@@ -80,7 +79,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         await firebaseService.initialize();
 
         // Load persisted user
-        await loadPersistedUser();
+        loadPersistedUser();
 
         // Setup auth state listener
         unsubscribe = firebaseService.onAuthStateChanged((firebaseUser) => {
@@ -91,7 +90,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         });
       } catch (err: any) {
         console.error('Failed to initialize auth:', err);
-        setError(err.message || 'Không thể khởi tạo xác thực');
+        setError(err.message || 'Failed to initialize authentication');
         setLoading(false);
       }
     };
@@ -117,10 +116,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // User state will be updated by onAuthStateChanged listener
     } catch (err: any) {
       console.error('Google sign in failed:', err);
+
+      // Don't show error if redirect is in progress
+      if (err.message === 'REDIRECT_IN_PROGRESS') {
+        // Keep loading state while redirecting
+        return;
+      }
+
       setError(err.message || 'Đăng nhập Google thất bại');
-      throw err;
-    } finally {
       setLoading(false);
+      throw err;
     }
   };
 
@@ -169,14 +174,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setError(null);
       await firebaseService.signOut();
       setUser(null);
-      await persistUser(null);
+      persistUser(null);
     } catch (err: any) {
       console.error('Sign out failed:', err);
-      setError(err.message || 'Đăng xuất thất bại');
+      setError(err.message || 'Sign out failed');
       throw err;
     } finally {
       setLoading(false);
     }
+  };
+
+  /**
+   * Clear error state
+   */
+  const clearError = (): void => {
+    setError(null);
+  };
+
+  /**
+   * Reset auth state (clear error and loading)
+   * Useful for resetting the flow when navigating back
+   */
+  const resetAuthState = (): void => {
+    setError(null);
+    setLoading(false);
   };
 
   const value: AuthContextType = {
@@ -187,6 +208,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signInWithEmail,
     signUpWithEmail,
     signOut,
+    clearError,
+    resetAuthState,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

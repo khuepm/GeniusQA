@@ -4,86 +4,103 @@
  */
 
 import React from 'react';
-import { createStackNavigator } from '@react-navigation/stack';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 
 // Import screens
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import DashboardScreen from '../screens/DashboardScreen';
+import RecorderScreen from '../screens/RecorderScreen';
+import ScriptEditorScreen from '../screens/ScriptEditorScreen';
 
-// Define navigation param list
-export type RootStackParamList = {
-  Login: undefined;
-  Register: undefined;
-  Dashboard: undefined;
+/**
+ * Protected Route component
+ * Redirects to login if user is not authenticated
+ */
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  return user ? <>{children}</> : <Navigate to="/login" replace />;
 };
 
-const Stack = createStackNavigator<RootStackParamList>();
+/**
+ * Public Route component
+ * Redirects to dashboard if user is already authenticated
+ */
+const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  return user ? <Navigate to="/dashboard" replace /> : <>{children}</>;
+};
 
 /**
  * AppNavigator component
  * Conditionally renders auth or main app screens based on authentication state
  */
 const AppNavigator: React.FC = () => {
-  const { user, loading } = useAuth();
-
-  // Show loading spinner while checking auth state
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#1a73e8" />
-      </View>
-    );
-  }
-
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerShown: false,
-        cardStyle: { backgroundColor: '#ffffff' },
-      }}
-    >
-      {user ? (
-        // User is authenticated - show main app screens
-        <Stack.Screen
-          name="Dashboard"
-          component={DashboardScreen}
-          options={{
-            animationEnabled: true,
-          }}
+    <BrowserRouter>
+      <Routes>
+        {/* Public routes */}
+        <Route
+          path="/login"
+          element={
+            <PublicRoute>
+              <LoginScreen />
+            </PublicRoute>
+          }
         />
-      ) : (
-        // User is not authenticated - show auth screens
-        <>
-          <Stack.Screen
-            name="Login"
-            component={LoginScreen}
-            options={{
-              animationEnabled: true,
-            }}
-          />
-          <Stack.Screen
-            name="Register"
-            component={RegisterScreen}
-            options={{
-              animationEnabled: true,
-            }}
-          />
-        </>
-      )}
-    </Stack.Navigator>
+        <Route
+          path="/register"
+          element={
+            <PublicRoute>
+              <RegisterScreen />
+            </PublicRoute>
+          }
+        />
+
+        {/* Protected routes */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/recorder"
+          element={
+            <ProtectedRoute>
+              <RecorderScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/script-editor"
+          element={
+            <ProtectedRoute>
+              <ScriptEditorScreen />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Default redirect */}
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 };
-
-const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-  },
-});
 
 export default AppNavigator;

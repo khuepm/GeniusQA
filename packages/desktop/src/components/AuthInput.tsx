@@ -1,5 +1,5 @@
 import React from 'react';
-import { TextInput, StyleSheet, View, Text } from 'react-native';
+import './AuthInput.css';
 
 interface AuthInputProps {
   value: string;
@@ -22,52 +22,21 @@ export const AuthInput: React.FC<AuthInputProps> = ({
   editable = true,
   label,
 }) => {
+  const inputType = secureTextEntry ? 'password' : keyboardType === 'email-address' ? 'email' : 'text';
+
   return (
-    <View style={styles.container}>
-      {label && <Text style={styles.label}>{label}</Text>}
-      <TextInput
-        style={[
-          styles.input,
-          !editable && styles.inputDisabled,
-        ]}
+    <div className="auth-input-container">
+      {label && <label className="auth-input-label">{label}</label>}
+      <input
+        className={`auth-input ${!editable ? 'auth-input-disabled' : ''}`}
+        type={inputType}
         value={value}
-        onChangeText={onChangeText}
+        onChange={(e) => onChangeText(e.target.value)}
         placeholder={placeholder}
-        placeholderTextColor="#999"
-        secureTextEntry={secureTextEntry}
-        keyboardType={keyboardType}
+        disabled={!editable}
         autoCapitalize={autoCapitalize}
-        editable={editable}
-        autoCorrect={false}
+        autoCorrect="off"
       />
-    </View>
+    </div>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: 16,
-    width: '100%',
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  input: {
-    height: 48,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    backgroundColor: '#fff',
-    color: '#333',
-  },
-  inputDisabled: {
-    backgroundColor: '#f5f5f5',
-    color: '#999',
-    borderColor: '#e0e0e0',
-  },
-});
