@@ -507,3 +507,354 @@
   color: #1a73e8;
   font-weight: 600;
 }
+
+.button-group {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.button-group > * {
+  flex: 1;
+}
+
+.playback-progress-container {
+  margin: 16px 0;
+  padding: 16px;
+  background-color: #e8f0fe;
+  border-radius: 8px;
+  border-left: 4px solid #1a73e8;
+}
+
+.playback-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.playback-progress-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a73e8;
+}
+
+.playback-loop-label {
+  font-size: 12px;
+  color: #5f6368;
+  font-weight: 500;
+}
+
+.playback-progress-bar-container {
+  height: 8px;
+  background-color: #c2d7f5;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.playback-progress-bar {
+  height: 100%;
+  background-color: #1a73e8;
+  border-radius: 4px;
+  transition: width 0.1s ease-out;
+}
+
+.shortcut-hint {
+  margin-top: 16px;
+  padding: 12px;
+  background-color: #fff3cd;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 14px;
+  color: #856404;
+}
+
+.shortcut-hint kbd {
+  display: inline-block;
+  padding: 2px 8px;
+  background-color: #ffc107;
+  border-radius: 4px;
+  font-family: monospace;
+  font-weight: bold;
+  margin: 0 4px;
+}
+
+
+.playback-progress-container.paused {
+  border-left-color: #f9a825;
+  background-color: #fff8e1;
+}
+
+.playback-progress-container.paused .playback-progress-label {
+  color: #f57c00;
+}
+
+.playback-progress-bar.paused {
+  background-color: #f9a825;
+}
+
+/* Main Progress Container */
+.main-progress-container {
+  margin: 16px 0;
+  padding: 20px;
+  background-color: #e8f0fe;
+  border-radius: 12px;
+  border-left: 4px solid #1a73e8;
+  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.1);
+  transition: all 0.3s ease-in-out;
+}
+
+.main-progress-container.paused {
+  border-left-color: #f9a825;
+  background-color: #fff8e1;
+}
+
+.main-progress-container.completed {
+  border-left-color: #34a853;
+  background-color: #e8f5e8;
+  animation: completePulse 0.6s ease-in-out;
+}
+
+@keyframes completePulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+.main-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.progress-status {
+  flex: 1;
+}
+
+.progress-status-text {
+  font-size: 18px;
+  font-weight: 600;
+  display: block;
+}
+
+.progress-status-text.playing {
+  color: #1a73e8;
+}
+
+.progress-status-text.paused {
+  color: #f57c00;
+}
+
+.progress-status-text.completed {
+  color: #34a853;
+}
+
+.progress-details {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.progress-action-count {
+  font-size: 14px;
+  color: #5f6368;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.progress-percentage {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a73e8;
+}
+
+.main-progress-container.paused .progress-percentage {
+  color: #f57c00;
+}
+
+.main-progress-container.completed .progress-percentage {
+  color: #34a853;
+}
+
+.progress-loop-info {
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.progress-loop-text {
+  font-size: 14px;
+  color: #5f6368;
+  font-weight: 500;
+  background-color: rgba(255, 255, 255, 0.7);
+  padding: 6px 12px;
+  border-radius: 16px;
+  display: inline-block;
+}
+
+.main-progress-bar-container {
+  position: relative;
+  height: 12px;
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.progress-bar-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+.main-progress-bar {
+  position: relative;
+  height: 100%;
+  background: linear-gradient(90deg, #1a73e8 0%, #4285f4 100%);
+  border-radius: 6px;
+  transition: width 0.3s ease-out;
+  box-shadow: 0 1px 3px rgba(26, 115, 232, 0.3);
+}
+
+.main-progress-bar.paused {
+  background: linear-gradient(90deg, #f9a825 0%, #fbc02d 100%);
+  box-shadow: 0 1px 3px rgba(249, 168, 37, 0.3);
+}
+
+.main-progress-bar.completed {
+  background: linear-gradient(90deg, #34a853 0%, #4caf50 100%);
+  box-shadow: 0 1px 3px rgba(52, 168, 83, 0.3);
+  animation: completeGlow 1s ease-in-out;
+}
+
+@keyframes completeGlow {
+  0% { box-shadow: 0 1px 3px rgba(52, 168, 83, 0.3); }
+  50% { box-shadow: 0 2px 8px rgba(52, 168, 83, 0.6); }
+  100% { box-shadow: 0 1px 3px rgba(52, 168, 83, 0.3); }
+}
+
+.progress-text {
+  text-align: center;
+  font-size: 14px;
+  color: #5f6368;
+  font-weight: 500;
+}
+
+.main-progress-container.completed .progress-text {
+  color: #34a853;
+  font-weight: 600;
+}
+
+/* Recording Status Container */
+.recording-status-container {
+  margin: 16px 0;
+  padding: 20px;
+  background-color: #fce8e6;
+  border-radius: 12px;
+  border-left: 4px solid #d93025;
+  box-shadow: 0 2px 8px rgba(217, 48, 37, 0.1);
+  animation: recordingGlow 2s ease-in-out infinite;
+}
+
+@keyframes recordingGlow {
+  0%, 100% { box-shadow: 0 2px 8px rgba(217, 48, 37, 0.1); }
+  50% { box-shadow: 0 4px 12px rgba(217, 48, 37, 0.2); }
+}
+
+.recording-status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.recording-status-indicator {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.recording-status-text {
+  font-size: 18px;
+  font-weight: 600;
+  color: #d93025;
+  margin-right: 12px;
+}
+
+.recording-pulse {
+  width: 12px;
+  height: 12px;
+  background-color: #d93025;
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.recording-time-display {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.recording-time-label {
+  font-size: 12px;
+  color: #5f6368;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.recording-time-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #d93025;
+  font-family: monospace;
+  letter-spacing: 1px;
+}
+
+.recording-info-text {
+  text-align: center;
+  font-size: 14px;
+  color: #5f6368;
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.recording-hint {
+  text-align: center;
+  font-size: 14px;
+  color: #856404;
+  background-color: rgba(255, 255, 255, 0.7);
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.recording-hint kbd {
+  display: inline-block;
+  padding: 2px 8px;
+  background-color: #d93025;
+  color: white;
+  border-radius: 4px;
+  font-family: monospace;
+  font-weight: bold;
+  margin: 0 4px;
+}

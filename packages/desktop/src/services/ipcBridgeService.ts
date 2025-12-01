@@ -178,9 +178,16 @@ export class IPCBridgeService {
    */
   public async stopRecording(): Promise<RecordingResult> {
     try {
+      console.log('[IPC Bridge] Invoking stop_recording command...');
       const result = await invoke<RecordingResult>('stop_recording');
-      return result;
+      console.log('[IPC Bridge] stop_recording result:', result);
+      // Tauri returns the RecordingResult struct directly, add success field
+      return {
+        success: true,
+        ...result,
+      };
     } catch (error) {
+      console.error('[IPC Bridge] stop_recording command failed:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to stop recording',
@@ -226,12 +233,15 @@ export class IPCBridgeService {
    */
   public async startPlayback(scriptPath?: string, speed?: number, loopCount?: number): Promise<void> {
     try {
+      console.log('[IPC Bridge] Invoking start_playback command...', { scriptPath, speed, loopCount });
       await invoke('start_playback', {
         scriptPath: scriptPath || null,
         speed: speed || 1.0,
         loopCount: loopCount || 1,
       });
+      console.log('[IPC Bridge] start_playback command successful');
     } catch (error) {
+      console.error('[IPC Bridge] start_playback command failed:', error);
       throw new Error(this.formatErrorMessage(error as Error));
     }
   }
@@ -253,8 +263,35 @@ export class IPCBridgeService {
    */
   public async stopPlayback(): Promise<void> {
     try {
+      console.log('[IPC Bridge] Invoking stop_playback command...');
       await invoke('stop_playback');
+      console.log('[IPC Bridge] stop_playback command successful');
     } catch (error) {
+      console.error('[IPC Bridge] stop_playback command failed:', error);
+      throw new Error(this.formatErrorMessage(error as Error));
+    }
+  }
+
+  /**
+   * Pause/Resume current playback
+   * 
+   * Invokes the Tauri pause_playback command, which toggles the pause state
+   * of the active playback session.
+   * 
+   * @returns {Promise<boolean>} True if playback is now paused, false if resumed
+   * @throws {Error} If Python Core is unavailable
+   * @throws {Error} If no playback is currently active
+   * 
+   * Requirements: 2.3
+   */
+  public async pausePlayback(): Promise<boolean> {
+    try {
+      console.log('[IPC Bridge] Invoking pause_playback command...');
+      const isPaused = await invoke<boolean>('pause_playback');
+      console.log('[IPC Bridge] pause_playback command successful, isPaused:', isPaused);
+      return isPaused;
+    } catch (error) {
+      console.error('[IPC Bridge] pause_playback command failed:', error);
       throw new Error(this.formatErrorMessage(error as Error));
     }
   }
@@ -332,6 +369,25 @@ export class IPCBridgeService {
     // Handle empty or missing error messages
     if (!message || message.trim() === '' || message === 'Unknown error') {
       return 'An unknown error occurred. Please try again.';
+    }
+    
+    // Check for Python process errors
+    if (message.includes('Broken pipe') || message.includes('Failed to write to Python stdin')) {
+      return 'Python process is not running or has crashed. Please ensure:\n' +
+             '1. Python 3.9+ is installed (python3 --version)\n' +
+             '2. Dependencies are installed (cd packages/python-core && pip3 install -r requirements.txt)\n' +
+             '3. Restart the application';
+    }
+    
+    if (message.includes('Failed to spawn Python process')) {
+      return 'Failed to start Python process. Please ensure:\n' +
+             '1. Python 3.9+ is installed (python3 --version)\n' +
+             '2. Python is in your system PATH\n' +
+             '3. Try restarting the application';
+    }
+    
+    if (message.includes('Python process not running')) {
+      return 'Python process is not running. Please restart the application.';
     }
     
     // Check for common error patterns and provide helpful guidance

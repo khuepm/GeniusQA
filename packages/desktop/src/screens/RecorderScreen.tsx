@@ -14,7 +14,6 @@ import {
   ActionData,
   ActionPreviewData,
 } from '../types/recorder.types';
-import { calculateButtonStates } from '../utils/buttonStates';
 import './RecorderScreen.css';
 
 interface ScriptInfo {
@@ -43,12 +42,14 @@ const RecorderScreen: React.FC = () => {
   const [loopCount, setLoopCount] = useState<number>(1);
   const [currentLoop, setCurrentLoop] = useState<number>(1);
   const [totalLoops, setTotalLoops] = useState<number>(1);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [playbackProgress, setPlaybackProgress] = useState<number>(0);
+  const [isPlaybackComplete, setIsPlaybackComplete] = useState<boolean>(false);
+  const [recordingTime, setRecordingTime] = useState<number>(0);
+  const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
 
   const navigate = useNavigate();
   const ipcBridge = getIPCBridge();
-
-  // Calculate button states
-  const buttonStates = calculateButtonStates(status, hasRecordings);
 
   /**
    * Initialize component - check for existing recordings
@@ -85,6 +86,10 @@ const RecorderScreen: React.FC = () => {
       if (event.data?.currentAction && event.data?.totalActions) {
         setActionIndex(event.data.currentAction);
         setTotalActions(event.data.totalActions);
+
+        // Calculate overall progress percentage
+        const actionProgress = (event.data.currentAction / event.data.totalActions) * 100;
+        setPlaybackProgress(actionProgress);
       }
       if (event.data?.currentLoop !== undefined && event.data?.totalLoops !== undefined) {
         setCurrentLoop(event.data.currentLoop);
@@ -109,6 +114,16 @@ const RecorderScreen: React.FC = () => {
       setShowPreview(false);
       setCurrentAction(null);
       setPreviewOpacity(0);
+      setPlaybackProgress(100);
+      setIsPlaybackComplete(true);
+
+      // Reset completion state after 3 seconds
+      setTimeout(() => {
+        setIsPlaybackComplete(false);
+        setPlaybackProgress(0);
+        setActionIndex(0);
+        setTotalActions(0);
+      }, 3000);
     };
 
     const handleErrorEvent = (event: IPCEvent) => {
@@ -119,12 +134,52 @@ const RecorderScreen: React.FC = () => {
       setShowPreview(false);
       setCurrentAction(null);
       setPreviewOpacity(0);
+      setPlaybackProgress(0);
+      setIsPlaybackComplete(false);
+    };
+
+    const handleRecordingStoppedEvent = async (event: IPCEvent) => {
+      console.log('Recording stopped by ESC key:', event.data);
+      setStatus('idle');
+      setLoading(false);
+      setRecordingStartTime(null);
+      setRecordingTime(0);
+
+      // Update with the new recording
+      if (event.data?.scriptPath) {
+        setLastRecordingPath(event.data.scriptPath);
+        setSelectedScriptPath(event.data.scriptPath);
+        setHasRecordings(true);
+        await loadAvailableScripts();
+      }
+    };
+
+    const handlePlaybackStoppedEvent = (event: IPCEvent) => {
+      console.log('Playback stopped by ESC key:', event.data);
+      setStatus('idle');
+      setLoading(false);
+      setShowPreview(false);
+      setCurrentAction(null);
+      setPreviewOpacity(0);
+      setIsPaused(false);
+      setActionIndex(0);
+      setTotalActions(0);
+      setPlaybackProgress(0);
+      setIsPlaybackComplete(false);
+    };
+
+    const handlePlaybackPausedEvent = (event: IPCEvent) => {
+      console.log('Playback pause toggled:', event.data);
+      setIsPaused(event.data?.isPaused ?? false);
     };
 
     ipcBridge.addEventListener('progress', handleProgressEvent);
     ipcBridge.addEventListener('action_preview', handleActionPreviewEvent);
     ipcBridge.addEventListener('complete', handleCompleteEvent);
     ipcBridge.addEventListener('error', handleErrorEvent);
+    ipcBridge.addEventListener('recording_stopped', handleRecordingStoppedEvent);
+    ipcBridge.addEventListener('playback_stopped', handlePlaybackStoppedEvent);
+    ipcBridge.addEventListener('playback_paused', handlePlaybackPausedEvent);
 
     // Cleanup
     return () => {
@@ -132,8 +187,31 @@ const RecorderScreen: React.FC = () => {
       ipcBridge.removeEventListener('action_preview', handleActionPreviewEvent);
       ipcBridge.removeEventListener('complete', handleCompleteEvent);
       ipcBridge.removeEventListener('error', handleErrorEvent);
+      ipcBridge.removeEventListener('recording_stopped', handleRecordingStoppedEvent);
+      ipcBridge.removeEventListener('playback_stopped', handlePlaybackStoppedEvent);
+      ipcBridge.removeEventListener('playback_paused', handlePlaybackPausedEvent);
     };
   }, []);
+
+  /**
+   * Update recording time while recording
+   */
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+
+    if (status === 'recording' && recordingStartTime) {
+      interval = setInterval(() => {
+        const elapsed = (Date.now() - recordingStartTime) / 1000;
+        setRecordingTime(elapsed);
+      }, 100); // Update every 100ms for smooth display
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [status, recordingStartTime]);
 
   /**
    * Load available scripts for selection
@@ -157,6 +235,8 @@ const RecorderScreen: React.FC = () => {
       setLoading(true);
       await ipcBridge.startRecording();
       setStatus('recording');
+      setRecordingStartTime(Date.now());
+      setRecordingTime(0);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to start recording';
       setError(errorMessage);
@@ -174,10 +254,17 @@ const RecorderScreen: React.FC = () => {
     try {
       setError(null);
       setLoading(true);
+      // Reset playback state before starting
+      setActionIndex(0);
+      setTotalActions(0);
+      setCurrentLoop(1);
+      setPlaybackProgress(0);
+      setIsPlaybackComplete(false);
       // Use selected script path, or fall back to last recording
       const scriptPath = selectedScriptPath || lastRecordingPath || undefined;
       await ipcBridge.startPlayback(scriptPath, playbackSpeed, loopCount);
       setStatus('playing');
+      setLoading(false);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to start playback';
       setError(errorMessage);
@@ -228,6 +315,8 @@ const RecorderScreen: React.FC = () => {
           setSelectedScriptPath(result.scriptPath || null);
           setHasRecordings(true);
           setStatus('idle');
+          setRecordingStartTime(null);
+          setRecordingTime(0);
           // Reload available scripts to include the new recording
           await loadAvailableScripts();
         } else {
@@ -236,7 +325,16 @@ const RecorderScreen: React.FC = () => {
       } else if (status === 'playing') {
         // Stop playback
         await ipcBridge.stopPlayback();
+        // Reset all playback state
         setStatus('idle');
+        setActionIndex(0);
+        setTotalActions(0);
+        setCurrentLoop(1);
+        setShowPreview(false);
+        setCurrentAction(null);
+        setPreviewOpacity(0);
+        setPlaybackProgress(0);
+        setIsPlaybackComplete(false);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to stop';
@@ -244,6 +342,22 @@ const RecorderScreen: React.FC = () => {
       console.error('Stop error:', err);
     } finally {
       setLoading(false);
+      setIsPaused(false);
+    }
+  };
+
+  /**
+   * Handle Pause button click
+   */
+  const handlePauseClick = async () => {
+    try {
+      setError(null);
+      const paused = await ipcBridge.pausePlayback();
+      setIsPaused(paused);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to pause';
+      setError(errorMessage);
+      console.error('Pause error:', err);
     }
   };
 
@@ -322,6 +436,16 @@ const RecorderScreen: React.FC = () => {
       default:
         return '#5f6368';
     }
+  };
+
+  /**
+   * Format recording time for display
+   */
+  const formatRecordingTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    const ms = Math.floor((seconds % 1) * 10);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms}`;
   };
 
   return (
@@ -413,18 +537,55 @@ const RecorderScreen: React.FC = () => {
           </div>
         )}
 
+        {/* Recording Status */}
+        {status === 'recording' && (
+          <div className="recording-status-container">
+            <div className="recording-status-header">
+              <div className="recording-status-indicator">
+                <span className="recording-status-text">
+                  🔴 Recording in Progress
+                </span>
+                <div className="recording-pulse" />
+              </div>
+              <div className="recording-time-display">
+                <span className="recording-time-label">Duration</span>
+                <span className="recording-time-value">
+                  {formatRecordingTime(recordingTime)}
+                </span>
+              </div>
+            </div>
+
+            <div className="recording-info-text">
+              <span>Capturing all mouse movements, clicks, and keyboard inputs</span>
+            </div>
+
+            <div className="recording-hint">
+              Press <kbd>ESC</kbd> to stop recording or click "Stop Recording" button
+            </div>
+          </div>
+        )}
+
         {/* Control Buttons */}
         <div className="controls-card">
           <h2 className="controls-title">Controls</h2>
 
-          {/* Record Button */}
-          <AuthButton
-            title="Record"
-            onPress={handleRecordClick}
-            loading={loading && status === 'idle'}
-            disabled={!buttonStates.recordEnabled || loading}
-            variant="primary"
-          />
+          {/* Recording Controls */}
+          <div className="button-group">
+            <AuthButton
+              title="Record"
+              onPress={handleRecordClick}
+              loading={loading && status === 'idle'}
+              disabled={status !== 'idle' || loading}
+              variant="primary"
+            />
+            <AuthButton
+              title="Stop Recording"
+              onPress={handleStopClick}
+              loading={loading && status === 'recording'}
+              disabled={status !== 'recording'}
+              variant="secondary"
+            />
+          </div>
 
           {/* Script Selection */}
           {hasRecordings && (
@@ -476,6 +637,13 @@ const RecorderScreen: React.FC = () => {
                 >
                   2x
                 </button>
+                <button
+                  className={`speed-button ${playbackSpeed === 5.0 ? 'active' : ''}`}
+                  onClick={() => setPlaybackSpeed(5.0)}
+                  disabled={loading || status !== 'idle'}
+                >
+                  5x
+                </button>
               </div>
             </div>
           )}
@@ -526,23 +694,103 @@ const RecorderScreen: React.FC = () => {
             </div>
           )}
 
-          {/* Start Button */}
-          <AuthButton
-            title="Start Playback"
-            onPress={handleStartClick}
-            loading={loading && status === 'idle'}
-            disabled={!buttonStates.startEnabled || loading}
-            variant="primary"
-          />
+          {/* Main Playback Progress */}
+          {(status === 'playing' || isPlaybackComplete) && totalActions > 0 && (
+            <div className={`main-progress-container ${isPaused ? 'paused' : ''} ${isPlaybackComplete ? 'completed' : ''}`}>
+              <div className="main-progress-header">
+                <div className="progress-status">
+                  {isPlaybackComplete ? (
+                    <span className="progress-status-text completed">
+                      ✅ Playback Complete!
+                    </span>
+                  ) : isPaused ? (
+                    <span className="progress-status-text paused">
+                      ⏸ Paused
+                    </span>
+                  ) : (
+                    <span className="progress-status-text playing">
+                      ▶ Playing
+                    </span>
+                  )}
+                </div>
+                <div className="progress-details">
+                  <span className="progress-action-count">
+                    Action {actionIndex} of {totalActions}
+                  </span>
+                  <span className="progress-percentage">
+                    {Math.round(playbackProgress)}%
+                  </span>
+                </div>
+              </div>
 
-          {/* Stop Button */}
-          <AuthButton
-            title="Stop"
-            onPress={handleStopClick}
-            loading={loading && (status === 'recording' || status === 'playing')}
-            disabled={!buttonStates.stopEnabled || loading}
-            variant="secondary"
-          />
+              {/* Loop Information */}
+              {(totalLoops > 1 || totalLoops === 0) && (
+                <div className="progress-loop-info">
+                  {totalLoops > 1 ? (
+                    <span className="progress-loop-text">
+                      Loop {currentLoop} of {totalLoops}
+                    </span>
+                  ) : (
+                    <span className="progress-loop-text">
+                      Loop {currentLoop} (Infinite)
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Main Progress Bar */}
+              <div className="main-progress-bar-container">
+                <div
+                  className={`main-progress-bar ${isPaused ? 'paused' : ''} ${isPlaybackComplete ? 'completed' : ''}`}
+                  style={{ width: `${playbackProgress}%` }}
+                />
+                <div className="progress-bar-background" />
+              </div>
+
+              {/* Progress Text */}
+              <div className="progress-text">
+                {isPlaybackComplete ? (
+                  <span>All actions executed successfully</span>
+                ) : (
+                  <span>
+                    {actionIndex > 0 ? `${actionIndex} actions completed` : 'Starting playback...'}
+                    {totalActions > actionIndex && `, ${totalActions - actionIndex} remaining`}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Playback Controls */}
+          <div className="button-group">
+            <AuthButton
+              title="Start Playback"
+              onPress={handleStartClick}
+              loading={loading && status === 'idle'}
+              disabled={status !== 'idle' || !hasRecordings || loading}
+              variant="primary"
+            />
+            <AuthButton
+              title={isPaused ? 'Resume' : 'Pause'}
+              onPress={handlePauseClick}
+              disabled={status !== 'playing'}
+              variant="secondary"
+            />
+            <AuthButton
+              title="Stop Playback"
+              onPress={handleStopClick}
+              loading={loading && status === 'playing'}
+              disabled={status !== 'playing'}
+              variant="secondary"
+            />
+          </div>
+
+          {/* Keyboard Shortcut Hint */}
+          {(status === 'recording' || status === 'playing') && (
+            <div className="shortcut-hint">
+              Press <kbd>ESC</kbd> to stop{status === 'playing' && <>, <kbd>⌘</kbd>+<kbd>ESC</kbd> to {isPaused ? 'resume' : 'pause'}</>}
+            </div>
+          )}
         </div>
 
         {/* Script Selector Modal */}

@@ -25,6 +25,7 @@ class Recorder:
         self.screenshots_dir: Optional[Path] = screenshots_dir
         self.capture_screenshots: bool = capture_screenshots
         self.screenshot_counter: int = 0
+        self._stop_requested: bool = False
     
     @staticmethod
     def check_dependencies(check_pillow: bool = True) -> tuple[bool, str]:
@@ -79,6 +80,7 @@ class Recorder:
         self.start_time = time.time()
         self.is_recording = True
         self.screenshot_counter = 0
+        self._stop_requested = False
         
         # Create screenshots directory if needed
         if self.capture_screenshots and self.screenshots_dir:
@@ -94,8 +96,14 @@ class Recorder:
             on_release=lambda key: self._on_key_event(key, False)
         )
         
+        import sys
+        sys.stderr.write("[Recorder] Starting mouse and keyboard listeners...\n")
+        sys.stderr.flush()
         self.mouse_listener.start()
         self.keyboard_listener.start()
+        sys.stderr.write("[Recorder] Listeners started successfully. Recording in progress...\n")
+        sys.stderr.write("[Recorder] Press ESC to stop recording\n")
+        sys.stderr.flush()
     
     def stop_recording(self) -> list[Action]:
         """Stop capturing and return recorded actions."""
@@ -113,7 +121,27 @@ class Recorder:
             self.keyboard_listener.stop()
             self.keyboard_listener = None
         
+        import sys
+        sys.stderr.write(f"[Recorder] Recording stopped. Captured {len(self.actions)} actions.\n")
+        sys.stderr.flush()
+        
+        # Log first few actions for debugging
+        if self.actions:
+            sys.stderr.write(f"[Recorder] First action: {self.actions[0].type} at ({self.actions[0].x}, {self.actions[0].y})\n")
+            if len(self.actions) > 1:
+                sys.stderr.write(f"[Recorder] Last action: {self.actions[-1].type} at ({self.actions[-1].x}, {self.actions[-1].y})\n")
+            sys.stderr.flush()
+        else:
+            sys.stderr.write("[Recorder] WARNING: No actions were captured!\n")
+            sys.stderr.write("[Recorder] This usually means Accessibility permissions are not granted.\n")
+            sys.stderr.write("[Recorder] On macOS: System Preferences → Security & Privacy → Privacy → Accessibility\n")
+            sys.stderr.flush()
+        
         return self.actions
+    
+    def is_stop_requested(self) -> bool:
+        """Check if ESC key was pressed to request stop."""
+        return self._stop_requested
     
     def _on_mouse_move(self, x: int, y: int) -> None:
         """Callback for mouse movement."""
@@ -128,6 +156,11 @@ class Recorder:
             y=y
         )
         self.actions.append(action)
+        # Log every 10th mouse move to avoid spam
+        if len(self.actions) % 10 == 0:
+            import sys
+            sys.stderr.write(f"[Recorder] Mouse move: ({x}, {y}) at {timestamp:.2f}s\n")
+            sys.stderr.flush()
     
     def _on_mouse_click(self, x: int, y: int, button: mouse.Button, pressed: bool) -> None:
         """Callback for mouse clicks."""
@@ -138,6 +171,9 @@ class Recorder:
         if not pressed:
             return
         
+        import sys
+        sys.stderr.write(f"[Recorder] Mouse click: {button.name} at ({x}, {y})\n")
+        sys.stderr.flush()
         timestamp = time.time() - self.start_time
         
         # Map pynput button to our button format
@@ -195,6 +231,14 @@ class Recorder:
     def _on_key_event(self, key, pressed: bool) -> None:
         """Callback for keyboard events."""
         if not self.is_recording or self.start_time is None:
+            return
+        
+        # Check if ESC key was pressed to stop recording
+        if pressed and key == keyboard.Key.esc:
+            import sys
+            sys.stderr.write("[Recorder] ESC pressed - stopping recording\n")
+            sys.stderr.flush()
+            self._stop_requested = True
             return
         
         timestamp = time.time() - self.start_time

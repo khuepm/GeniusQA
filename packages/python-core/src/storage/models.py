@@ -56,7 +56,7 @@ class Action(BaseModel):
     key: Optional[str] = Field(None, description="Key identifier for keyboard actions")
     screenshot: Optional[str] = Field(None, description="Filename of screenshot captured with this action")
     
-    @field_validator('x', 'y')
+    @field_validator('x', 'y', mode='before')
     @classmethod
     def validate_mouse_coordinates(cls, v, info):
         """
@@ -64,17 +64,22 @@ class Action(BaseModel):
         
         Mouse actions (mouse_move, mouse_click) require both x and y coordinates
         to specify the screen position. This validator ensures data integrity.
+        Converts float coordinates to integers.
         
         Args:
             v: The coordinate value being validated
             info: Validation context containing field name and other data
         
         Returns:
-            The validated coordinate value
+            The validated coordinate value as integer
         
         Raises:
             ValueError: If coordinate is None for a mouse action
         """
+        # Convert float to int if needed
+        if v is not None and isinstance(v, float):
+            v = int(v)
+        
         action_type = info.data.get('type')
         if action_type in ['mouse_move', 'mouse_click'] and v is None:
             raise ValueError(f"Coordinate {info.field_name} is required for {action_type}")

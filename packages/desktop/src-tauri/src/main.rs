@@ -3,8 +3,9 @@
 
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Write};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::{Arc, Mutex};
+use std::thread;
 use tauri::{Manager, State};
 
 // Python process manager to maintain a single long-lived Python process
@@ -16,6 +17,7 @@ struct PythonProcess {
     _child: Child,
     stdin: Arc<Mutex<ChildStdin>>,
     stdout_reader: Arc<Mutex<BufReader<ChildStdout>>>,
+    _stderr_thread: thread::JoinHandle<()>,
 }
 
 impl PythonProcessManager {
@@ -65,8 +67,7 @@ impl PythonProcessManager {
         // Spawn Python process with stdin/stdout/stderr pipes
         let mut child = Command::new(python_cmd)
             .arg("-u") // Unbuffered output
-            .arg("-m")
-            .arg("__main__")
+            .arg("__main__.py")
             .current_dir(&python_core_path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -74,17 +75,29 @@ impl PythonProcessManager {
             .spawn()
             .map_err(|e| format!("Failed to spawn Python process: {}. Make sure Python 3.9+ is installed.", e))?;
 
-        // Take ownership of stdin and stdout
+        // Take ownership of stdin, stdout, and stderr
         let stdin = child.stdin.take().ok_or("Failed to get stdin")?;
         let stdout = child.stdout.take().ok_or("Failed to get stdout")?;
+        let stderr = child.stderr.take().ok_or("Failed to get stderr")?;
         
         let stdin = Arc::new(Mutex::new(stdin));
         let stdout_reader = Arc::new(Mutex::new(BufReader::new(stdout)));
+
+        // Spawn a thread to read and log stderr
+        let stderr_thread = thread::spawn(move || {
+            let reader = BufReader::new(stderr);
+            for line in reader.lines() {
+                if let Ok(line) = line {
+                    eprintln!("[Python stderr] {}", line);
+                }
+            }
+        });
 
         Ok(PythonProcess { 
             _child: child,
             stdin,
             stdout_reader,
+            _stderr_thread: stderr_thread,
         })
     }
 
@@ -133,6 +146,9 @@ impl PythonProcessManager {
             // Try to parse the line
             let parsed: serde_json::Value = serde_json::from_str(&response_line)
                 .map_err(|e| format!("Failed to parse Python output: {}", e))?;
+
+            // Log the parsed message for debugging
+            eprintln!("[Python stdout] {}", response_line.trim());
 
             // Check if this is an event or a response
             if let Some(event_type) = parsed.get("type").and_then(|t| t.as_str()) {
@@ -274,6 +290,31 @@ async fn stop_playback(
     // Check if successful
     if response.get("success").and_then(|s| s.as_bool()) == Some(true) {
         Ok(())
+    } else {
+        let error = response
+            .get("error")
+            .and_then(|e| e.as_str())
+            .unwrap_or("Unknown error");
+        Err(error.to_string())
+    }
+}
+
+#[tauri::command]
+async fn pause_playback(
+    process_manager: State<'_, PythonProcessManager>,
+    app_handle: tauri::AppHandle,
+) -> Result<bool, String> {
+    // Send pause_playback command
+    let response = process_manager.send_command("pause_playback", serde_json::json!({}), &app_handle)?;
+
+    // Check if successful
+    if response.get("success").and_then(|s| s.as_bool()) == Some(true) {
+        let data = response.get("data").ok_or("Missing data in response")?;
+        let is_paused = data
+            .get("isPaused")
+            .and_then(|b| b.as_bool())
+            .unwrap_or(false);
+        Ok(is_paused)
     } else {
         let error = response
             .get("error")
@@ -478,6 +519,7 @@ fn main() {
             stop_recording,
             start_playback,
             stop_playback,
+            pause_playback,
             check_recordings,
             get_latest,
             list_scripts,

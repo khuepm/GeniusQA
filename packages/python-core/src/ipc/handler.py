@@ -64,6 +64,8 @@ class IPCHandler:
             return self._handle_start_playback(params)
         elif command == 'stop_playback':
             return self._handle_stop_playback(params)
+        elif command == 'pause_playback':
+            return self._handle_pause_playback(params)
         elif command == 'check_recordings':
             return self._handle_check_recordings(params)
         elif command == 'get_latest':
@@ -85,6 +87,10 @@ class IPCHandler:
     def _handle_start_recording(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Handle start_recording command."""
         try:
+            # Clean up old recorder if it exists and is not recording
+            if self.recorder and not self.recorder.is_recording:
+                self.recorder = None
+            
             if self.recorder and self.recorder.is_recording:
                 return {
                     'success': False,
@@ -104,6 +110,43 @@ class IPCHandler:
                 capture_screenshots=capture_screenshots
             )
             self.recorder.start_recording()
+            
+            # Start a thread to monitor for ESC key press
+            import threading
+            def monitor_stop_request():
+                import time
+                while self.recorder and self.recorder.is_recording:
+                    if self.recorder.is_stop_requested():
+                        # Auto-stop recording
+                        try:
+                            actions = self.recorder.stop_recording()
+                            screenshots_dir = self.recorder.screenshots_dir
+                            script_path = self.storage.save_script(actions, screenshots_dir=screenshots_dir)
+                            
+                            # Calculate duration and screenshot count
+                            duration = 0.0
+                            screenshot_count = 0
+                            if actions:
+                                duration = max(action.timestamp for action in actions)
+                                screenshot_count = sum(1 for action in actions if action.screenshot is not None)
+                            
+                            # Emit stop event
+                            event = {
+                                'type': 'recording_stopped',
+                                'data': {
+                                    'scriptPath': str(script_path),
+                                    'actionCount': len(actions),
+                                    'duration': duration,
+                                    'screenshotCount': screenshot_count
+                                }
+                            }
+                            self._send_response(event)
+                        except Exception as e:
+                            self._log_error(f"Failed to auto-stop recording: {str(e)}")
+                        break
+                    time.sleep(0.1)
+            
+            threading.Thread(target=monitor_stop_request, daemon=True).start()
             
             return {
                 'success': True,
@@ -235,9 +278,24 @@ class IPCHandler:
                 action_callback=self._emit_action_preview,
                 variables=variables,
                 speed=speed,
-                loop_count=loop_count
+                loop_count=loop_count,
+                stop_callback=self._emit_playback_stopped
             )
-            self.player.start_playback()
+            self.player.pause_callback = self._emit_playback_paused
+            
+            # Start playback in a separate thread and monitor completion
+            import threading
+            def monitor_playback():
+                self.player.start_playback()
+                # Wait for playback to complete
+                if self.player._playback_thread:
+                    self.player._playback_thread.join()
+                
+                # Emit completion event if playback finished normally (not stopped by ESC)
+                if not self.player._stopped_by_esc:
+                    self._emit_complete()
+            
+            threading.Thread(target=monitor_playback, daemon=True).start()
             
             return {
                 'success': True,
@@ -277,6 +335,31 @@ class IPCHandler:
             return {
                 'success': True,
                 'data': {'status': 'stopped'}
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def _handle_pause_playback(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle pause_playback command."""
+        try:
+            if not self.player or not self.player.is_playing:
+                return {
+                    'success': False,
+                    'error': "No playback in progress"
+                }
+            
+            self.player.toggle_pause()
+            is_paused = self.player.is_paused
+            
+            return {
+                'success': True,
+                'data': {
+                    'status': 'paused' if is_paused else 'playing',
+                    'isPaused': is_paused
+                }
             }
         except Exception as e:
             return {
@@ -415,6 +498,52 @@ class IPCHandler:
             sys.stdout.flush()
         except Exception as e:
             self._log_error(f"Failed to emit action preview event: {str(e)}")
+    
+    def _emit_playback_stopped(self) -> None:
+        """Emit playback_stopped event when ESC key is pressed during playback."""
+        event = {
+            'type': 'playback_stopped',
+            'data': {
+                'reason': 'esc_key'
+            }
+        }
+        try:
+            json_str = json.dumps(event)
+            sys.stdout.write(json_str + '\n')
+            sys.stdout.flush()
+        except Exception as e:
+            self._log_error(f"Failed to emit playback_stopped event: {str(e)}")
+    
+    def _emit_playback_paused(self, is_paused: bool) -> None:
+        """Emit playback_paused event when Cmd+ESC is pressed during playback."""
+        event = {
+            'type': 'playback_paused',
+            'data': {
+                'isPaused': is_paused
+            }
+        }
+        try:
+            json_str = json.dumps(event)
+            sys.stdout.write(json_str + '\n')
+            sys.stdout.flush()
+        except Exception as e:
+            self._log_error(f"Failed to emit playback_paused event: {str(e)}")
+    
+    def _emit_complete(self) -> None:
+        """Emit complete event when playback finishes successfully."""
+        event = {
+            'type': 'complete',
+            'data': {
+                'completed': True,
+                'reason': 'finished'
+            }
+        }
+        try:
+            json_str = json.dumps(event)
+            sys.stdout.write(json_str + '\n')
+            sys.stdout.flush()
+        except Exception as e:
+            self._log_error(f"Failed to emit complete event: {str(e)}")
     
     def _format_permission_error(self, error_msg: str) -> str:
         """Format permission error with platform-specific guidance.

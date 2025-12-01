@@ -56,13 +56,22 @@
 **Solution:**
 ```bash
 cd packages/python-core
-pip install -r requirements.txt
+pip3 install -r requirements-recorder.txt
+```
+
+Or use the install script:
+```bash
+cd packages/python-core
+./install-dependencies.sh
 ```
 
 **Required Python packages:**
 - pyautogui >= 0.9.53
 - pynput >= 1.7.6
 - pydantic >= 2.0.0
+- Pillow >= 10.1.0
+
+**Note:** Use `requirements-recorder.txt` (not `requirements.txt`) for minimal dependencies.
 
 ### Issue 3: Accessibility Permissions (macOS)
 
