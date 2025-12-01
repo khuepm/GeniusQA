@@ -1,0 +1,12 @@
+# Minimal dependencies for Desktop Recorder MVP
+# These are the only packages needed for recording and playback functionality
+
+# Core automation libraries
+pyautogui>=0.9.53
+pynput>=1.7.6
+
+# Data validation
+pydantic>=2.0.0
+
+# Image processing (required by pyautogui)
+Pillow>=10.1.0
