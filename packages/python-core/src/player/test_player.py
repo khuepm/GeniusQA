@@ -447,12 +447,18 @@ def test_loop_progress_callback():
         player._playback_thread.join(timeout=5.0)
     
     # Verify progress calls include loop information
-    assert len(progress_calls) == len(actions) * loop_count, \
-        f"Expected {len(actions) * loop_count} progress calls but got {len(progress_calls)}"
+    # Expected: one call per action per loop + one final completion call
+    expected_calls = len(actions) * loop_count + 1
+    assert len(progress_calls) == expected_calls, \
+        f"Expected {expected_calls} progress calls but got {len(progress_calls)}"
     
     # Check that loop numbers are correct
     for i, call in enumerate(progress_calls):
-        expected_loop = (i // len(actions)) + 1
+        if i < len(actions) * loop_count:  # Regular action progress calls
+            expected_loop = (i // len(actions)) + 1
+        else:  # Final completion call
+            expected_loop = loop_count  # Should report the final loop number
+        
         assert call['current_loop'] == expected_loop, \
             f"Progress call {i} should report loop {expected_loop} but reported {call['current_loop']}"
         assert call['total_loops'] == loop_count, \
