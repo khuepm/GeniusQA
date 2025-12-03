@@ -9,9 +9,11 @@ use core_graphics::{
 };
 
 use crate::{Result, AutomationError};
+use crate::logging::{get_logger, CoreType, OperationType, LogLevel};
 use super::PlatformAutomation;
 use std::collections::HashMap;
 use std::sync::Mutex;
+use serde_json::json;
 
 /// macOS-specific automation implementation
 /// 
@@ -120,6 +122,96 @@ impl MacOSAutomation {
                 message: format!("Unknown key: {}", key),
             })
     }
+    
+    /// Log platform-specific API call
+    fn log_platform_call(&self, operation: &str, params: &str) {
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("platform".to_string(), json!("macos"));
+            metadata.insert("operation".to_string(), json!(operation));
+            metadata.insert("params".to_string(), json!(params));
+            
+            logger.log_operation(
+                LogLevel::Debug,
+                CoreType::Rust,
+                OperationType::Playback,
+                format!("platform_call_{}", operation),
+                format!("Platform call: {} with {}", operation, params),
+                Some(metadata),
+            );
+        }
+    }
+    
+    /// Log platform-specific error
+    fn log_platform_error(&self, operation: &str, error_message: &str) {
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("platform".to_string(), json!("macos"));
+            metadata.insert("operation".to_string(), json!(operation));
+            metadata.insert("error_message".to_string(), json!(error_message));
+            
+            logger.log_operation(
+                LogLevel::Error,
+                CoreType::Rust,
+                OperationType::Playback,
+                format!("platform_error_{}", operation),
+                format!("Platform error in {}: {}", operation, error_message),
+                Some(metadata),
+            );
+        }
+    }
+    
+    /// Validate and clamp coordinates to screen bounds
+    fn validate_and_clamp_coordinates(&self, x: i32, y: i32) -> Result<(i32, i32)> {
+        let (screen_width, screen_height) = self.get_screen_size()?;
+        
+        let clamped_x = x.clamp(0, screen_width as i32 - 1);
+        let clamped_y = y.clamp(0, screen_height as i32 - 1);
+        
+        if clamped_x != x || clamped_y != y {
+            self.log_coordinate_clamping(x, y, clamped_x, clamped_y);
+        }
+        
+        Ok((clamped_x, clamped_y))
+    }
+    
+    /// Log coordinate clamping warning
+    fn log_coordinate_clamping(&self, original_x: i32, original_y: i32, clamped_x: i32, clamped_y: i32) {
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("original_x".to_string(), json!(original_x));
+            metadata.insert("original_y".to_string(), json!(original_y));
+            metadata.insert("clamped_x".to_string(), json!(clamped_x));
+            metadata.insert("clamped_y".to_string(), json!(clamped_y));
+            
+            logger.log_operation(
+                LogLevel::Warn,
+                CoreType::Rust,
+                OperationType::Playback,
+                "coordinate_clamping".to_string(),
+                format!("Coordinates clamped from ({}, {}) to ({}, {})", original_x, original_y, clamped_x, clamped_y),
+                Some(metadata),
+            );
+        }
+    }
+    
+    /// Check accessibility permissions
+    fn check_accessibility_permissions(&self) -> Result<bool> {
+        // On macOS, we need to check if the app has accessibility permissions
+        // This is a simplified check - in production, you'd use AXIsProcessTrusted()
+        // For now, we'll assume permissions are granted and log a warning
+        if let Some(logger) = get_logger() {
+            logger.log_operation(
+                LogLevel::Info,
+                CoreType::Rust,
+                OperationType::Playback,
+                "permission_check".to_string(),
+                "Checking macOS accessibility permissions".to_string(),
+                None,
+            );
+        }
+        Ok(true)
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -131,33 +223,108 @@ impl PlatformAutomation for MacOSAutomation {
     
     fn check_permissions(&self) -> Result<bool> {
         // Check if we have accessibility permissions
-        // This is a simplified check - in practice, you'd use AXIsProcessTrusted()
-        Ok(true) // Placeholder
+        let has_permissions = self.check_accessibility_permissions()?;
+        
+        if !has_permissions {
+            if let Some(logger) = get_logger() {
+                logger.log_operation(
+                    LogLevel::Error,
+                    CoreType::Rust,
+                    OperationType::Playback,
+                    "permission_denied".to_string(),
+                    "Accessibility permissions not granted. Please enable accessibility permissions in System Preferences > Security & Privacy > Privacy > Accessibility".to_string(),
+                    None,
+                );
+            }
+            return Err(AutomationError::PermissionDenied {
+                operation: "macOS accessibility permissions required. Go to System Preferences > Security & Privacy > Privacy > Accessibility and enable access for this application.".to_string(),
+            });
+        }
+        
+        Ok(true)
     }
     
     fn request_permissions(&self) -> Result<bool> {
         // On macOS, we need to request accessibility permissions
+        if let Some(logger) = get_logger() {
+            logger.log_operation(
+                LogLevel::Info,
+                CoreType::Rust,
+                OperationType::Playback,
+                "permission_request".to_string(),
+                "Requesting macOS accessibility permissions. Please grant access in System Preferences.".to_string(),
+                None,
+            );
+        }
+        
         // This would typically show a system dialog
-        Ok(true) // Placeholder
+        // For now, we'll return true and rely on the system to handle the permission request
+        Ok(true)
     }
     
     fn mouse_move(&self, x: i32, y: i32) -> Result<()> {
+        // Validate and clamp coordinates
+        let (clamped_x, clamped_y) = self.validate_and_clamp_coordinates(x, y)?;
+        
+        // Log the operation
+        self.log_platform_call("CGEvent::new_mouse_event (MouseMoved)", &format!("x={}, y={}", clamped_x, clamped_y));
+        
         let event_source = Self::create_event_source()?;
-        let point = CGPoint::new(x as f64, y as f64);
+        let point = CGPoint::new(clamped_x as f64, clamped_y as f64);
         let event = CGEvent::new_mouse_event(
             event_source,
             CGEventType::MouseMoved,
             point,
             CGMouseButton::Left,
-        ).map_err(|_| AutomationError::SystemError {
-            message: "Failed to create mouse move event".to_string(),
+        ).map_err(|_| {
+            self.log_platform_error("CGEvent::new_mouse_event", "Failed to create mouse move event");
+            AutomationError::SystemError {
+                message: "Failed to create mouse move event. This may indicate missing accessibility permissions.".to_string(),
+            }
         })?;
         
         event.post(CGEventTapLocation::HID);
+        
+        // Verify the move succeeded
+        let (actual_x, actual_y) = self.get_mouse_position()?;
+        if actual_x != clamped_x || actual_y != clamped_y {
+            if let Some(logger) = get_logger() {
+                let mut metadata = HashMap::new();
+                metadata.insert("expected_x".to_string(), json!(clamped_x));
+                metadata.insert("expected_y".to_string(), json!(clamped_y));
+                metadata.insert("actual_x".to_string(), json!(actual_x));
+                metadata.insert("actual_y".to_string(), json!(actual_y));
+                
+                logger.log_operation(
+                    LogLevel::Warn,
+                    CoreType::Rust,
+                    OperationType::Playback,
+                    "mouse_position_mismatch".to_string(),
+                    format!("Mouse position mismatch: expected ({}, {}), got ({}, {})", 
+                        clamped_x, clamped_y, actual_x, actual_y),
+                    Some(metadata),
+                );
+            }
+        }
+        
         Ok(())
     }
     
     fn mouse_click(&self, button: &str) -> Result<()> {
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("button".to_string(), json!(button));
+            
+            logger.log_operation(
+                LogLevel::Debug,
+                CoreType::Rust,
+                OperationType::Playback,
+                "mouse_click".to_string(),
+                format!("Mouse click: {}", button),
+                Some(metadata),
+            );
+        }
+        
         let (mouse_button, down_type, up_type) = match button.to_lowercase().as_str() {
             "left" => (CGMouseButton::Left, CGEventType::LeftMouseDown, CGEventType::LeftMouseUp),
             "right" => (CGMouseButton::Right, CGEventType::RightMouseDown, CGEventType::RightMouseUp),
@@ -171,14 +338,20 @@ impl PlatformAutomation for MacOSAutomation {
         let point = CGPoint::new(x as f64, y as f64);
         let event_source = Self::create_event_source()?;
         
+        // Log the operation
+        self.log_platform_call("CGEvent::new_mouse_event (MouseDown)", &format!("button={}, x={}, y={}", button, x, y));
+        
         // Mouse down
         let down_event = CGEvent::new_mouse_event(
             event_source.clone(),
             down_type,
             point,
             mouse_button,
-        ).map_err(|_| AutomationError::SystemError {
-            message: "Failed to create mouse down event".to_string(),
+        ).map_err(|_| {
+            self.log_platform_error("CGEvent::new_mouse_event", "Failed to create mouse down event");
+            AutomationError::SystemError {
+                message: "Failed to create mouse down event. This may indicate missing accessibility permissions.".to_string(),
+            }
         })?;
         down_event.post(CGEventTapLocation::HID);
         
@@ -188,8 +361,11 @@ impl PlatformAutomation for MacOSAutomation {
             up_type,
             point,
             mouse_button,
-        ).map_err(|_| AutomationError::SystemError {
-            message: "Failed to create mouse up event".to_string(),
+        ).map_err(|_| {
+            self.log_platform_error("CGEvent::new_mouse_event", "Failed to create mouse up event");
+            AutomationError::SystemError {
+                message: "Failed to create mouse up event. This may indicate missing accessibility permissions.".to_string(),
+            }
         })?;
         up_event.post(CGEventTapLocation::HID);
         
@@ -280,14 +456,35 @@ impl PlatformAutomation for MacOSAutomation {
     }
     
     fn key_press(&self, key: &str) -> Result<()> {
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("key".to_string(), json!(key));
+            
+            logger.log_operation(
+                LogLevel::Debug,
+                CoreType::Rust,
+                OperationType::Playback,
+                "key_press".to_string(),
+                format!("Key press: {}", key),
+                Some(metadata),
+            );
+        }
+        
         let key_code = self.get_key_code(key)?;
         let event_source = Self::create_event_source()?;
+        
+        // Log the operation
+        self.log_platform_call("CGEvent::new_keyboard_event", &format!("key={}, keycode={}, down=true", key, key_code));
+        
         let event = CGEvent::new_keyboard_event(
             event_source,
             key_code,
             true,
-        ).map_err(|_| AutomationError::SystemError {
-            message: "Failed to create key press event".to_string(),
+        ).map_err(|_| {
+            self.log_platform_error("CGEvent::new_keyboard_event", "Failed to create key press event");
+            AutomationError::SystemError {
+                message: "Failed to create key press event. This may indicate missing accessibility permissions.".to_string(),
+            }
         })?;
         
         event.post(CGEventTapLocation::HID);
@@ -339,13 +536,18 @@ impl PlatformAutomation for MacOSAutomation {
     }
     
     fn get_mouse_position(&self) -> Result<(i32, i32)> {
+        self.log_platform_call("CGEvent::new (get mouse position)", "");
+        
         // Use a different approach to get mouse position
         // The mouse_location method doesn't exist in this version of core-graphics
         // We'll use a workaround by creating an event and getting the location
         let event_source = Self::create_event_source()?;
         let event = CGEvent::new(event_source)
-            .map_err(|_| AutomationError::SystemError {
-                message: "Failed to create event for mouse position".to_string(),
+            .map_err(|_| {
+                self.log_platform_error("CGEvent::new", "Failed to create event for mouse position");
+                AutomationError::SystemError {
+                    message: "Failed to create event for mouse position. This may indicate missing accessibility permissions.".to_string(),
+                }
             })?;
         
         let location = event.location();
@@ -353,9 +555,22 @@ impl PlatformAutomation for MacOSAutomation {
     }
     
     fn get_screen_size(&self) -> Result<(u32, u32)> {
+        self.log_platform_call("CGDisplay::main", "");
+        
         let display = CGDisplay::main();
         let bounds = display.bounds();
-        Ok((bounds.size.width as u32, bounds.size.height as u32))
+        
+        let width = bounds.size.width as u32;
+        let height = bounds.size.height as u32;
+        
+        if width == 0 || height == 0 {
+            self.log_platform_error("CGDisplay::main", "Invalid screen dimensions");
+            return Err(AutomationError::SystemError {
+                message: "Failed to get valid screen dimensions".to_string(),
+            });
+        }
+        
+        Ok((width, height))
     }
     
     fn take_screenshot(&self) -> Result<Vec<u8>> {

@@ -281,6 +281,8 @@ const RecorderScreen: React.FC = () => {
    * Requirements: 1.2, 1.3, 6.4, 8.4
    */
   const handleCoreChange = async (newCore: CoreType) => {
+    console.log('[DEBUG] handleCoreChange called:', { newCore, currentStatus: status });
+
     if (status !== 'idle') {
       throw new Error('Cannot switch cores while recording or playing. Please stop the current operation first.');
     }
@@ -288,23 +290,62 @@ const RecorderScreen: React.FC = () => {
     try {
       setCoreLoading(true);
       setCoreError(null);
+      console.log('[DEBUG] Starting core switch to:', newCore);
 
       // Switch to the new core
       await ipcBridge.selectCore(newCore);
+      console.log('[DEBUG] IPC selectCore completed');
 
       // Update current core
       setCurrentCore(newCore);
+      console.log('[DEBUG] Current core state updated to:', newCore);
 
       // Refresh core status and metrics
       await refreshCoreStatus();
+      console.log('[DEBUG] Core status refreshed');
 
-      console.log(`Successfully switched to ${newCore} core`);
+      // Reload recordings and scripts for the new core
+      try {
+        console.log('[DEBUG] Checking for recordings...');
+        const recordings = await ipcBridge.checkForRecordings();
+        console.log('[DEBUG] checkForRecordings result:', recordings);
+        setHasRecordings(recordings);
+
+        if (recordings) {
+          console.log('[DEBUG] Loading latest recording...');
+          const latestPath = await ipcBridge.getLatestRecording();
+          console.log('[DEBUG] Latest recording path:', latestPath);
+          setLastRecordingPath(latestPath);
+          setSelectedScriptPath(latestPath);
+
+          console.log('[DEBUG] Loading available scripts...');
+          await loadAvailableScripts();
+          console.log('[DEBUG] Scripts loaded');
+        } else {
+          // Clear recordings state if new core has no recordings
+          console.log('[DEBUG] No recordings found, clearing state');
+          setLastRecordingPath(null);
+          setSelectedScriptPath(null);
+          setAvailableScripts([]);
+        }
+      } catch (recordingsError) {
+        console.error('[DEBUG] Failed to reload recordings:', recordingsError);
+        // Don't fail the core switch if recordings can't be loaded
+        setHasRecordings(false);
+        setLastRecordingPath(null);
+        setSelectedScriptPath(null);
+        setAvailableScripts([]);
+      }
+
+      console.log('[DEBUG] Successfully switched to', newCore, 'core');
     } catch (err) {
+      console.error('[DEBUG] Core switch failed:', err);
       const errorMessage = err instanceof Error ? err.message : `Failed to switch to ${newCore} core`;
       setCoreError(errorMessage);
       throw err; // Re-throw to let CoreSelector handle the error display
     } finally {
       setCoreLoading(false);
+      console.log('[DEBUG] handleCoreChange completed, coreLoading set to false');
     }
   };
 
@@ -588,6 +629,18 @@ const RecorderScreen: React.FC = () => {
     const ms = Math.floor((seconds % 1) * 10);
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms}`;
   };
+
+  // Debug logging for render
+  console.log('[DEBUG] RecorderScreen render:', {
+    status,
+    currentCore,
+    hasRecordings,
+    coreLoading,
+    error,
+    coreError,
+    availableCores,
+    selectedScriptPath
+  });
 
   return (
     <div className="recorder-container">

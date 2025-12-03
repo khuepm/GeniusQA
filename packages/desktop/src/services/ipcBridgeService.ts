@@ -396,6 +396,35 @@ export class IPCBridgeService {
       return 'An unknown error occurred. Please try again.';
     }
     
+    // Check for Rust core "not yet implemented" errors
+    if (message.includes('Rust core recording not yet fully integrated')) {
+      return 'Rust Core does not support recording yet.\n\n' +
+             'Please switch to Python Core to use recording features.\n\n' +
+             'Click on "Python Core" in the Core Selector above.';
+    }
+    
+    if (message.includes('Rust core playback not yet fully integrated')) {
+      return 'Rust Core does not support playback yet.\n\n' +
+             'Please switch to Python Core to use playback features.\n\n' +
+             'Click on "Python Core" in the Core Selector above.';
+    }
+    
+    if (message.includes('Rust core') && message.includes('not yet fully integrated')) {
+      return 'This feature is not yet available in Rust Core.\n\n' +
+             'Please switch to Python Core to use this feature.\n\n' +
+             'Click on "Python Core" in the Core Selector above.';
+    }
+    
+    // Check for fallback errors
+    if (message.includes('Failed to fallback') && message.includes('Python core is not healthy')) {
+      return 'Rust Core does not support this operation yet, and Python Core is not available.\n\n' +
+             'Please ensure Python Core is properly configured:\n' +
+             '1. Python 3.9+ is installed (python3 --version)\n' +
+             '2. Dependencies are installed (cd packages/python-core && pip3 install -r requirements.txt)\n' +
+             '3. Restart the application\n\n' +
+             'Then switch to Python Core to use this feature.';
+    }
+    
     // Check for Python process errors
     if (message.includes('Broken pipe') || message.includes('Failed to write to Python stdin')) {
       return 'Python process is not running or has crashed. Please ensure:\n' +

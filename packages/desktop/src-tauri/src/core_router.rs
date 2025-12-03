@@ -8,6 +8,9 @@ use crate::python_process::PythonProcessManager;
 
 // Import preference types from rust-core
 use rust_automation_core::preferences::{PreferenceManager, UserSettings, CoreType as RustCoreType};
+// Import automation types from rust-core
+use rust_automation_core::{AutomationConfig, ScriptData};
+use rust_automation_core::recorder::Recorder;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum CoreType {
@@ -36,6 +39,7 @@ impl From<CoreType> for RustCoreType {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CoreStatus {
     pub active_core: CoreType,
     pub available_cores: Vec<CoreType>,
@@ -67,7 +71,6 @@ pub enum AutomationCommand {
     DeleteScript { path: String },
 }
 
-#[derive(Debug)]
 pub struct CoreRouter {
     active_core: Arc<Mutex<CoreType>>,
     python_manager: Arc<PythonProcessManager>,
@@ -79,8 +82,9 @@ pub struct CoreRouter {
     performance_metrics: Arc<RwLock<HashMap<CoreType, CorePerformanceMetrics>>>,
     // Preference manager for settings persistence
     preference_manager: Arc<Mutex<Option<PreferenceManager>>>,
-    // TODO: Add rust_core when implemented
-    // rust_core: Arc<Mutex<Option<RustCore>>>,
+    // Rust automation core components
+    rust_recorder: Arc<Mutex<Option<Recorder>>>,
+    rust_player: Arc<Mutex<Option<rust_automation_core::player::Player>>>,
 }
 
 /// Error record for cross-core error tracking
@@ -141,7 +145,7 @@ pub struct ComparisonDetails {
 impl CoreRouter {
     pub fn new(python_manager: Arc<PythonProcessManager>) -> Self {
         Self {
-            active_core: Arc::new(Mutex::new(CoreType::Python)), // Default to Python for now
+            active_core: Arc::new(Mutex::new(CoreType::Rust)), // Default to Rust
             python_manager,
             startup_health_check_completed: Arc::new(RwLock::new(false)),
             last_health_check: Arc::new(RwLock::new(None)),
@@ -149,6 +153,8 @@ impl CoreRouter {
             error_history: Arc::new(RwLock::new(Vec::new())),
             performance_metrics: Arc::new(RwLock::new(HashMap::new())),
             preference_manager: Arc::new(Mutex::new(None)),
+            rust_recorder: Arc::new(Mutex::new(None)),
+            rust_player: Arc::new(Mutex::new(None)),
         }
     }
     
@@ -1082,9 +1088,18 @@ impl CoreRouter {
 
     /// Check if Rust core is available and functional
     fn is_rust_core_available(&self) -> bool {
-        // TODO: Implement Rust core availability check
-        // For now, return false since Rust core is not yet implemented
-        false
+        // Check if the rust-automation-core library is available
+        // Since we're already using it in this binary, it's available
+        // We can do a basic platform check to ensure automation is supported
+        #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+        {
+            true
+        }
+        
+        #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+        {
+            false
+        }
     }
 
     /// Route command to Python core
@@ -1167,11 +1182,189 @@ impl CoreRouter {
     /// Route command to Rust core
     fn route_to_rust(
         &self,
-        _command: AutomationCommand,
+        command: AutomationCommand,
         _app_handle: &AppHandle,
     ) -> Result<serde_json::Value, String> {
-        // TODO: Implement Rust core routing when Rust core is available
-        Err("Rust core is not yet implemented".to_string())
+        match command {
+            AutomationCommand::StartRecording => {
+                // Initialize recorder if not already created
+                let mut recorder_lock = self.rust_recorder.lock().unwrap();
+                if recorder_lock.is_none() {
+                    let config = AutomationConfig::default();
+                    match Recorder::new(config) {
+                        Ok(recorder) => {
+                            *recorder_lock = Some(recorder);
+                        }
+                        Err(e) => {
+                            return Err(format!("Failed to initialize Rust recorder: {:?}", e));
+                        }
+                    }
+                }
+
+                // Start recording
+                if let Some(recorder) = recorder_lock.as_mut() {
+                    match recorder.start_recording() {
+                        Ok(_) => {
+                            Ok(serde_json::json!({
+                                "success": true,
+                                "data": {
+                                    "message": "Recording started with Rust core"
+                                }
+                            }))
+                        }
+                        Err(e) => {
+                            Err(format!("Failed to start recording: {:?}", e))
+                        }
+                    }
+                } else {
+                    Err("Recorder not initialized".to_string())
+                }
+            }
+            AutomationCommand::StopRecording => {
+                let mut recorder_lock = self.rust_recorder.lock().unwrap();
+                if let Some(recorder) = recorder_lock.as_mut() {
+                    match recorder.stop_recording() {
+                        Ok(script_data) => {
+                            // Save script to file
+                            let script_path = format!(
+                                "{}/GeniusQA/recordings/recording_{}.json",
+                                std::env::var("HOME").unwrap_or_else(|_| ".".to_string()),
+                                chrono::Utc::now().timestamp()
+                            );
+
+                            // Create directory if it doesn't exist
+                            if let Some(parent) = std::path::Path::new(&script_path).parent() {
+                                let _ = std::fs::create_dir_all(parent);
+                            }
+
+                            // Save script to JSON file
+                            let json_data = serde_json::to_string_pretty(&script_data)
+                                .map_err(|e| format!("Failed to serialize script: {}", e))?;
+                            
+                            std::fs::write(&script_path, json_data)
+                                .map_err(|e| format!("Failed to write script file: {}", e))?;
+
+                            Ok(serde_json::json!({
+                                "success": true,
+                                "data": {
+                                    "scriptPath": script_path,
+                                    "actionCount": script_data.actions.len(),
+                                    "duration": script_data.metadata.duration,
+                                    "screenshotCount": 0
+                                }
+                            }))
+                        }
+                        Err(e) => {
+                            Err(format!("Failed to stop recording: {:?}", e))
+                        }
+                    }
+                } else {
+                    Err("No active recording session".to_string())
+                }
+            }
+            AutomationCommand::StartPlayback { .. } => {
+                Err("Rust core playback not yet fully integrated. Please use Python core for playback.".to_string())
+            }
+            AutomationCommand::StopPlayback => {
+                Err("Rust core playback not yet fully integrated. Please use Python core for playback.".to_string())
+            }
+            AutomationCommand::PausePlayback => {
+                Err("Rust core playback not yet fully integrated. Please use Python core for playback.".to_string())
+            }
+            AutomationCommand::CheckRecordings => {
+                // Check if recordings directory exists and has files
+                let recordings_dir = format!(
+                    "{}/GeniusQA/recordings",
+                    std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+                );
+                
+                let has_recordings = std::path::Path::new(&recordings_dir)
+                    .read_dir()
+                    .map(|entries| entries.count() > 0)
+                    .unwrap_or(false);
+
+                Ok(serde_json::json!({
+                    "success": true,
+                    "data": {
+                        "hasRecordings": has_recordings
+                    }
+                }))
+            }
+            AutomationCommand::GetLatest => {
+                let recordings_dir = format!(
+                    "{}/GeniusQA/recordings",
+                    std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+                );
+                
+                // Find the most recent recording file
+                let latest = std::fs::read_dir(&recordings_dir)
+                    .ok()
+                    .and_then(|entries| {
+                        entries
+                            .filter_map(|e| e.ok())
+                            .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("json"))
+                            .max_by_key(|e| e.metadata().and_then(|m| m.modified()).ok())
+                            .map(|e| e.path().to_string_lossy().to_string())
+                    });
+
+                Ok(serde_json::json!({
+                    "success": true,
+                    "data": {
+                        "scriptPath": latest
+                    }
+                }))
+            }
+            AutomationCommand::ListScripts => {
+                let recordings_dir = format!(
+                    "{}/GeniusQA/recordings",
+                    std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+                );
+                
+                let scripts: Vec<serde_json::Value> = std::fs::read_dir(&recordings_dir)
+                    .ok()
+                    .map(|entries| {
+                        entries
+                            .filter_map(|e| e.ok())
+                            .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("json"))
+                            .filter_map(|e| {
+                                let path = e.path();
+                                let metadata = e.metadata().ok()?;
+                                let modified = metadata.modified().ok()?;
+                                let created_at = modified
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .ok()?
+                                    .as_secs();
+
+                                Some(serde_json::json!({
+                                    "path": path.to_string_lossy(),
+                                    "filename": path.file_name()?.to_string_lossy(),
+                                    "created_at": chrono::DateTime::from_timestamp(created_at as i64, 0)?
+                                        .format("%Y-%m-%d %H:%M:%S").to_string(),
+                                    "duration": 0.0,
+                                    "action_count": 0
+                                }))
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                Ok(serde_json::json!({
+                    "success": true,
+                    "data": {
+                        "scripts": scripts
+                    }
+                }))
+            }
+            AutomationCommand::LoadScript { .. } => {
+                Err("Rust core script loading not yet fully integrated. Please use Python core.".to_string())
+            }
+            AutomationCommand::SaveScript { .. } => {
+                Err("Rust core script saving not yet fully integrated. Please use Python core.".to_string())
+            }
+            AutomationCommand::DeleteScript { .. } => {
+                Err("Rust core script deletion not yet fully integrated. Please use Python core.".to_string())
+            }
+        }
     }
 }
 

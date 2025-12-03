@@ -17,12 +17,15 @@ use winapi::{
             KEYEVENTF_KEYUP, VK_LBUTTON, VK_RBUTTON, VK_MBUTTON,
         },
         wingdi::{GetDC, CreateCompatibleDC, CreateCompatibleBitmap, SelectObject, BitBlt, SRCCOPY},
+        errhandlingapi::GetLastError,
     },
 };
 
 use crate::{Result, AutomationError};
+use crate::logging::{get_logger, CoreType, OperationType, LogLevel};
 use super::PlatformAutomation;
 use std::collections::HashMap;
+use serde_json::json;
 
 /// Windows-specific automation implementation
 #[cfg(windows)]
@@ -86,6 +89,9 @@ impl WindowsAutomation {
     }
     
     fn send_mouse_input(&self, flags: DWORD, dx: i32, dy: i32, data: DWORD) -> Result<()> {
+        // Log platform call
+        self.log_platform_call("SendInput", &format!("flags={}, dx={}, dy={}, data={}", flags, dx, dy, data));
+        
         unsafe {
             let mut input = INPUT {
                 type_: INPUT_MOUSE,
@@ -103,8 +109,13 @@ impl WindowsAutomation {
             
             let result = SendInput(1, &mut input, std::mem::size_of::<INPUT>() as i32);
             if result == 0 {
+                let error_code = GetLastError();
+                self.log_platform_error("SendInput", error_code);
                 return Err(AutomationError::SystemError {
-                    message: "Failed to send mouse input".to_string(),
+                    message: format!("Failed to send mouse input. Error code: {} ({}). {}", 
+                        error_code, 
+                        Self::get_error_message(error_code),
+                        Self::get_troubleshooting_suggestion(error_code)),
                 });
             }
         }
@@ -113,6 +124,9 @@ impl WindowsAutomation {
     }
     
     fn send_keyboard_input(&self, vk: WORD, flags: DWORD) -> Result<()> {
+        // Log platform call
+        self.log_platform_call("SendInput (keyboard)", &format!("vk={}, flags={}", vk, flags));
+        
         unsafe {
             let mut input = INPUT {
                 type_: INPUT_KEYBOARD,
@@ -129,13 +143,117 @@ impl WindowsAutomation {
             
             let result = SendInput(1, &mut input, std::mem::size_of::<INPUT>() as i32);
             if result == 0 {
+                let error_code = GetLastError();
+                self.log_platform_error("SendInput (keyboard)", error_code);
                 return Err(AutomationError::SystemError {
-                    message: "Failed to send keyboard input".to_string(),
+                    message: format!("Failed to send keyboard input. Error code: {} ({}). {}", 
+                        error_code, 
+                        Self::get_error_message(error_code),
+                        Self::get_troubleshooting_suggestion(error_code)),
                 });
             }
         }
         
         Ok(())
+    }
+    
+    /// Log platform-specific API call
+    fn log_platform_call(&self, operation: &str, params: &str) {
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("platform".to_string(), json!("windows"));
+            metadata.insert("operation".to_string(), json!(operation));
+            metadata.insert("params".to_string(), json!(params));
+            
+            logger.log_operation(
+                LogLevel::Debug,
+                CoreType::Rust,
+                OperationType::Playback,
+                format!("platform_call_{}", operation),
+                format!("Platform call: {} with {}", operation, params),
+                Some(metadata),
+            );
+        }
+    }
+    
+    /// Log platform-specific error
+    fn log_platform_error(&self, operation: &str, error_code: DWORD) {
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("platform".to_string(), json!("windows"));
+            metadata.insert("operation".to_string(), json!(operation));
+            metadata.insert("error_code".to_string(), json!(error_code));
+            metadata.insert("error_message".to_string(), json!(Self::get_error_message(error_code)));
+            
+            logger.log_operation(
+                LogLevel::Error,
+                CoreType::Rust,
+                OperationType::Playback,
+                format!("platform_error_{}", operation),
+                format!("Platform error in {}: {} ({})", operation, error_code, Self::get_error_message(error_code)),
+                Some(metadata),
+            );
+        }
+    }
+    
+    /// Get Windows error message from error code
+    fn get_error_message(error_code: DWORD) -> String {
+        match error_code {
+            0 => "Success".to_string(),
+            5 => "Access denied".to_string(),
+            87 => "Invalid parameter".to_string(),
+            1400 => "Invalid window handle".to_string(),
+            1401 => "Invalid menu handle".to_string(),
+            1402 => "Invalid cursor handle".to_string(),
+            1403 => "Invalid accelerator table handle".to_string(),
+            1404 => "Invalid hook handle".to_string(),
+            1405 => "Invalid DWP handle".to_string(),
+            _ => format!("Unknown error code: {}", error_code),
+        }
+    }
+    
+    /// Get troubleshooting suggestion based on error code
+    fn get_troubleshooting_suggestion(error_code: DWORD) -> String {
+        match error_code {
+            5 => "Try running the application with administrator privileges.".to_string(),
+            87 => "Check that the input parameters are valid.".to_string(),
+            1400..=1405 => "The handle is invalid. This may indicate a system resource issue.".to_string(),
+            _ => "Please check system logs for more details.".to_string(),
+        }
+    }
+    
+    /// Validate and clamp coordinates to screen bounds
+    fn validate_and_clamp_coordinates(&self, x: i32, y: i32) -> Result<(i32, i32)> {
+        let (screen_width, screen_height) = self.get_screen_size()?;
+        
+        let clamped_x = x.clamp(0, screen_width as i32 - 1);
+        let clamped_y = y.clamp(0, screen_height as i32 - 1);
+        
+        if clamped_x != x || clamped_y != y {
+            self.log_coordinate_clamping(x, y, clamped_x, clamped_y);
+        }
+        
+        Ok((clamped_x, clamped_y))
+    }
+    
+    /// Log coordinate clamping warning
+    fn log_coordinate_clamping(&self, original_x: i32, original_y: i32, clamped_x: i32, clamped_y: i32) {
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("original_x".to_string(), json!(original_x));
+            metadata.insert("original_y".to_string(), json!(original_y));
+            metadata.insert("clamped_x".to_string(), json!(clamped_x));
+            metadata.insert("clamped_y".to_string(), json!(clamped_y));
+            
+            logger.log_operation(
+                LogLevel::Warn,
+                CoreType::Rust,
+                OperationType::Playback,
+                "coordinate_clamping".to_string(),
+                format!("Coordinates clamped from ({}, {}) to ({}, {})", original_x, original_y, clamped_x, clamped_y),
+                Some(metadata),
+            );
+        }
     }
 }
 
@@ -158,18 +276,68 @@ impl PlatformAutomation for WindowsAutomation {
     }
     
     fn mouse_move(&self, x: i32, y: i32) -> Result<()> {
+        // Validate and clamp coordinates
+        let (clamped_x, clamped_y) = self.validate_and_clamp_coordinates(x, y)?;
+        
+        // Log the operation
+        self.log_platform_call("SetCursorPos", &format!("x={}, y={}", clamped_x, clamped_y));
+        
+        // Execute with error handling
         unsafe {
-            let result = SetCursorPos(x, y);
+            let result = SetCursorPos(clamped_x, clamped_y);
             if result == 0 {
+                let error_code = GetLastError();
+                self.log_platform_error("SetCursorPos", error_code);
                 return Err(AutomationError::SystemError {
-                    message: "Failed to move mouse cursor".to_string(),
+                    message: format!("Failed to move mouse cursor to ({}, {}). Error code: {} ({}). {}", 
+                        clamped_x, clamped_y,
+                        error_code, 
+                        Self::get_error_message(error_code),
+                        Self::get_troubleshooting_suggestion(error_code)),
                 });
             }
         }
+        
+        // Verify the move succeeded
+        let (actual_x, actual_y) = self.get_mouse_position()?;
+        if actual_x != clamped_x || actual_y != clamped_y {
+            if let Some(logger) = get_logger() {
+                let mut metadata = HashMap::new();
+                metadata.insert("expected_x".to_string(), json!(clamped_x));
+                metadata.insert("expected_y".to_string(), json!(clamped_y));
+                metadata.insert("actual_x".to_string(), json!(actual_x));
+                metadata.insert("actual_y".to_string(), json!(actual_y));
+                
+                logger.log_operation(
+                    LogLevel::Warn,
+                    CoreType::Rust,
+                    OperationType::Playback,
+                    "mouse_position_mismatch".to_string(),
+                    format!("Mouse position mismatch: expected ({}, {}), got ({}, {})", 
+                        clamped_x, clamped_y, actual_x, actual_y),
+                    Some(metadata),
+                );
+            }
+        }
+        
         Ok(())
     }
     
     fn mouse_click(&self, button: &str) -> Result<()> {
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("button".to_string(), json!(button));
+            
+            logger.log_operation(
+                LogLevel::Debug,
+                CoreType::Rust,
+                OperationType::Playback,
+                "mouse_click".to_string(),
+                format!("Mouse click: {}", button),
+                Some(metadata),
+            );
+        }
+        
         let (down_flag, up_flag) = match button.to_lowercase().as_str() {
             "left" => (MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP),
             "right" => (MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP),
@@ -230,6 +398,20 @@ impl PlatformAutomation for WindowsAutomation {
     }
     
     fn key_press(&self, key: &str) -> Result<()> {
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("key".to_string(), json!(key));
+            
+            logger.log_operation(
+                LogLevel::Debug,
+                CoreType::Rust,
+                OperationType::Playback,
+                "key_press".to_string(),
+                format!("Key press: {}", key),
+                Some(metadata),
+            );
+        }
+        
         let vk = self.get_virtual_key(key)?;
         self.send_keyboard_input(vk, 0)?;
         Ok(())
@@ -272,12 +454,19 @@ impl PlatformAutomation for WindowsAutomation {
     }
     
     fn get_mouse_position(&self) -> Result<(i32, i32)> {
+        self.log_platform_call("GetCursorPos", "");
+        
         unsafe {
             let mut point = POINT { x: 0, y: 0 };
             let result = GetCursorPos(&mut point);
             if result == 0 {
+                let error_code = GetLastError();
+                self.log_platform_error("GetCursorPos", error_code);
                 return Err(AutomationError::SystemError {
-                    message: "Failed to get mouse position".to_string(),
+                    message: format!("Failed to get mouse position. Error code: {} ({}). {}", 
+                        error_code, 
+                        Self::get_error_message(error_code),
+                        Self::get_troubleshooting_suggestion(error_code)),
                 });
             }
             Ok((point.x, point.y))
@@ -285,9 +474,23 @@ impl PlatformAutomation for WindowsAutomation {
     }
     
     fn get_screen_size(&self) -> Result<(u32, u32)> {
+        self.log_platform_call("GetSystemMetrics", "SM_CXSCREEN, SM_CYSCREEN");
+        
         unsafe {
             let width = GetSystemMetrics(SM_CXSCREEN) as u32;
             let height = GetSystemMetrics(SM_CYSCREEN) as u32;
+            
+            if width == 0 || height == 0 {
+                let error_code = GetLastError();
+                self.log_platform_error("GetSystemMetrics", error_code);
+                return Err(AutomationError::SystemError {
+                    message: format!("Failed to get screen size. Error code: {} ({}). {}", 
+                        error_code, 
+                        Self::get_error_message(error_code),
+                        Self::get_troubleshooting_suggestion(error_code)),
+                });
+            }
+            
             Ok((width, height))
         }
     }

@@ -198,7 +198,7 @@ export const CoreSelector: React.FC<CoreSelectorProps> = ({
    * Check if core is available
    */
   const isCoreAvailable = (coreType: CoreType): boolean => {
-    return availableCores.includes(coreType);
+    return availableCores?.includes(coreType) ?? false;
   };
 
   /**

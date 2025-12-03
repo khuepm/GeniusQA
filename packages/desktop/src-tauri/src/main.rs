@@ -641,14 +641,6 @@ fn main() {
     // Initialize monitoring system
     let monitoring_config = rust_automation_core::MonitoringConfig::default();
     let core_monitor = rust_automation_core::CoreMonitor::new(monitoring_config);
-    
-    // Start monitoring in background
-    let monitor_clone = core_monitor.clone();
-    tokio::spawn(async move {
-        if let Err(e) = monitor_clone.start_monitoring().await {
-            log::error!("Failed to start core monitoring: {}", e);
-        }
-    });
 
     let python_manager = Arc::new(PythonProcessManager::new());
     let core_router = CoreRouter::new(python_manager);
@@ -659,11 +651,20 @@ fn main() {
     }
     
     let core_router_state = CoreRouterState { router: core_router };
-    let monitor_state = MonitorState { monitor: core_monitor };
+    let monitor_state = MonitorState { monitor: core_monitor.clone() };
 
     tauri::Builder::default()
         .manage(core_router_state)
         .manage(monitor_state)
+        .setup(move |_app| {
+            // Start monitoring in background after Tauri runtime is initialized
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = core_monitor.start_monitoring().await {
+                    log::error!("Failed to start core monitoring: {}", e);
+                }
+            });
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             // Core management commands
             select_core,
@@ -704,18 +705,22 @@ fn main() {
 
 /// Initialize the logging system
 fn init_logging() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize Rust core logging
-    let logging_config = rust_automation_core::LoggingConfig::default();
-    rust_automation_core::init_logger(logging_config)?;
-
-    // Initialize tracing for Tauri backend
+    // Initialize tracing for Tauri backend (only once)
     tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"))
+        )
         .with_target(true)
         .with_thread_ids(true)
         .with_file(true)
         .with_line_number(true)
-        .init();
+        .try_init()
+        .ok(); // Ignore error if already initialized
+
+    // Initialize Rust core logging (without tracing subscriber)
+    let logging_config = rust_automation_core::LoggingConfig::default();
+    rust_automation_core::init_logger(logging_config)?;
 
     log::info!("Logging system initialized successfully");
     Ok(())

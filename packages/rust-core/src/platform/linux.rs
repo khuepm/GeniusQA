@@ -14,10 +14,12 @@ use x11::{
 };
 
 use crate::{Result, AutomationError};
+use crate::logging::{get_logger, CoreType, OperationType, LogLevel};
 use super::PlatformAutomation;
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::ptr;
+use serde_json::json;
 
 /// Linux-specific automation implementation
 #[cfg(target_os = "linux")]
@@ -103,6 +105,91 @@ impl LinuxAutomation {
                 message: format!("Unknown key: {}", key),
             })
     }
+    
+    /// Log platform-specific API call
+    fn log_platform_call(&self, operation: &str, params: &str) {
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("platform".to_string(), json!("linux"));
+            metadata.insert("operation".to_string(), json!(operation));
+            metadata.insert("params".to_string(), json!(params));
+            metadata.insert("display_server".to_string(), json!(self.detect_display_server()));
+            
+            logger.log_operation(
+                LogLevel::Debug,
+                CoreType::Rust,
+                OperationType::Playback,
+                format!("platform_call_{}", operation),
+                format!("Platform call: {} with {}", operation, params),
+                Some(metadata),
+            );
+        }
+    }
+    
+    /// Log platform-specific error
+    fn log_platform_error(&self, operation: &str, error_message: &str) {
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("platform".to_string(), json!("linux"));
+            metadata.insert("operation".to_string(), json!(operation));
+            metadata.insert("error_message".to_string(), json!(error_message));
+            metadata.insert("display_server".to_string(), json!(self.detect_display_server()));
+            
+            logger.log_operation(
+                LogLevel::Error,
+                CoreType::Rust,
+                OperationType::Playback,
+                format!("platform_error_{}", operation),
+                format!("Platform error in {}: {}", operation, error_message),
+                Some(metadata),
+            );
+        }
+    }
+    
+    /// Detect display server (X11 or Wayland)
+    fn detect_display_server(&self) -> String {
+        if std::env::var("WAYLAND_DISPLAY").is_ok() {
+            "wayland".to_string()
+        } else if std::env::var("DISPLAY").is_ok() {
+            "x11".to_string()
+        } else {
+            "unknown".to_string()
+        }
+    }
+    
+    /// Validate and clamp coordinates to screen bounds
+    fn validate_and_clamp_coordinates(&self, x: i32, y: i32) -> Result<(i32, i32)> {
+        let (screen_width, screen_height) = self.get_screen_size()?;
+        
+        let clamped_x = x.clamp(0, screen_width as i32 - 1);
+        let clamped_y = y.clamp(0, screen_height as i32 - 1);
+        
+        if clamped_x != x || clamped_y != y {
+            self.log_coordinate_clamping(x, y, clamped_x, clamped_y);
+        }
+        
+        Ok((clamped_x, clamped_y))
+    }
+    
+    /// Log coordinate clamping warning
+    fn log_coordinate_clamping(&self, original_x: i32, original_y: i32, clamped_x: i32, clamped_y: i32) {
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("original_x".to_string(), json!(original_x));
+            metadata.insert("original_y".to_string(), json!(original_y));
+            metadata.insert("clamped_x".to_string(), json!(clamped_x));
+            metadata.insert("clamped_y".to_string(), json!(clamped_y));
+            
+            logger.log_operation(
+                LogLevel::Warn,
+                CoreType::Rust,
+                OperationType::Playback,
+                "coordinate_clamping".to_string(),
+                format!("Coordinates clamped from ({}, {}) to ({}, {})", original_x, original_y, clamped_x, clamped_y),
+                Some(metadata),
+            );
+        }
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -119,30 +206,138 @@ impl Drop for LinuxAutomation {
 #[cfg(target_os = "linux")]
 impl PlatformAutomation for LinuxAutomation {
     fn initialize(&mut self) -> Result<()> {
-        // Linux automation is ready after construction
+        // Check display server
+        let display_server = self.detect_display_server();
+        
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("display_server".to_string(), json!(display_server));
+            
+            logger.log_operation(
+                LogLevel::Info,
+                CoreType::Rust,
+                OperationType::Playback,
+                "linux_init".to_string(),
+                format!("Initializing Linux automation with display server: {}", display_server),
+                Some(metadata),
+            );
+        }
+        
+        if display_server == "unknown" {
+            return Err(AutomationError::SystemError {
+                message: "No display server detected. Please ensure DISPLAY or WAYLAND_DISPLAY environment variable is set.".to_string(),
+            });
+        }
+        
+        if display_server == "wayland" {
+            if let Some(logger) = get_logger() {
+                logger.log_operation(
+                    LogLevel::Warn,
+                    CoreType::Rust,
+                    OperationType::Playback,
+                    "wayland_warning".to_string(),
+                    "Wayland detected. X11 automation may not work correctly. Consider using XWayland or switching to X11.".to_string(),
+                    None,
+                );
+            }
+        }
+        
         Ok(())
     }
     
     fn check_permissions(&self) -> Result<bool> {
         // On Linux, we generally have permissions if we can open the display
-        Ok(!self.display.is_null())
+        if self.display.is_null() {
+            if let Some(logger) = get_logger() {
+                logger.log_operation(
+                    LogLevel::Error,
+                    CoreType::Rust,
+                    OperationType::Playback,
+                    "display_error".to_string(),
+                    format!("Failed to open X11 display. Display server: {}. Please ensure X11 is running and DISPLAY is set correctly.", self.detect_display_server()),
+                    None,
+                );
+            }
+            return Ok(false);
+        }
+        Ok(true)
     }
     
     fn request_permissions(&self) -> Result<bool> {
         // Linux doesn't require explicit permission requests for X11 automation
+        if let Some(logger) = get_logger() {
+            logger.log_operation(
+                LogLevel::Info,
+                CoreType::Rust,
+                OperationType::Playback,
+                "permission_check".to_string(),
+                "Linux X11 automation does not require explicit permissions.".to_string(),
+                None,
+            );
+        }
         Ok(true)
     }
     
     fn mouse_move(&self, x: i32, y: i32) -> Result<()> {
+        // Validate and clamp coordinates
+        let (clamped_x, clamped_y) = self.validate_and_clamp_coordinates(x, y)?;
+        
+        // Log the operation
+        self.log_platform_call("XWarpPointer", &format!("x={}, y={}", clamped_x, clamped_y));
+        
         unsafe {
             let root = XDefaultRootWindow(self.display);
-            XWarpPointer(self.display, 0, root, 0, 0, 0, 0, x, y);
+            if root == 0 {
+                self.log_platform_error("XDefaultRootWindow", "Failed to get root window");
+                return Err(AutomationError::SystemError {
+                    message: "Failed to get root window. Display connection may be invalid.".to_string(),
+                });
+            }
+            
+            XWarpPointer(self.display, 0, root, 0, 0, 0, 0, clamped_x, clamped_y);
             XFlush(self.display);
         }
+        
+        // Verify the move succeeded
+        let (actual_x, actual_y) = self.get_mouse_position()?;
+        if actual_x != clamped_x || actual_y != clamped_y {
+            if let Some(logger) = get_logger() {
+                let mut metadata = HashMap::new();
+                metadata.insert("expected_x".to_string(), json!(clamped_x));
+                metadata.insert("expected_y".to_string(), json!(clamped_y));
+                metadata.insert("actual_x".to_string(), json!(actual_x));
+                metadata.insert("actual_y".to_string(), json!(actual_y));
+                
+                logger.log_operation(
+                    LogLevel::Warn,
+                    CoreType::Rust,
+                    OperationType::Playback,
+                    "mouse_position_mismatch".to_string(),
+                    format!("Mouse position mismatch: expected ({}, {}), got ({}, {})", 
+                        clamped_x, clamped_y, actual_x, actual_y),
+                    Some(metadata),
+                );
+            }
+        }
+        
         Ok(())
     }
     
     fn mouse_click(&self, button: &str) -> Result<()> {
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("button".to_string(), json!(button));
+            
+            logger.log_operation(
+                LogLevel::Debug,
+                CoreType::Rust,
+                OperationType::Playback,
+                "mouse_click".to_string(),
+                format!("Mouse click: {}", button),
+                Some(metadata),
+            );
+        }
+        
         let button_num = match button.to_lowercase().as_str() {
             "left" => Button1,
             "middle" => Button2,
@@ -151,6 +346,9 @@ impl PlatformAutomation for LinuxAutomation {
                 message: format!("Unknown mouse button: {}", button),
             }),
         };
+        
+        // Log the operation
+        self.log_platform_call("XTestFakeButtonEvent", &format!("button={}", button));
         
         unsafe {
             // Press
@@ -223,7 +421,25 @@ impl PlatformAutomation for LinuxAutomation {
     }
     
     fn key_press(&self, key: &str) -> Result<()> {
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("key".to_string(), json!(key));
+            
+            logger.log_operation(
+                LogLevel::Debug,
+                CoreType::Rust,
+                OperationType::Playback,
+                "key_press".to_string(),
+                format!("Key press: {}", key),
+                Some(metadata),
+            );
+        }
+        
         let keycode = self.get_keycode(key)?;
+        
+        // Log the operation
+        self.log_platform_call("XTestFakeKeyEvent", &format!("key={}, keycode={}, down=true", key, keycode));
+        
         unsafe {
             XTestFakeKeyEvent(self.display, keycode, True, CurrentTime);
             XFlush(self.display);
@@ -271,8 +487,17 @@ impl PlatformAutomation for LinuxAutomation {
     }
     
     fn get_mouse_position(&self) -> Result<(i32, i32)> {
+        self.log_platform_call("XQueryPointer", "");
+        
         unsafe {
             let root = XDefaultRootWindow(self.display);
+            if root == 0 {
+                self.log_platform_error("XDefaultRootWindow", "Failed to get root window");
+                return Err(AutomationError::SystemError {
+                    message: "Failed to get root window. Display connection may be invalid.".to_string(),
+                });
+            }
+            
             let mut root_return = 0;
             let mut child_return = 0;
             let mut root_x = 0;
@@ -281,7 +506,7 @@ impl PlatformAutomation for LinuxAutomation {
             let mut win_y = 0;
             let mut mask_return = 0;
             
-            XQueryPointer(
+            let result = XQueryPointer(
                 self.display,
                 root,
                 &mut root_return,
@@ -293,15 +518,32 @@ impl PlatformAutomation for LinuxAutomation {
                 &mut mask_return,
             );
             
+            if result == 0 {
+                self.log_platform_error("XQueryPointer", "Failed to query pointer position");
+                return Err(AutomationError::SystemError {
+                    message: "Failed to query pointer position. Display connection may be invalid.".to_string(),
+                });
+            }
+            
             Ok((root_x, root_y))
         }
     }
     
     fn get_screen_size(&self) -> Result<(u32, u32)> {
+        self.log_platform_call("XDisplayWidth/XDisplayHeight", "");
+        
         unsafe {
             let screen = x11::xlib::XDefaultScreen(self.display);
             let width = x11::xlib::XDisplayWidth(self.display, screen) as u32;
             let height = x11::xlib::XDisplayHeight(self.display, screen) as u32;
+            
+            if width == 0 || height == 0 {
+                self.log_platform_error("XDisplayWidth/XDisplayHeight", "Invalid screen dimensions");
+                return Err(AutomationError::SystemError {
+                    message: "Failed to get valid screen dimensions. Display connection may be invalid.".to_string(),
+                });
+            }
+            
             Ok((width, height))
         }
     }
