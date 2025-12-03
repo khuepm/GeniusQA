@@ -283,10 +283,12 @@ class IPCHandler:
             )
             self.player.pause_callback = self._emit_playback_paused
             
-            # Start playback in a separate thread and monitor completion
+            # Start playback - this may raise PermissionError
+            self.player.start_playback()
+            
+            # Monitor completion in a separate thread
             import threading
             def monitor_playback():
-                self.player.start_playback()
                 # Wait for playback to complete
                 if self.player._playback_thread:
                     self.player._playback_thread.join()

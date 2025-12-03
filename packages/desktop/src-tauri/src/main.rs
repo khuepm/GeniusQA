@@ -1,170 +1,24 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod core_router;
+mod python_process;
+
+use core_router::{AutomationCommand, CoreRouter, CoreStatus, CoreType, PerformanceComparison};
+use python_process::PythonProcessManager;
+use rust_automation_core::preferences::UserSettings;
 use serde::{Deserialize, Serialize};
-use std::io::{BufRead, BufReader, Write};
-use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
-use std::sync::{Arc, Mutex};
-use std::thread;
-use tauri::{Manager, State};
+use std::sync::Arc;
+use tauri::State;
 
-// Python process manager to maintain a single long-lived Python process
-struct PythonProcessManager {
-    process: Arc<Mutex<Option<PythonProcess>>>,
+// Core router state wrapper
+struct CoreRouterState {
+    router: CoreRouter,
 }
 
-struct PythonProcess {
-    _child: Child,
-    stdin: Arc<Mutex<ChildStdin>>,
-    stdout_reader: Arc<Mutex<BufReader<ChildStdout>>>,
-    _stderr_thread: thread::JoinHandle<()>,
-}
-
-impl PythonProcessManager {
-    fn new() -> Self {
-        Self {
-            process: Arc::new(Mutex::new(None)),
-        }
-    }
-
-    fn ensure_process_running(&self, app_handle: tauri::AppHandle) -> Result<(), String> {
-        let mut process_guard = self.process.lock().unwrap();
-        
-        if process_guard.is_none() {
-            // Spawn new Python process
-            let python_process = Self::spawn_python_process(app_handle)?;
-            *process_guard = Some(python_process);
-        }
-        
-        Ok(())
-    }
-
-    fn spawn_python_process(app_handle: tauri::AppHandle) -> Result<PythonProcess, String> {
-        // Determine Python command (try python3 first, then python)
-        let python_cmd = if cfg!(target_os = "windows") {
-            "python"
-        } else {
-            "python3"
-        };
-
-        // Get the path to the Python core package
-        // In development, it's at packages/python-core
-        // In production, it should be bundled with the app
-        let python_core_path = if cfg!(debug_assertions) {
-            // Development mode - use relative path
-            std::env::current_dir()
-                .map_err(|e| format!("Failed to get current directory: {}", e))?
-                .join("../../python-core/src")
-        } else {
-            // Production mode - use bundled resources
-            app_handle
-                .path_resolver()
-                .resource_dir()
-                .ok_or_else(|| "Failed to resolve resource directory".to_string())?
-                .join("python-core/src")
-        };
-
-        // Spawn Python process with stdin/stdout/stderr pipes
-        let mut child = Command::new(python_cmd)
-            .arg("-u") // Unbuffered output
-            .arg("__main__.py")
-            .current_dir(&python_core_path)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("Failed to spawn Python process: {}. Make sure Python 3.9+ is installed.", e))?;
-
-        // Take ownership of stdin, stdout, and stderr
-        let stdin = child.stdin.take().ok_or("Failed to get stdin")?;
-        let stdout = child.stdout.take().ok_or("Failed to get stdout")?;
-        let stderr = child.stderr.take().ok_or("Failed to get stderr")?;
-        
-        let stdin = Arc::new(Mutex::new(stdin));
-        let stdout_reader = Arc::new(Mutex::new(BufReader::new(stdout)));
-
-        // Spawn a thread to read and log stderr
-        let stderr_thread = thread::spawn(move || {
-            let reader = BufReader::new(stderr);
-            for line in reader.lines() {
-                if let Ok(line) = line {
-                    eprintln!("[Python stderr] {}", line);
-                }
-            }
-        });
-
-        Ok(PythonProcess { 
-            _child: child,
-            stdin,
-            stdout_reader,
-            _stderr_thread: stderr_thread,
-        })
-    }
-
-    fn send_command(&self, command: &str, params: serde_json::Value, app_handle: &tauri::AppHandle) -> Result<serde_json::Value, String> {
-        let process_guard = self.process.lock().unwrap();
-        
-        let process = process_guard
-            .as_ref()
-            .ok_or_else(|| "Python process not running".to_string())?;
-
-        // Create command message
-        let message = serde_json::json!({
-            "command": command,
-            "params": params
-        });
-
-        // Send command to Python stdin
-        let mut stdin = process.stdin.lock().unwrap();
-        let message_str = serde_json::to_string(&message)
-            .map_err(|e| format!("Failed to serialize command: {}", e))?;
-
-        writeln!(stdin, "{}", message_str)
-            .map_err(|e| format!("Failed to write to Python stdin: {}", e))?;
-
-        stdin
-            .flush()
-            .map_err(|e| format!("Failed to flush Python stdin: {}", e))?;
-
-        drop(stdin);
-
-        // Read response from Python stdout
-        let mut stdout_reader = process.stdout_reader.lock().unwrap();
-        let mut response_line = String::new();
-
-        // Read lines until we get a response (not an event)
-        loop {
-            response_line.clear();
-            stdout_reader
-                .read_line(&mut response_line)
-                .map_err(|e| format!("Failed to read from Python stdout: {}", e))?;
-
-            if response_line.is_empty() {
-                return Err("Python process closed stdout".to_string());
-            }
-
-            // Try to parse the line
-            let parsed: serde_json::Value = serde_json::from_str(&response_line)
-                .map_err(|e| format!("Failed to parse Python output: {}", e))?;
-
-            // Log the parsed message for debugging
-            eprintln!("[Python stdout] {}", response_line.trim());
-
-            // Check if this is an event or a response
-            if let Some(event_type) = parsed.get("type").and_then(|t| t.as_str()) {
-                // This is an event, emit it to frontend
-                if let Some(data) = parsed.get("data") {
-                    let _ = app_handle.emit_all(event_type, data);
-                }
-                continue;
-            } else if parsed.get("success").is_some() {
-                // This is a response
-                return Ok(parsed);
-            } else {
-                return Err(format!("Unexpected message format: {}", response_line));
-            }
-        }
-    }
+// Monitor state wrapper
+struct MonitorState {
+    monitor: rust_automation_core::CoreMonitor,
 }
 
 // Response types
@@ -188,152 +42,382 @@ struct ScriptInfo {
     action_count: i32,
 }
 
-// Tauri commands
+#[derive(Debug, Serialize, Deserialize)]
+struct PerformanceMetricsResponse {
+    #[serde(rename = "coreType")]
+    core_type: String,
+    #[serde(rename = "lastOperationTime")]
+    last_operation_time: f64,
+    #[serde(rename = "memoryUsage")]
+    memory_usage: f64,
+    #[serde(rename = "cpuUsage")]
+    cpu_usage: f64,
+    #[serde(rename = "operationCount")]
+    operation_count: u64,
+    #[serde(rename = "errorRate")]
+    error_rate: f32,
+}
+
+// Core management commands
+#[tauri::command]
+async fn select_core(
+    core_router: State<'_, CoreRouterState>,
+    core_type: String,
+) -> Result<(), String> {
+    let core_type = match core_type.as_str() {
+        "python" => CoreType::Python,
+        "rust" => CoreType::Rust,
+        _ => return Err(format!("Invalid core type: {}", core_type)),
+    };
+
+    core_router.router.select_core(core_type)
+}
+
+#[tauri::command]
+async fn get_available_cores(
+    core_router: State<'_, CoreRouterState>,
+) -> Result<Vec<String>, String> {
+    let cores = core_router.router.get_available_cores();
+    let core_strings: Vec<String> = cores
+        .into_iter()
+        .map(|core| match core {
+            CoreType::Python => "python".to_string(),
+            CoreType::Rust => "rust".to_string(),
+        })
+        .collect();
+    Ok(core_strings)
+}
+
+#[tauri::command]
+async fn get_core_status(
+    core_router: State<'_, CoreRouterState>,
+) -> Result<CoreStatus, String> {
+    Ok(core_router.router.get_core_status())
+}
+
+#[tauri::command]
+async fn get_core_performance_metrics(
+    core_router: State<'_, CoreRouterState>,
+) -> Result<Vec<PerformanceMetricsResponse>, String> {
+    let metrics_map = core_router.router.get_performance_metrics().await;
+    
+    let metrics_vec: Vec<PerformanceMetricsResponse> = metrics_map
+        .into_iter()
+        .map(|(core_type, metrics)| PerformanceMetricsResponse {
+            core_type: match core_type {
+                CoreType::Python => "python".to_string(),
+                CoreType::Rust => "rust".to_string(),
+            },
+            last_operation_time: metrics.avg_response_time.as_millis() as f64,
+            memory_usage: 0.0, // TODO: Implement memory tracking
+            cpu_usage: 0.0,    // TODO: Implement CPU tracking
+            operation_count: metrics.total_operations,
+            error_rate: 1.0 - metrics.success_rate,
+        })
+        .collect();
+    
+    Ok(metrics_vec)
+}
+
+#[tauri::command]
+async fn get_performance_comparison(
+    core_router: State<'_, CoreRouterState>,
+) -> Result<PerformanceComparison, String> {
+    Ok(core_router.router.get_performance_comparison().await)
+}
+
+// Settings management commands
+#[tauri::command]
+async fn get_user_settings(
+    core_router: State<'_, CoreRouterState>,
+) -> Result<Option<UserSettings>, String> {
+    Ok(core_router.router.get_user_settings())
+}
+
+#[tauri::command]
+async fn update_user_settings(
+    core_router: State<'_, CoreRouterState>,
+    settings: UserSettings,
+) -> Result<(), String> {
+    core_router.router.update_user_settings(settings)
+}
+
+#[tauri::command]
+async fn set_playback_speed(
+    core_router: State<'_, CoreRouterState>,
+    speed: f64,
+) -> Result<(), String> {
+    core_router.router.set_playback_speed(speed)
+}
+
+#[tauri::command]
+async fn set_loop_count(
+    core_router: State<'_, CoreRouterState>,
+    count: u32,
+) -> Result<(), String> {
+    core_router.router.set_loop_count(count)
+}
+
+#[tauri::command]
+async fn set_selected_script_path(
+    core_router: State<'_, CoreRouterState>,
+    path: Option<String>,
+) -> Result<(), String> {
+    core_router.router.set_selected_script_path(path)
+}
+
+#[tauri::command]
+async fn set_show_preview(
+    core_router: State<'_, CoreRouterState>,
+    show_preview: bool,
+) -> Result<(), String> {
+    core_router.router.set_show_preview(show_preview)
+}
+
+#[tauri::command]
+async fn set_preview_opacity(
+    core_router: State<'_, CoreRouterState>,
+    opacity: f64,
+) -> Result<(), String> {
+    core_router.router.set_preview_opacity(opacity)
+}
+
+// Automation commands (now routed through CoreRouter)
 #[tauri::command]
 async fn start_recording(
-    process_manager: State<'_, PythonProcessManager>,
+    core_router: State<'_, CoreRouterState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    // Ensure Python process is running
-    process_manager.ensure_process_running(app_handle.clone())?;
+    let start_time = std::time::Instant::now();
+    let active_core = core_router.router.get_core_status().active_core;
+    
+    let response = core_router.router.route_command(
+        AutomationCommand::StartRecording,
+        &app_handle,
+    ).await;
 
-    // Send start_recording command
-    let response = process_manager.send_command("start_recording", serde_json::json!({}), &app_handle)?;
+    let operation_duration = start_time.elapsed();
+    let success = response.is_ok() && 
+        response.as_ref().unwrap().get("success").and_then(|s| s.as_bool()) == Some(true);
 
-    // Check if successful
-    if response.get("success").and_then(|s| s.as_bool()) == Some(true) {
-        Ok(())
-    } else {
-        let error = response
-            .get("error")
-            .and_then(|e| e.as_str())
-            .unwrap_or("Unknown error");
-        Err(error.to_string())
+    // Update performance metrics
+    core_router.router.update_performance_metrics(
+        active_core,
+        operation_duration,
+        success,
+    ).await;
+
+    match response {
+        Ok(resp) => {
+            // Check if successful
+            if resp.get("success").and_then(|s| s.as_bool()) == Some(true) {
+                Ok(())
+            } else {
+                let error = resp
+                    .get("error")
+                    .and_then(|e| e.as_str())
+                    .unwrap_or("Unknown error");
+                Err(error.to_string())
+            }
+        }
+        Err(e) => Err(e)
     }
 }
 
 #[tauri::command]
 async fn stop_recording(
-    process_manager: State<'_, PythonProcessManager>,
+    core_router: State<'_, CoreRouterState>,
     app_handle: tauri::AppHandle,
 ) -> Result<RecordingResult, String> {
-    // Send stop_recording command
-    let response = process_manager.send_command("stop_recording", serde_json::json!({}), &app_handle)?;
+    let start_time = std::time::Instant::now();
+    let active_core = core_router.router.get_core_status().active_core;
+    
+    let response = core_router.router.route_command(
+        AutomationCommand::StopRecording,
+        &app_handle,
+    ).await;
 
-    // Check if successful
-    if response.get("success").and_then(|s| s.as_bool()) == Some(true) {
-        let data = response.get("data").ok_or("Missing data in response")?;
-        
-        let result = RecordingResult {
-            script_path: data.get("scriptPath").and_then(|s| s.as_str()).map(String::from),
-            action_count: data.get("actionCount").and_then(|n| n.as_i64()).map(|n| n as i32),
-            duration: data.get("duration").and_then(|n| n.as_f64()),
-            screenshot_count: data.get("screenshotCount").and_then(|n| n.as_i64()).map(|n| n as i32),
-        };
-        
-        Ok(result)
-    } else {
-        let error = response
-            .get("error")
-            .and_then(|e| e.as_str())
-            .unwrap_or("Unknown error");
-        Err(error.to_string())
+    let operation_duration = start_time.elapsed();
+    let success = response.is_ok() && 
+        response.as_ref().unwrap().get("success").and_then(|s| s.as_bool()) == Some(true);
+
+    // Update performance metrics
+    core_router.router.update_performance_metrics(
+        active_core,
+        operation_duration,
+        success,
+    ).await;
+
+    match response {
+        Ok(resp) => {
+            // Check if successful
+            if resp.get("success").and_then(|s| s.as_bool()) == Some(true) {
+                let data = resp.get("data").ok_or("Missing data in response")?;
+                
+                let result = RecordingResult {
+                    script_path: data.get("scriptPath").and_then(|s| s.as_str()).map(String::from),
+                    action_count: data.get("actionCount").and_then(|n| n.as_i64()).map(|n| n as i32),
+                    duration: data.get("duration").and_then(|n| n.as_f64()),
+                    screenshot_count: data.get("screenshotCount").and_then(|n| n.as_i64()).map(|n| n as i32),
+                };
+                
+                Ok(result)
+            } else {
+                let error = resp
+                    .get("error")
+                    .and_then(|e| e.as_str())
+                    .unwrap_or("Unknown error");
+                Err(error.to_string())
+            }
+        }
+        Err(e) => Err(e)
     }
 }
 
 #[tauri::command]
 async fn start_playback(
-    process_manager: State<'_, PythonProcessManager>,
+    core_router: State<'_, CoreRouterState>,
     app_handle: tauri::AppHandle,
     script_path: Option<String>,
     speed: Option<f64>,
     loop_count: Option<i32>,
 ) -> Result<(), String> {
-    // Ensure Python process is running
-    process_manager.ensure_process_running(app_handle.clone())?;
+    let start_time = std::time::Instant::now();
+    let active_core = core_router.router.get_core_status().active_core;
+    
+    let response = core_router.router.route_command(
+        AutomationCommand::StartPlayback {
+            script_path,
+            speed,
+            loop_count,
+        },
+        &app_handle,
+    ).await;
 
-    // Build params
-    let mut params = serde_json::Map::new();
-    if let Some(path) = script_path {
-        params.insert("scriptPath".to_string(), serde_json::Value::String(path));
-    }
-    if let Some(s) = speed {
-        params.insert("speed".to_string(), serde_json::json!(s));
-    }
-    if let Some(lc) = loop_count {
-        params.insert("loopCount".to_string(), serde_json::json!(lc));
-    }
+    let operation_duration = start_time.elapsed();
+    let success = response.is_ok() && 
+        response.as_ref().unwrap().get("success").and_then(|s| s.as_bool()) == Some(true);
 
-    // Send start_playback command
-    let response = process_manager.send_command("start_playback", serde_json::Value::Object(params), &app_handle)?;
+    // Update performance metrics
+    core_router.router.update_performance_metrics(
+        active_core,
+        operation_duration,
+        success,
+    ).await;
 
-    // Check if successful
-    if response.get("success").and_then(|s| s.as_bool()) == Some(true) {
-        Ok(())
-    } else {
-        let error = response
-            .get("error")
-            .and_then(|e| e.as_str())
-            .unwrap_or("Unknown error");
-        Err(error.to_string())
+    match response {
+        Ok(resp) => {
+            // Check if successful
+            if resp.get("success").and_then(|s| s.as_bool()) == Some(true) {
+                Ok(())
+            } else {
+                let error = resp
+                    .get("error")
+                    .and_then(|e| e.as_str())
+                    .unwrap_or("Unknown error");
+                Err(error.to_string())
+            }
+        }
+        Err(e) => Err(e)
     }
 }
 
 #[tauri::command]
 async fn stop_playback(
-    process_manager: State<'_, PythonProcessManager>,
+    core_router: State<'_, CoreRouterState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    // Send stop_playback command
-    let response = process_manager.send_command("stop_playback", serde_json::json!({}), &app_handle)?;
+    let start_time = std::time::Instant::now();
+    let active_core = core_router.router.get_core_status().active_core;
+    
+    let response = core_router.router.route_command(
+        AutomationCommand::StopPlayback,
+        &app_handle,
+    ).await;
 
-    // Check if successful
-    if response.get("success").and_then(|s| s.as_bool()) == Some(true) {
-        Ok(())
-    } else {
-        let error = response
-            .get("error")
-            .and_then(|e| e.as_str())
-            .unwrap_or("Unknown error");
-        Err(error.to_string())
+    let operation_duration = start_time.elapsed();
+    let success = response.is_ok() && 
+        response.as_ref().unwrap().get("success").and_then(|s| s.as_bool()) == Some(true);
+
+    // Update performance metrics
+    core_router.router.update_performance_metrics(
+        active_core,
+        operation_duration,
+        success,
+    ).await;
+
+    match response {
+        Ok(resp) => {
+            // Check if successful
+            if resp.get("success").and_then(|s| s.as_bool()) == Some(true) {
+                Ok(())
+            } else {
+                let error = resp
+                    .get("error")
+                    .and_then(|e| e.as_str())
+                    .unwrap_or("Unknown error");
+                Err(error.to_string())
+            }
+        }
+        Err(e) => Err(e)
     }
 }
 
 #[tauri::command]
 async fn pause_playback(
-    process_manager: State<'_, PythonProcessManager>,
+    core_router: State<'_, CoreRouterState>,
     app_handle: tauri::AppHandle,
 ) -> Result<bool, String> {
-    // Send pause_playback command
-    let response = process_manager.send_command("pause_playback", serde_json::json!({}), &app_handle)?;
+    let start_time = std::time::Instant::now();
+    let active_core = core_router.router.get_core_status().active_core;
+    
+    let response = core_router.router.route_command(
+        AutomationCommand::PausePlayback,
+        &app_handle,
+    ).await;
 
-    // Check if successful
-    if response.get("success").and_then(|s| s.as_bool()) == Some(true) {
-        let data = response.get("data").ok_or("Missing data in response")?;
-        let is_paused = data
-            .get("isPaused")
-            .and_then(|b| b.as_bool())
-            .unwrap_or(false);
-        Ok(is_paused)
-    } else {
-        let error = response
-            .get("error")
-            .and_then(|e| e.as_str())
-            .unwrap_or("Unknown error");
-        Err(error.to_string())
+    let operation_duration = start_time.elapsed();
+    let success = response.is_ok() && 
+        response.as_ref().unwrap().get("success").and_then(|s| s.as_bool()) == Some(true);
+
+    // Update performance metrics
+    core_router.router.update_performance_metrics(
+        active_core,
+        operation_duration,
+        success,
+    ).await;
+
+    match response {
+        Ok(resp) => {
+            // Check if successful
+            if resp.get("success").and_then(|s| s.as_bool()) == Some(true) {
+                let data = resp.get("data").ok_or("Missing data in response")?;
+                let is_paused = data
+                    .get("isPaused")
+                    .and_then(|b| b.as_bool())
+                    .unwrap_or(false);
+                Ok(is_paused)
+            } else {
+                let error = resp
+                    .get("error")
+                    .and_then(|e| e.as_str())
+                    .unwrap_or("Unknown error");
+                Err(error.to_string())
+            }
+        }
+        Err(e) => Err(e)
     }
 }
 
 #[tauri::command]
 async fn check_recordings(
-    process_manager: State<'_, PythonProcessManager>,
+    core_router: State<'_, CoreRouterState>,
     app_handle: tauri::AppHandle,
 ) -> Result<bool, String> {
-    // Ensure Python process is running
-    process_manager.ensure_process_running(app_handle.clone())?;
-
-    // Send check_recordings command
-    let response = process_manager.send_command("check_recordings", serde_json::json!({}), &app_handle)?;
+    let response = core_router.router.route_command(
+        AutomationCommand::CheckRecordings,
+        &app_handle,
+    ).await?;
 
     // Check if successful
     if response.get("success").and_then(|s| s.as_bool()) == Some(true) {
@@ -354,14 +438,13 @@ async fn check_recordings(
 
 #[tauri::command]
 async fn get_latest(
-    process_manager: State<'_, PythonProcessManager>,
+    core_router: State<'_, CoreRouterState>,
     app_handle: tauri::AppHandle,
 ) -> Result<Option<String>, String> {
-    // Ensure Python process is running
-    process_manager.ensure_process_running(app_handle.clone())?;
-
-    // Send get_latest command
-    let response = process_manager.send_command("get_latest", serde_json::json!({}), &app_handle)?;
+    let response = core_router.router.route_command(
+        AutomationCommand::GetLatest,
+        &app_handle,
+    ).await?;
 
     // Check if successful
     if response.get("success").and_then(|s| s.as_bool()) == Some(true) {
@@ -382,14 +465,13 @@ async fn get_latest(
 
 #[tauri::command]
 async fn list_scripts(
-    process_manager: State<'_, PythonProcessManager>,
+    core_router: State<'_, CoreRouterState>,
     app_handle: tauri::AppHandle,
 ) -> Result<Vec<ScriptInfo>, String> {
-    // Ensure Python process is running
-    process_manager.ensure_process_running(app_handle.clone())?;
-
-    // Send list_scripts command
-    let response = process_manager.send_command("list_scripts", serde_json::json!({}), &app_handle)?;
+    let response = core_router.router.route_command(
+        AutomationCommand::ListScripts,
+        &app_handle,
+    ).await?;
 
     // Check if successful
     if response.get("success").and_then(|s| s.as_bool()) == Some(true) {
@@ -416,18 +498,14 @@ async fn list_scripts(
 
 #[tauri::command]
 async fn load_script(
-    process_manager: State<'_, PythonProcessManager>,
+    core_router: State<'_, CoreRouterState>,
     app_handle: tauri::AppHandle,
     script_path: String,
 ) -> Result<serde_json::Value, String> {
-    // Ensure Python process is running
-    process_manager.ensure_process_running(app_handle.clone())?;
-
-    // Send load_script command
-    let params = serde_json::json!({
-        "scriptPath": script_path
-    });
-    let response = process_manager.send_command("load_script", params, &app_handle)?;
+    let response = core_router.router.route_command(
+        AutomationCommand::LoadScript { path: script_path },
+        &app_handle,
+    ).await?;
 
     // Check if successful
     if response.get("success").and_then(|s| s.as_bool()) == Some(true) {
@@ -445,20 +523,18 @@ async fn load_script(
 
 #[tauri::command]
 async fn save_script(
-    process_manager: State<'_, PythonProcessManager>,
+    core_router: State<'_, CoreRouterState>,
     app_handle: tauri::AppHandle,
     script_path: String,
     script_data: serde_json::Value,
 ) -> Result<String, String> {
-    // Ensure Python process is running
-    process_manager.ensure_process_running(app_handle.clone())?;
-
-    // Send save_script command
-    let params = serde_json::json!({
-        "scriptPath": script_path,
-        "scriptData": script_data
-    });
-    let response = process_manager.send_command("save_script", params, &app_handle)?;
+    let response = core_router.router.route_command(
+        AutomationCommand::SaveScript {
+            path: script_path,
+            data: script_data,
+        },
+        &app_handle,
+    ).await?;
 
     // Check if successful
     if response.get("success").and_then(|s| s.as_bool()) == Some(true) {
@@ -479,18 +555,14 @@ async fn save_script(
 
 #[tauri::command]
 async fn delete_script(
-    process_manager: State<'_, PythonProcessManager>,
+    core_router: State<'_, CoreRouterState>,
     app_handle: tauri::AppHandle,
     script_path: String,
 ) -> Result<String, String> {
-    // Ensure Python process is running
-    process_manager.ensure_process_running(app_handle.clone())?;
-
-    // Send delete_script command
-    let params = serde_json::json!({
-        "scriptPath": script_path
-    });
-    let response = process_manager.send_command("delete_script", params, &app_handle)?;
+    let response = core_router.router.route_command(
+        AutomationCommand::DeleteScript { path: script_path },
+        &app_handle,
+    ).await?;
 
     // Check if successful
     if response.get("success").and_then(|s| s.as_bool()) == Some(true) {
@@ -509,12 +581,111 @@ async fn delete_script(
     }
 }
 
+// Monitoring commands
+#[tauri::command]
+async fn get_health_status(
+    monitor: State<'_, MonitorState>,
+) -> Result<std::collections::HashMap<String, rust_automation_core::CoreHealthInfo>, String> {
+    let health_status = monitor.monitor.get_health_status().await;
+    
+    // Convert CoreType keys to strings for JSON serialization
+    let mut result = std::collections::HashMap::new();
+    for (core_type, health_info) in health_status {
+        let key = match core_type {
+            rust_automation_core::logging::CoreType::Python => "python".to_string(),
+            rust_automation_core::logging::CoreType::Rust => "rust".to_string(),
+        };
+        result.insert(key, health_info);
+    }
+    
+    Ok(result)
+}
+
+#[tauri::command]
+async fn get_active_alerts(
+    monitor: State<'_, MonitorState>,
+) -> Result<Vec<rust_automation_core::Alert>, String> {
+    Ok(monitor.monitor.get_active_alerts().await)
+}
+
+#[tauri::command]
+async fn get_alert_history(
+    monitor: State<'_, MonitorState>,
+    limit: Option<usize>,
+) -> Result<Vec<rust_automation_core::Alert>, String> {
+    Ok(monitor.monitor.get_alert_history(limit))
+}
+
+#[tauri::command]
+async fn resolve_alert(
+    monitor: State<'_, MonitorState>,
+    alert_id: String,
+) -> Result<(), String> {
+    monitor.monitor.resolve_alert(&alert_id).await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_monitoring_stats(
+    monitor: State<'_, MonitorState>,
+) -> Result<rust_automation_core::monitoring::MonitoringStats, String> {
+    Ok(monitor.monitor.get_monitoring_stats().await)
+}
+
 fn main() {
-    let process_manager = PythonProcessManager::new();
+    // Initialize logging system
+    if let Err(e) = init_logging() {
+        eprintln!("Failed to initialize logging: {}", e);
+    }
+
+    // Initialize monitoring system
+    let monitoring_config = rust_automation_core::MonitoringConfig::default();
+    let core_monitor = rust_automation_core::CoreMonitor::new(monitoring_config);
+    
+    // Start monitoring in background
+    let monitor_clone = core_monitor.clone();
+    tokio::spawn(async move {
+        if let Err(e) = monitor_clone.start_monitoring().await {
+            log::error!("Failed to start core monitoring: {}", e);
+        }
+    });
+
+    let python_manager = Arc::new(PythonProcessManager::new());
+    let core_router = CoreRouter::new(python_manager);
+    
+    // Initialize preferences
+    if let Err(e) = core_router.initialize_preferences() {
+        eprintln!("Warning: Failed to initialize preferences: {}", e);
+    }
+    
+    let core_router_state = CoreRouterState { router: core_router };
+    let monitor_state = MonitorState { monitor: core_monitor };
 
     tauri::Builder::default()
-        .manage(process_manager)
+        .manage(core_router_state)
+        .manage(monitor_state)
         .invoke_handler(tauri::generate_handler![
+            // Core management commands
+            select_core,
+            get_available_cores,
+            get_core_status,
+            get_core_performance_metrics,
+            get_performance_comparison,
+            // Settings management commands
+            get_user_settings,
+            update_user_settings,
+            set_playback_speed,
+            set_loop_count,
+            set_selected_script_path,
+            set_show_preview,
+            set_preview_opacity,
+            // Monitoring commands
+            get_health_status,
+            get_active_alerts,
+            get_alert_history,
+            resolve_alert,
+            get_monitoring_stats,
+            // Automation commands (routed through CoreRouter)
             start_recording,
             stop_recording,
             start_playback,
@@ -529,4 +700,23 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// Initialize the logging system
+fn init_logging() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize Rust core logging
+    let logging_config = rust_automation_core::LoggingConfig::default();
+    rust_automation_core::init_logger(logging_config)?;
+
+    // Initialize tracing for Tauri backend
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_target(true)
+        .with_thread_ids(true)
+        .with_file(true)
+        .with_line_number(true)
+        .init();
+
+    log::info!("Logging system initialized successfully");
+    Ok(())
 }

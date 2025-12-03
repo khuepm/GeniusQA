@@ -54,3 +54,4 @@ android/
 ios/
 . bundle/
 GoogleService-Info.plist
+packages/rust-core/target/debug/

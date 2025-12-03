@@ -1,0 +1,9 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc cbb6e26f3ab59cc7bcd8bf167b7edbe7e7295c9880bd3485c696037fc6750ca5 # shrinks to actions = [Action { action_type: MouseMove, timestamp: 8.945214274327313, x: Some(0), y: Some(0), button: None, key: None, text: None, modifiers: None, additional_data: None }, Action { action_type: MouseMove, timestamp: 0.0, x: Some(0), y: Some(0), button: None, key: None, text: None, modifiers: None, additional_data: None }], playback_speed = 0.5
+cc 2b6b098b8e468322f06828281352b8d49cfae4f10058aabffdaee44b4c99ffe3 # shrinks to actions = [Action { action_type: MouseMove, timestamp: 6.604729734085931, x: Some(0), y: Some(0), button: None, key: None, text: None, modifiers: None, additional_data: None }, Action { action_type: KeyPress, timestamp: 0.0, x: None, y: None, button: None, key: Some("r"), text: None, modifiers: None, additional_data: None }], source_core = "h", _target_core = "|", platform = "s"
+cc 7490c18d499d39989abef4ad37defa402f9bc282aaa3b50c329448c0532b89a1 # shrinks to actions = [Action { action_type: KeyType, timestamp: 9.673955312065335, x: None, y: None, button: None, key: None, text: Some("a"), modifiers: None, additional_data: None }], core_type = "y", platform = "a", duration = 0.1

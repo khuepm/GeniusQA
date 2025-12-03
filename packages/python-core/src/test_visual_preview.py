@@ -99,7 +99,7 @@ def test_action_preview_with_progress_callback():
     def action_callback(action, index):
         action_callbacks.append(index)
     
-    def progress_callback(current, total):
+    def progress_callback(current, total, current_loop=1, total_loops=1):
         progress_callbacks.append((current, total))
     
     # Create player with both callbacks
@@ -116,13 +116,15 @@ def test_action_preview_with_progress_callback():
     
     # Verify both callbacks were invoked
     assert len(action_callbacks) == 2
-    assert len(progress_callbacks) == 2
+    assert len(progress_callbacks) == 3  # 2 action progress + 1 completion progress
     
     # Verify order: action_callback before progress_callback
     assert action_callbacks[0] == 0
     assert progress_callbacks[0] == (1, 2)
     assert action_callbacks[1] == 1
     assert progress_callbacks[1] == (2, 2)
+    # Final completion progress callback
+    assert progress_callbacks[2] == (2, 2)
 
 
 def test_action_preview_callback_optional():

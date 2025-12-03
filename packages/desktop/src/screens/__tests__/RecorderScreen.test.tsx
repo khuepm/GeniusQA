@@ -46,6 +46,22 @@ describe('RecorderScreen', () => {
       stopPlayback: jest.fn().mockResolvedValue(undefined),
       addEventListener: jest.fn(),
       removeEventListener: jest.fn(),
+      // Core management methods
+      getAvailableCores: jest.fn().mockResolvedValue(['python']),
+      getCoreStatus: jest.fn().mockResolvedValue({
+        activeCoreType: 'python',
+        availableCores: ['python'],
+        coreHealth: { python: true, rust: false }
+      }),
+      selectCore: jest.fn().mockResolvedValue(undefined),
+      getCorePerformanceMetrics: jest.fn().mockResolvedValue([{
+        coreType: 'python',
+        lastOperationTime: 100,
+        memoryUsage: 50,
+        cpuUsage: 10,
+        operationCount: 5,
+        errorRate: 0
+      }]),
     };
 
     (getIPCBridge as jest.Mock).mockReturnValue(mockIPCBridge);
@@ -79,7 +95,7 @@ describe('RecorderScreen', () => {
 
       expect(getByText('Record')).toBeInTheDocument();
       expect(getByText('Start Playback')).toBeInTheDocument();
-      expect(getByText('Stop')).toBeInTheDocument();
+      expect(getByText('Stop Recording')).toBeInTheDocument();
     });
   });
 
@@ -112,7 +128,7 @@ describe('RecorderScreen', () => {
       const { getByText } = renderWithRouter(<RecorderScreen />);
 
       await waitFor(() => {
-        const stopButton = getByText('Stop').closest('button');
+        const stopButton = getByText('Stop Recording').closest('button');
         expect(stopButton).toBeDisabled();
       });
     });
@@ -258,7 +274,7 @@ describe('RecorderScreen', () => {
       });
 
       // Stop recording
-      const stopButton = getByText('Stop').closest('button');
+      const stopButton = getByText('Stop Recording').closest('button');
       fireEvent.click(stopButton!);
 
       await waitFor(() => {
@@ -283,7 +299,7 @@ describe('RecorderScreen', () => {
       });
 
       // Stop playback
-      const stopButton = getByText('Stop').closest('button');
+      const stopButton = getByText('Stop Playback').closest('button');
       fireEvent.click(stopButton!);
 
       await waitFor(() => {
@@ -357,7 +373,7 @@ describe('RecorderScreen', () => {
       });
 
       // Stop recording
-      const stopButton = getByText('Stop').closest('button');
+      const stopButton = getByText('Stop Recording').closest('button');
       fireEvent.click(stopButton!);
 
       await waitFor(() => {
@@ -378,7 +394,7 @@ describe('RecorderScreen', () => {
       });
 
       // Stop recording
-      const stopButton = getByText('Stop').closest('button');
+      const stopButton = getByText('Stop Recording').closest('button');
       fireEvent.click(stopButton!);
 
       await waitFor(() => {

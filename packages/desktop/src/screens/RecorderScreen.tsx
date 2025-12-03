@@ -7,6 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthButton } from '../components/AuthButton';
+import { CoreSelector, CoreType, CoreStatus, PerformanceMetrics, PerformanceComparison } from '../components/CoreSelector';
 import { getIPCBridge } from '../services/ipcBridgeService';
 import {
   RecorderStatus,
@@ -48,16 +49,28 @@ const RecorderScreen: React.FC = () => {
   const [recordingTime, setRecordingTime] = useState<number>(0);
   const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
 
+  // Core management state
+  const [currentCore, setCurrentCore] = useState<CoreType>('python');
+  const [availableCores, setAvailableCores] = useState<CoreType[]>(['python']);
+  const [coreStatus, setCoreStatus] = useState<CoreStatus | null>(null);
+  const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics[]>([]);
+  const [performanceComparison, setPerformanceComparison] = useState<PerformanceComparison | null>(null);
+  const [coreLoading, setCoreLoading] = useState<boolean>(false);
+  const [coreError, setCoreError] = useState<string | null>(null);
+
   const navigate = useNavigate();
   const ipcBridge = getIPCBridge();
 
   /**
-   * Initialize component - check for existing recordings
-   * Requirements: 2.5, 6.4
+   * Initialize component - check for existing recordings and core status
+   * Requirements: 2.5, 6.4, 9.1, 9.5
    */
   useEffect(() => {
     const initialize = async () => {
       try {
+        // Initialize core status first
+        await initializeCoreStatus();
+
         // Check for existing recordings
         const recordings = await ipcBridge.checkForRecordings();
         setHasRecordings(recordings);
@@ -212,6 +225,134 @@ const RecorderScreen: React.FC = () => {
       }
     };
   }, [status, recordingStartTime]);
+
+  /**
+   * Initialize core status and availability
+   * Requirements: 9.1, 9.5
+   */
+  const initializeCoreStatus = async () => {
+    try {
+      setCoreLoading(true);
+      setCoreError(null);
+
+      // Get available cores
+      const cores = await ipcBridge.getAvailableCores();
+      setAvailableCores(cores as CoreType[]);
+
+      // Get current core status
+      const status = await ipcBridge.getCoreStatus();
+      setCoreStatus(status);
+      setCurrentCore(status.activeCoreType);
+
+      // Get performance metrics
+      try {
+        const metrics = await ipcBridge.getCorePerformanceMetrics();
+        setPerformanceMetrics(metrics);
+      } catch (metricsError) {
+        // Performance metrics are optional, don't fail initialization
+        console.warn('Failed to load performance metrics:', metricsError);
+        setPerformanceMetrics([]);
+      }
+
+      // Get performance comparison
+      try {
+        const comparison = await ipcBridge.getPerformanceComparison();
+        setPerformanceComparison(comparison);
+      } catch (comparisonError) {
+        // Performance comparison is optional, don't fail initialization
+        console.warn('Failed to load performance comparison:', comparisonError);
+        setPerformanceComparison(null);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to initialize core status';
+      setCoreError(errorMessage);
+      console.error('Core initialization error:', err);
+
+      // Fallback to Python core if initialization fails
+      setCurrentCore('python');
+      setAvailableCores(['python']);
+    } finally {
+      setCoreLoading(false);
+    }
+  };
+
+  /**
+   * Handle core selection change
+   * Requirements: 1.2, 1.3, 6.4, 8.4
+   */
+  const handleCoreChange = async (newCore: CoreType) => {
+    if (status !== 'idle') {
+      throw new Error('Cannot switch cores while recording or playing. Please stop the current operation first.');
+    }
+
+    try {
+      setCoreLoading(true);
+      setCoreError(null);
+
+      // Switch to the new core
+      await ipcBridge.selectCore(newCore);
+
+      // Update current core
+      setCurrentCore(newCore);
+
+      // Refresh core status and metrics
+      await refreshCoreStatus();
+
+      console.log(`Successfully switched to ${newCore} core`);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : `Failed to switch to ${newCore} core`;
+      setCoreError(errorMessage);
+      throw err; // Re-throw to let CoreSelector handle the error display
+    } finally {
+      setCoreLoading(false);
+    }
+  };
+
+  /**
+   * Refresh core status and performance metrics
+   * Requirements: 6.4, 9.5, 10.1
+   */
+  const refreshCoreStatus = async () => {
+    try {
+      // Get updated core status
+      const status = await ipcBridge.getCoreStatus();
+      setCoreStatus(status);
+      setAvailableCores(status.availableCores as CoreType[]);
+
+      // Get updated performance metrics
+      try {
+        const metrics = await ipcBridge.getCorePerformanceMetrics();
+        setPerformanceMetrics(metrics);
+      } catch (metricsError) {
+        console.warn('Failed to refresh performance metrics:', metricsError);
+      }
+
+      // Get updated performance comparison
+      try {
+        const comparison = await ipcBridge.getPerformanceComparison();
+        setPerformanceComparison(comparison);
+      } catch (comparisonError) {
+        console.warn('Failed to refresh performance comparison:', comparisonError);
+      }
+    } catch (err) {
+      console.error('Failed to refresh core status:', err);
+    }
+  };
+
+  /**
+   * Periodic core status updates
+   * Requirements: 9.5
+   */
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (status === 'idle') {
+        // Only refresh when idle to avoid interfering with operations
+        await refreshCoreStatus();
+      }
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [status]);
 
   /**
    * Load available scripts for selection
@@ -472,6 +613,24 @@ const RecorderScreen: React.FC = () => {
             {getStatusText()}
           </span>
         </div>
+
+        {/* Core Selection */}
+        <CoreSelector
+          currentCore={currentCore}
+          availableCores={availableCores}
+          onCoreChange={handleCoreChange}
+          performanceMetrics={performanceMetrics}
+          performanceComparison={performanceComparison}
+          disabled={status !== 'idle'}
+          loading={coreLoading}
+        />
+
+        {/* Core Error Message */}
+        {coreError && (
+          <div className="error-container">
+            <p className="error-text">Core Error: {coreError}</p>
+          </div>
+        )}
 
         {/* Error Message */}
         {error && (
