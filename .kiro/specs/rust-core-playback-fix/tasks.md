@@ -1,4 +1,4 @@
-# Implementation Plan
+  # Implementation Plan
 
 - [x] 1. Fix platform automation execution
 - [x] 1.1 Enhance Windows platform implementation
@@ -9,11 +9,11 @@
   - Test mouse_move, mouse_click, and key_press functions
   - _Requirements: 1.1, 1.2, 1.3, 5.1, 5.4_
 
-- [ ]* 1.2 Write property test for mouse cursor movement
+- [x] 1.2 Write property test for mouse cursor movement
   - **Property 1: Mouse cursor movement execution**
   - **Validates: Requirements 1.1**
 
-- [ ]* 1.3 Write property test for mouse click execution
+- [x] 1.3 Write property test for mouse click execution
   - **Property 2: Mouse click execution**
   - **Validates: Requirements 1.2**
 
@@ -33,7 +33,7 @@
   - Test automation functions on Linux
   - _Requirements: 1.1, 1.2, 1.3, 5.3, 5.4_
 
-- [ ]* 1.6 Write property test for keyboard action execution
+- [x] 1.6 Write property test for keyboard action execution
   - **Property 3: Keyboard action execution**
   - **Validates: Requirements 1.3**
 
@@ -59,11 +59,11 @@
   - Add log_platform_error for API failures
   - _Requirements: 3.3_
 
-- [ ]* 2.4 Write property test for action logging completeness
+- [ ] 2.4 Write property test for action logging completeness
   - **Property 9: Action logging completeness**
   - **Validates: Requirements 3.2**
 
-- [ ]* 2.5 Write property test for error logging
+- [x] 2.5 Write property test for error logging
   - **Property 11: Error logging with context**
   - **Validates: Requirements 3.4**
 
@@ -89,11 +89,11 @@
   - Implement timing statistics collection
   - _Requirements: 2.1, 2.5_
 
-- [ ]* 3.4 Write property test for timestamp delay respect
+- [x] 3.4 Write property test for timestamp delay respect
   - **Property 6: Timestamp delay respect**
   - **Validates: Requirements 2.1**
 
-- [ ]* 3.5 Write property test for speed scaling
+- [x] 3.5 Write property test for speed scaling
   - **Property 8: Speed scaling proportionality**
   - **Validates: Requirements 2.3**
 
@@ -119,11 +119,11 @@
   - Implement stop-on-critical-error logic
   - _Requirements: 7.2, 7.4, 7.5_
 
-- [ ]* 4.4 Write property test for exception conversion
+- [x] 4.4 Write property test for exception conversion
   - **Property 22: Exception to AutomationError conversion**
   - **Validates: Requirements 7.1**
 
-- [ ]* 4.5 Write property test for error severity handling
+- [x] 4.5 Write property test for error severity handling
   - **Property 23: Error severity handling**
   - **Validates: Requirements 7.2**
 
@@ -155,11 +155,11 @@
   - Add playback summary to completion event
   - _Requirements: 4.3, 4.4, 4.5_
 
-- [ ]* 5.5 Write property test for action feedback events
+- [x] 5.5 Write property test for action feedback events
   - **Property 4: Action feedback events**
   - **Validates: Requirements 1.4**
 
-- [ ]* 5.6 Write property test for progress event frequency
+- [x] 5.6 Write property test for progress event frequency
   - **Property 12: Progress event frequency**
   - **Validates: Requirements 4.1**
 
@@ -184,11 +184,11 @@
   - Optimize atomic operations for responsiveness
   - _Requirements: 8.5_
 
-- [ ]* 6.4 Write property test for pause at action boundary
+- [x] 6.4 Write property test for pause at action boundary
   - **Property 27: Pause at action boundary**
   - **Validates: Requirements 8.1**
 
-- [ ]* 6.5 Write property test for immediate stop
+- [x] 6.5 Write property test for immediate stop
   - **Property 29: Immediate stop termination**
   - **Validates: Requirements 8.3**
 
@@ -214,11 +214,11 @@
   - Test concurrent playback attempts
   - _Requirements: 6.4_
 
-- [ ]* 7.4 Write property test for coordinate clamping
+- [ ] 7.4 Write property test for coordinate clamping
   - **Property 18: Coordinate clamping**
   - **Validates: Requirements 6.1**
 
-- [ ]* 7.5 Write property test for unsupported action handling
+- [x] 7.5 Write property test for unsupported action handling
   - **Property 19: Unsupported action handling**
   - **Validates: Requirements 6.2**
 
@@ -247,11 +247,11 @@
   - Add statistics to completion event
   - _Requirements: 3.5_
 
-- [ ]* 9.4 Write property test for complete action execution
+- [x] 9.4 Write property test for complete action execution
   - **Property 5: Complete action execution**
   - **Validates: Requirements 1.5**
 
-- [-] 10. Enhance platform-specific implementations
+- [x] 10. Enhance platform-specific implementations
 - [x] 10.1 Add Windows-specific error messages
   - Use GetLastError() to get detailed error codes
   - Map error codes to user-friendly messages
@@ -266,18 +266,18 @@
   - Test permission detection on macOS
   - _Requirements: 5.2, 5.5_
 
-- [ ] 10.3 Add Linux display server detection
+- [x] 10.3 Add Linux display server detection
   - Detect X11 vs Wayland
   - Check DISPLAY and WAYLAND_DISPLAY environment variables
   - Provide setup instructions for missing display server
   - Test on various Linux distributions
   - _Requirements: 5.3, 5.5_
 
-- [ ]* 10.4 Write property test for platform-specific errors
+- [x] 10.4 Write property test for platform-specific errors
   - **Property 16: Platform-specific error messages**
   - **Validates: Requirements 5.4**
 
-- [ ]* 10.5 Write property test for permission detection
+- [x] 10.5 Write property test for permission detection
   - **Property 17: Permission detection**
   - **Validates: Requirements 5.5**
 
@@ -303,11 +303,11 @@
   - Ensure essential data is preserved
   - _Requirements: 10.3, 10.4_
 
-- [ ]* 11.4 Write property test for Python-to-Rust compatibility
+- [x] 11.4 Write property test for Python-to-Rust compatibility
   - **Property 35: Python-to-Rust compatibility**
   - **Validates: Requirements 10.1**
 
-- [ ]* 11.5 Write property test for format difference handling
+- [x] 11.5 Write property test for format difference handling
   - **Property 37: Format difference handling**
   - **Validates: Requirements 10.3**
 
@@ -333,7 +333,7 @@
   - Create diagnostic report generation
   - _Requirements: 2.5, 5.4, 5.5_
 
-- [-] 13. Final integration and testing
+- [ ] 13. Final integration and testing
 - [x] 13.1 Test complete playback flow end-to-end
   - Record a test script with various actions
   - Play back the script and verify execution
@@ -357,14 +357,150 @@
   - Verify timing stays within tolerance
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ]* 13.4 Write integration property test for thread safety
+- [x] 13.4 Write integration property test for thread safety
   - **Property 32: Thread-safe state management**
   - **Validates: Requirements 9.3**
 
-- [ ]* 13.5 Write integration property test for loop counting
+- [x] 13.5 Write integration property test for loop counting
   - **Property 34: Loop counting correctness**
   - **Validates: Requirements 9.5**
 
 - [x] 14. Final Checkpoint - Make sure all tests are passing
   - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 15. Integrate Rust playback with Tauri frontend
+- [x] 15.1 Implement Rust Player initialization in core_router.rs
+  - Initialize Rust Player instance when needed
+  - Configure Player with event streaming to Tauri
+  - Add proper error handling for Player creation
+  - Store Player instance in CoreRouter state
+  - _Requirements: 1.1, 1.2, 1.3, 4.1, 4.2, 4.3_
+
+- [x] 15.2 Implement start_playback routing for Rust core
+  - Load script file from provided path or get latest
+  - Parse script JSON into ScriptData struct
+  - Configure playback speed and loop count
+  - Start playback with Rust Player
+  - Stream progress events to frontend via Tauri events
+  - _Requirements: 2.1, 2.2, 2.3, 4.1, 4.2_
+
+- [x] 15.3 Implement stop_playback routing for Rust core
+  - Call Player stop method
+  - Clean up Player resources
+  - Send completion event to frontend
+  - Handle errors gracefully
+  - _Requirements: 2.4, 4.5_
+
+- [x] 15.4 Implement pause_playback routing for Rust core
+  - Call Player pause/resume method
+  - Return current pause state
+  - Send pause status event to frontend
+  - _Requirements: 2.3, 4.3_
+
+- [x] 15.5 Add event streaming from Rust Player to Tauri
+  - Set up event channel between Player and Tauri
+  - Forward progress events to frontend
+  - Forward action_preview events to frontend
+  - Forward complete events to frontend
+  - Forward error events to frontend
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+
+- [x] 15.6 Update error messages in core_router.rs
+  - Remove "not yet fully integrated" messages for playback
+  - Add proper error handling for Rust playback failures
+  - Provide helpful error messages for common issues
+  - _Requirements: 7.1, 7.2, 7.3, 7.4_
+
+- [x] 16. Test frontend integration with Rust playback
+- [x] 16.1 Test playback start from frontend
+  - Switch to Rust core in UI
+  - Start playback with default settings
+  - Verify mouse cursor moves and actions execute
+  - Verify UI updates with progress
+  - _Requirements: 1.1, 1.2, 1.3, 2.1, 4.1_
+
+- [x] 16.2 Test playback controls from frontend
+  - Test pause/resume during playback
+  - Test stop during playback
+  - Verify UI state updates correctly
+  - Verify controls respond within 100ms
+  - _Requirements: 2.3, 2.4, 4.3, 8.5_
+
+- [x] 16.3 Test playback speed control from frontend
+  - Test playback at 0.5x speed
+  - Test playback at 1.0x speed
+  - Test playback at 2.0x speed
+  - Test playback at 5.0x speed
+  - Verify timing accuracy at each speed
+  - _Requirements: 2.2, 2.3_
+
+- [x] 16.4 Test loop/repeat functionality from frontend
+  - Test single playback (loop count = 1)
+  - Test multiple loops (loop count = 3)
+  - Test infinite loop (loop count = 0)
+  - Verify loop counter updates in UI
+  - Verify stop works during loops
+  - _Requirements: 2.1, 4.1_
+
+- [x] 16.5 Test visual preview during playback
+  - Verify action preview shows in UI
+  - Verify preview displays action type and coordinates
+  - Verify preview updates for each action
+  - Verify progress bar updates correctly
+  - _Requirements: 4.2_
+
+- [x] 16.6 Test error handling in frontend
+  - Test with invalid script path
+  - Test with corrupted script file
+  - Test with missing permissions
+  - Verify error messages display in UI
+  - Verify UI returns to idle state after errors
+  - _Requirements: 4.4, 7.1, 7.2, 7.3, 7.4_
+
+- [x] 17. Test cross-core playback compatibility
+- [x] 17.1 Test Python-recorded scripts with Rust playback
+  - Record script with Python core
+  - Switch to Rust core
+  - Play back the Python-recorded script
+  - Verify all actions execute correctly
+  - _Requirements: 10.1_
+
+- [x] 17.2 Test Rust-recorded scripts with Python playback
+  - Record script with Rust core
+  - Switch to Python core
+  - Play back the Rust-recorded script
+  - Verify all actions execute correctly
+  - _Requirements: 10.2_
+
+- [x] 17.3 Test script format compatibility
+  - Verify both cores can read each other's script files
+  - Test with scripts containing various action types
+  - Verify metadata is preserved across cores
+  - _Requirements: 10.3, 10.4_
+
+- [x] 18. Final integration testing
+- [x] 18.1 Test complete record-playback workflow with Rust core
+  - Record a script with Rust core
+  - Play back the script with Rust core
+  - Verify end-to-end functionality
+  - _Requirements: All requirements_
+
+- [x] 18.2 Test core switching during operations
+  - Verify cannot switch cores during recording
+  - Verify cannot switch cores during playback
+  - Verify error messages are clear
+  - _Requirements: 1.2, 1.3, 6.4_
+
+- [x] 18.3 Test performance comparison between cores
+  - Record same actions with both cores
+  - Play back with both cores
+  - Compare timing accuracy
+  - Compare success rates
+  - Verify performance metrics display in UI
+  - _Requirements: 10.1, 10.2, 10.3_
+
+- [x] 19. Final Checkpoint - Verify all frontend integration
+  - Ensure all Rust playback features work from UI
+  - Ensure all tests pass
+  - Ask the user if questions arise
 

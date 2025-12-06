@@ -6,7 +6,7 @@ use crate::{
     logging::{CoreType, OperationType, LogLevel, get_logger},
     error::PlaybackError,
 };
-use std::sync::{Arc, Mutex, atomic::{AtomicBool, AtomicUsize, Ordering}};
+use std::sync::{Arc, Mutex, atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering}};
 use std::time::{Duration, Instant};
 use std::collections::HashMap;
 use tokio::sync::mpsc;
@@ -22,9 +22,9 @@ pub struct Player {
     is_paused: Arc<AtomicBool>,
     current_script: Option<ScriptData>,
     playback_speed: f64,
-    loops_remaining: u32,
+    loops_remaining: Arc<AtomicU32>,
     loops_total: u32,
-    current_loop: u32,
+    current_loop: Arc<AtomicU32>,
     current_action_index: Arc<AtomicUsize>,
     start_time: Option<Instant>,
     event_sender: Option<mpsc::UnboundedSender<PlaybackEvent>>,
@@ -242,9 +242,9 @@ impl Player {
             is_paused: Arc::new(AtomicBool::new(false)),
             current_script: None,
             playback_speed: 1.0,
-            loops_remaining: 1,
+            loops_remaining: Arc::new(AtomicU32::new(1)),
             loops_total: 1,
-            current_loop: 1,
+            current_loop: Arc::new(AtomicU32::new(1)),
             current_action_index: Arc::new(AtomicUsize::new(0)),
             start_time: None,
             event_sender: None,
@@ -559,7 +559,7 @@ impl Player {
                 metadata.insert("requested_speed".to_string(), json!(speed));
                 metadata.insert("requested_loops".to_string(), json!(loops));
                 metadata.insert("current_action_index".to_string(), json!(self.current_action_index.load(Ordering::Relaxed)));
-                metadata.insert("current_loop".to_string(), json!(self.current_loop));
+                metadata.insert("current_loop".to_string(), json!(self.current_loop.load(Ordering::Relaxed)));
                 metadata.insert("is_paused".to_string(), json!(self.is_paused.load(Ordering::Relaxed)));
                 
                 if let Some(ref script) = self.current_script {
@@ -577,7 +577,7 @@ impl Player {
                     format!("concurrent_playback_rejected_{}", chrono::Utc::now().timestamp_millis()),
                     format!("Rejected concurrent playback attempt: playback already in progress (action {}, loop {}, {})", 
                         self.current_action_index.load(Ordering::Relaxed),
-                        self.current_loop,
+                        self.current_loop.load(Ordering::Relaxed),
                         if self.is_paused.load(Ordering::Relaxed) { "paused" } else { "playing" }),
                     Some(metadata),
                 );
@@ -629,9 +629,9 @@ impl Player {
         self.is_paused.store(false, Ordering::Relaxed);
         
         self.playback_speed = clamped_speed;
-        self.loops_remaining = loops;
+        self.loops_remaining.store(loops, Ordering::Relaxed);
         self.loops_total = loops;
-        self.current_loop = 1;
+        self.current_loop.store(1, Ordering::Relaxed);
         self.current_action_index.store(0, Ordering::Relaxed);
         self.start_time = Some(Instant::now());
 
@@ -669,8 +669,8 @@ impl Player {
             let mut metadata = HashMap::new();
             metadata.insert("current_action_index".to_string(), json!(current_action_index));
             metadata.insert("was_paused".to_string(), json!(was_paused));
-            metadata.insert("current_loop".to_string(), json!(self.current_loop));
-            metadata.insert("loops_remaining".to_string(), json!(self.loops_remaining));
+            metadata.insert("current_loop".to_string(), json!(self.current_loop.load(Ordering::Relaxed)));
+            metadata.insert("loops_remaining".to_string(), json!(self.loops_remaining.load(Ordering::Relaxed)));
             metadata.insert("loops_total".to_string(), json!(self.loops_total));
             
             if let Some(ref script) = self.current_script {
@@ -695,7 +695,7 @@ impl Player {
                 format!("playback_stop_{}", chrono::Utc::now().timestamp_millis()),
                 format!("Stopping playback at action {} (loop {}/{}, {:.1}% complete)", 
                     current_action_index,
-                    self.current_loop,
+                    self.current_loop.load(Ordering::Relaxed),
                     self.loops_total,
                     if let Some(ref script) = self.current_script {
                         if script.actions.len() > 0 {
@@ -721,7 +721,7 @@ impl Player {
         let cleanup_start = Instant::now();
         self.current_action_index.store(0, Ordering::Relaxed);
         self.start_time = None;
-        self.loops_remaining = 0;
+        self.loops_remaining.store(0, Ordering::Relaxed);
         let cleanup_duration = cleanup_start.elapsed();
         
         // Log resource cleanup
@@ -809,8 +809,8 @@ impl Player {
             metadata.insert("previous_state".to_string(), json!(if current_paused { "paused" } else { "playing" }));
             metadata.insert("new_state".to_string(), json!(if new_paused { "paused" } else { "playing" }));
             metadata.insert("current_action_index".to_string(), json!(current_action_index));
-            metadata.insert("current_loop".to_string(), json!(self.current_loop));
-            metadata.insert("loops_remaining".to_string(), json!(self.loops_remaining));
+            metadata.insert("current_loop".to_string(), json!(self.current_loop.load(Ordering::Relaxed)));
+            metadata.insert("loops_remaining".to_string(), json!(self.loops_remaining.load(Ordering::Relaxed)));
             
             if let Some(ref script) = self.current_script {
                 metadata.insert("total_actions".to_string(), json!(script.actions.len()));
@@ -836,7 +836,7 @@ impl Player {
                 format!("Playback {} at action {} (loop {}/{})", 
                     if new_paused { "paused" } else { "resumed" },
                     current_action_index,
-                    self.current_loop,
+                    self.current_loop.load(Ordering::Relaxed),
                     self.loops_total),
                 Some(metadata),
             );
@@ -906,14 +906,36 @@ impl Player {
         let current_action_index = Arc::clone(&self.current_action_index);
         let script = self.current_script.clone();
         let playback_speed = self.playback_speed;
-        let mut loops_remaining = self.loops_remaining;
+        let loops_remaining = Arc::clone(&self.loops_remaining);
         let loops_total = self.loops_total;
-        let mut current_loop = self.current_loop;
+        let current_loop = Arc::clone(&self.current_loop);
         let event_sender = self.event_sender.clone();
         let config = self.config.clone();
         
         // Create platform automation for the background thread
         let platform = create_platform_automation()?;
+        
+        // Spawn ESC key listener thread to stop playback
+        let is_playing_esc = Arc::clone(&self.is_playing);
+        thread::spawn(move || {
+            let is_playing_ref = is_playing_esc;
+            
+            // Use catch_unwind to prevent panics from crashing
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let callback = move |event: rdev::Event| {
+                    if !is_playing_ref.load(Ordering::SeqCst) {
+                        return;
+                    }
+                    
+                    if let rdev::EventType::KeyPress(rdev::Key::Escape) = event.event_type {
+                        // Stop playback when ESC is pressed
+                        is_playing_ref.store(false, Ordering::SeqCst);
+                    }
+                };
+                
+                let _ = rdev::listen(callback);
+            }));
+        });
         
         thread::spawn(move || {
             if let Some(script) = script {
@@ -930,15 +952,15 @@ impl Player {
                 const MAX_RETRY_ATTEMPTS: usize = 3;
                 const RETRY_DELAY_MS: u64 = 100;
                 
-                while is_playing.load(Ordering::Relaxed) && loops_remaining > 0 {
+                while is_playing.load(Ordering::Relaxed) && loops_remaining.load(Ordering::Relaxed) > 0 {
                     let action_index = current_action_index.load(Ordering::Relaxed);
                     
                     if action_index >= script.actions.len() {
                         // End of script reached, start next loop
-                        loops_remaining = loops_remaining.saturating_sub(1);
-                        current_loop += 1;
+                        let remaining = loops_remaining.fetch_sub(1, Ordering::Relaxed).saturating_sub(1);
+                        current_loop.fetch_add(1, Ordering::Relaxed);
                         
-                        if loops_remaining > 0 {
+                        if remaining > 0 {
                             current_action_index.store(0, Ordering::Relaxed);
                             loop_start_time = Instant::now();
                             
@@ -948,7 +970,7 @@ impl Player {
                                     CoreType::Rust,
                                     OperationType::Playback,
                                     format!("loop_restart_{}", chrono::Utc::now().timestamp_millis()),
-                                    format!("Starting loop {} of {}", current_loop, loops_total),
+                                    format!("Starting loop {} of {}", current_loop.load(Ordering::Relaxed), loops_total),
                                     None,
                                 );
                             }
@@ -960,7 +982,7 @@ impl Player {
                                     data: PlaybackEventData::Progress {
                                         current_action: 0,
                                         total_actions: script.actions.len(),
-                                        current_loop,
+                                        current_loop: current_loop.load(Ordering::Relaxed),
                                         total_loops: loops_total,
                                         progress: 0.0,
                                     },
@@ -980,7 +1002,7 @@ impl Player {
                         if let Some(logger) = get_logger() {
                             let mut metadata = HashMap::new();
                             metadata.insert("action_index".to_string(), json!(action_index));
-                            metadata.insert("current_loop".to_string(), json!(current_loop));
+                            metadata.insert("current_loop".to_string(), json!(current_loop.load(Ordering::Relaxed)));
                             metadata.insert("total_loops".to_string(), json!(loops_total));
                             
                             logger.log_operation(
@@ -989,7 +1011,7 @@ impl Player {
                                 OperationType::Playback,
                                 format!("pause_detected_{}", chrono::Utc::now().timestamp_millis()),
                                 format!("Playback paused at action boundary (action {}, loop {}/{})", 
-                                    action_index, current_loop, loops_total),
+                                    action_index, current_loop.load(Ordering::Relaxed), loops_total),
                                 Some(metadata),
                             );
                         }
@@ -1004,7 +1026,7 @@ impl Player {
                             if let Some(logger) = get_logger() {
                                 let mut metadata = HashMap::new();
                                 metadata.insert("action_index".to_string(), json!(action_index));
-                                metadata.insert("current_loop".to_string(), json!(current_loop));
+                                metadata.insert("current_loop".to_string(), json!(current_loop.load(Ordering::Relaxed)));
                                 
                                 logger.log_operation(
                                     LogLevel::Debug,
@@ -1012,7 +1034,7 @@ impl Player {
                                     OperationType::Playback,
                                     format!("resume_detected_{}", chrono::Utc::now().timestamp_millis()),
                                     format!("Playback resumed from action {} (loop {}/{})", 
-                                        action_index, current_loop, loops_total),
+                                        action_index, current_loop.load(Ordering::Relaxed), loops_total),
                                     Some(metadata),
                                 );
                             }
@@ -1381,7 +1403,7 @@ impl Player {
                             data: PlaybackEventData::Progress {
                                 current_action: action_index + 1,
                                 total_actions: script.actions.len(),
-                                current_loop,
+                                current_loop: current_loop.load(Ordering::Relaxed),
                                 total_loops: loops_total,
                                 progress,
                             },
@@ -1413,7 +1435,7 @@ impl Player {
                                     metadata.insert("current_action".to_string(), json!(action_index + 1));
                                     metadata.insert("total_actions".to_string(), json!(script.actions.len()));
                                     metadata.insert("progress_pct".to_string(), json!(progress * 100.0));
-                                    metadata.insert("current_loop".to_string(), json!(current_loop));
+                                    metadata.insert("current_loop".to_string(), json!(current_loop.load(Ordering::Relaxed)));
                                     metadata.insert("total_loops".to_string(), json!(loops_total));
                                     
                                     logger.log_operation(
@@ -1422,7 +1444,7 @@ impl Player {
                                         OperationType::Playback,
                                         format!("progress_update_{}", chrono::Utc::now().timestamp_millis()),
                                         format!("Progress: {}/{} actions ({:.1}%), loop {}/{}", 
-                                            action_index + 1, script.actions.len(), progress * 100.0, current_loop, loops_total),
+                                            action_index + 1, script.actions.len(), progress * 100.0, current_loop.load(Ordering::Relaxed), loops_total),
                                         Some(metadata),
                                     );
                                 }
@@ -1439,7 +1461,7 @@ impl Player {
                 let total_playback_duration = playback_start_time.elapsed();
                 
                 // Finalize statistics
-                statistics.finalize(total_playback_duration, loops_total - loops_remaining);
+                statistics.finalize(total_playback_duration, loops_total - loops_remaining.load(Ordering::Relaxed));
                 
                 // Log complete statistics summary
                 if let Some(logger) = get_logger() {
@@ -2064,8 +2086,8 @@ impl Player {
             total_actions,
             progress,
             elapsed_time,
-            loops_completed: self.current_loop.saturating_sub(1),
-            loops_remaining: self.loops_remaining,
+            loops_completed: self.current_loop.load(Ordering::Relaxed).saturating_sub(1),
+            loops_remaining: self.loops_remaining.load(Ordering::Relaxed),
         }
     }
 

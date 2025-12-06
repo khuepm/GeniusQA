@@ -17,7 +17,7 @@ pub enum CoreType {
 
 impl Default for CoreType {
     fn default() -> Self {
-        CoreType::Python // Default to Python for backward compatibility
+        CoreType::Rust // Default to Rust for better performance
     }
 }
 
@@ -373,7 +373,7 @@ mod tests {
         let (manager, _temp_dir) = create_temp_preference_manager();
         let prefs = manager.get_preferences();
         
-        assert_eq!(prefs.preferred_core, CoreType::Python);
+        assert_eq!(prefs.preferred_core, CoreType::Rust);
         assert!(prefs.fallback_enabled);
         assert!(prefs.performance_tracking);
         assert!(prefs.auto_detection);

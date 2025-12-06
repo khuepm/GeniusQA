@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
-use tauri::AppHandle;
-use tokio::sync::RwLock;
+use tauri::{AppHandle, Manager};
+use tokio::sync::{RwLock, mpsc};
 use std::collections::HashMap;
 
 use crate::python_process::PythonProcessManager;
@@ -1183,7 +1183,7 @@ impl CoreRouter {
     fn route_to_rust(
         &self,
         command: AutomationCommand,
-        _app_handle: &AppHandle,
+        app_handle: &AppHandle,
     ) -> Result<serde_json::Value, String> {
         match command {
             AutomationCommand::StartRecording => {
@@ -1262,14 +1262,156 @@ impl CoreRouter {
                     Err("No active recording session".to_string())
                 }
             }
-            AutomationCommand::StartPlayback { .. } => {
-                Err("Rust core playback not yet fully integrated. Please use Python core for playback.".to_string())
+            AutomationCommand::StartPlayback { script_path, speed, loop_count } => {
+                // Initialize player if not already created
+                let mut player_lock = self.rust_player.lock().unwrap();
+                if player_lock.is_none() {
+                    let config = AutomationConfig::default();
+                    match rust_automation_core::player::Player::new(config) {
+                        Ok(player) => {
+                            eprintln!("[Rust Player] Player instance created successfully");
+                            *player_lock = Some(player);
+                        }
+                        Err(e) => {
+                            eprintln!("[Rust Player] Failed to initialize player: {:?}", e);
+                            return Err(format!("Failed to initialize Rust player. Please check system permissions and ensure your platform is supported. Error: {:?}", e));
+                        }
+                    }
+                }
+
+                // Get the script path to load
+                let path_to_load = if let Some(path) = script_path {
+                    path
+                } else {
+                    // Get the latest recording
+                    let recordings_dir = format!(
+                        "{}/GeniusQA/recordings",
+                        std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+                    );
+                    
+                    std::fs::read_dir(&recordings_dir)
+                        .ok()
+                        .and_then(|entries| {
+                            entries
+                                .filter_map(|e| e.ok())
+                                .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("json"))
+                                .max_by_key(|e| e.metadata().and_then(|m| m.modified()).ok())
+                                .map(|e| e.path().to_string_lossy().to_string())
+                        })
+                        .ok_or_else(|| "No recordings found. Please record a script first before attempting playback.".to_string())?
+                };
+
+                eprintln!("[Rust Player] Loading script from: {}", path_to_load);
+
+                // Load the script file
+                let script_content = std::fs::read_to_string(&path_to_load)
+                    .map_err(|e| format!("Failed to read script file '{}'. Please ensure the file exists and is readable. Error: {}", path_to_load, e))?;
+                
+                let script_data: ScriptData = serde_json::from_str(&script_content)
+                    .map_err(|e| format!("Failed to parse script file '{}'. The file may be corrupted or in an invalid format. Error: {}", path_to_load, e))?;
+
+                eprintln!("[Rust Player] Script loaded successfully: {} actions", script_data.actions.len());
+
+                // Set up event streaming to Tauri
+                let app_handle_clone = app_handle.clone();
+                let (event_tx, mut event_rx) = mpsc::unbounded_channel::<rust_automation_core::player::PlaybackEvent>();
+                
+                eprintln!("[Rust Player] Event streaming channel created");
+                
+                // Spawn a task to forward events to Tauri
+                tauri::async_runtime::spawn(async move {
+                    while let Some(event) = event_rx.recv().await {
+                        let event_name = event.event_type.clone();
+                        if let Err(e) = app_handle_clone.emit_all(&event_name, &event) {
+                            eprintln!("[Rust Player] Failed to emit event '{}': {:?}", event_name, e);
+                        }
+                    }
+                    eprintln!("[Rust Player] Event forwarding task terminated");
+                });
+
+                // Configure player with event sender
+                if let Some(player) = player_lock.as_mut() {
+                    player.set_event_sender(event_tx);
+                    eprintln!("[Rust Player] Event sender configured");
+                    
+                    // Load the script
+                    player.load_script(script_data)
+                        .map_err(|e| format!("Failed to load script into player: {:?}", e))?;
+                    
+                    eprintln!("[Rust Player] Script loaded into player");
+                    
+                    // Start playback with specified parameters
+                    let playback_speed = speed.unwrap_or(1.0);
+                    let loops = loop_count.unwrap_or(1).max(1) as u32;
+                    
+                    eprintln!("[Rust Player] Starting playback: speed={:.2}x, loops={}", playback_speed, loops);
+                    
+                    player.start_playback(playback_speed, loops)
+                        .map_err(|e| {
+                            eprintln!("[Rust Player] Failed to start playback: {:?}", e);
+                            format!("Failed to start playback: {:?}", e)
+                        })?;
+                    
+                    eprintln!("[Rust Player] Playback started successfully");
+                    
+                    Ok(serde_json::json!({
+                        "success": true,
+                        "data": {
+                            "message": "Playback started with Rust core",
+                            "speed": playback_speed,
+                            "loops": loops
+                        }
+                    }))
+                } else {
+                    Err("Player not initialized after creation attempt".to_string())
+                }
             }
             AutomationCommand::StopPlayback => {
-                Err("Rust core playback not yet fully integrated. Please use Python core for playback.".to_string())
+                let mut player_lock = self.rust_player.lock().unwrap();
+                if let Some(player) = player_lock.as_mut() {
+                    eprintln!("[Rust Player] Stopping playback");
+                    
+                    player.stop_playback()
+                        .map_err(|e| {
+                            eprintln!("[Rust Player] Failed to stop playback: {:?}", e);
+                            format!("Failed to stop playback: {:?}", e)
+                        })?;
+                    
+                    eprintln!("[Rust Player] Playback stopped successfully");
+                    
+                    // Send completion event to frontend
+                    Ok(serde_json::json!({
+                        "success": true,
+                        "data": {
+                            "message": "Playback stopped successfully"
+                        }
+                    }))
+                } else {
+                    Err("No active playback session. Please start playback before attempting to stop.".to_string())
+                }
             }
             AutomationCommand::PausePlayback => {
-                Err("Rust core playback not yet fully integrated. Please use Python core for playback.".to_string())
+                let mut player_lock = self.rust_player.lock().unwrap();
+                if let Some(player) = player_lock.as_mut() {
+                    let is_paused = player.pause_playback()
+                        .map_err(|e| {
+                            eprintln!("[Rust Player] Failed to pause/resume playback: {:?}", e);
+                            format!("Failed to pause/resume playback: {:?}", e)
+                        })?;
+                    
+                    eprintln!("[Rust Player] Playback {} successfully", if is_paused { "paused" } else { "resumed" });
+                    
+                    // Send pause status event to frontend
+                    Ok(serde_json::json!({
+                        "success": true,
+                        "data": {
+                            "isPaused": is_paused,
+                            "message": if is_paused { "Playback paused" } else { "Playback resumed" }
+                        }
+                    }))
+                } else {
+                    Err("No active playback session. Please start playback before attempting to pause/resume.".to_string())
+                }
             }
             AutomationCommand::CheckRecordings => {
                 // Check if recordings directory exists and has files
@@ -1355,14 +1497,53 @@ impl CoreRouter {
                     }
                 }))
             }
-            AutomationCommand::LoadScript { .. } => {
-                Err("Rust core script loading not yet fully integrated. Please use Python core.".to_string())
+            AutomationCommand::LoadScript { path } => {
+                // Load script file and return its contents
+                let script_content = std::fs::read_to_string(&path)
+                    .map_err(|e| format!("Failed to read script file '{}': {}", path, e))?;
+                
+                let script_data: ScriptData = serde_json::from_str(&script_content)
+                    .map_err(|e| format!("Failed to parse script file '{}': {}", path, e))?;
+                
+                Ok(serde_json::json!({
+                    "success": true,
+                    "data": {
+                        "script": script_data
+                    }
+                }))
             }
-            AutomationCommand::SaveScript { .. } => {
-                Err("Rust core script saving not yet fully integrated. Please use Python core.".to_string())
+            AutomationCommand::SaveScript { path, data } => {
+                // Save script data to file
+                let json_string = serde_json::to_string_pretty(&data)
+                    .map_err(|e| format!("Failed to serialize script data: {}", e))?;
+                
+                // Create directory if it doesn't exist
+                if let Some(parent) = std::path::Path::new(&path).parent() {
+                    std::fs::create_dir_all(parent)
+                        .map_err(|e| format!("Failed to create directory for script: {}", e))?;
+                }
+                
+                std::fs::write(&path, json_string)
+                    .map_err(|e| format!("Failed to write script file '{}': {}", path, e))?;
+                
+                Ok(serde_json::json!({
+                    "success": true,
+                    "data": {
+                        "scriptPath": path
+                    }
+                }))
             }
-            AutomationCommand::DeleteScript { .. } => {
-                Err("Rust core script deletion not yet fully integrated. Please use Python core.".to_string())
+            AutomationCommand::DeleteScript { path } => {
+                // Delete script file
+                std::fs::remove_file(&path)
+                    .map_err(|e| format!("Failed to delete script file '{}': {}", path, e))?;
+                
+                Ok(serde_json::json!({
+                    "success": true,
+                    "data": {
+                        "deleted": path
+                    }
+                }))
             }
         }
     }

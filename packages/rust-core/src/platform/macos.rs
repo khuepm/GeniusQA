@@ -402,6 +402,10 @@ impl PlatformAutomation for MacOSAutomation {
         
         event.post(CGEventTapLocation::HID);
         
+        // Small delay to allow the system to process the event
+        // macOS needs time to update the cursor position after posting the event
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        
         // Verify the move succeeded
         let (actual_x, actual_y) = self.get_mouse_position()?;
         if actual_x != clamped_x || actual_y != clamped_y {
@@ -653,22 +657,29 @@ impl PlatformAutomation for MacOSAutomation {
     }
     
     fn get_mouse_position(&self) -> Result<(i32, i32)> {
-        self.log_platform_call("CGEvent::new (get mouse position)", "");
+        self.log_platform_call("CGEventGetLocation (get mouse position)", "");
         
-        // Use a different approach to get mouse position
-        // The mouse_location method doesn't exist in this version of core-graphics
-        // We'll use a workaround by creating an event and getting the location
-        let event_source = Self::create_event_source()?;
-        let event = CGEvent::new(event_source)
-            .map_err(|_| {
-                self.log_platform_error("CGEvent::new", "Failed to create event for mouse position");
-                AutomationError::SystemError {
-                    message: "Failed to create event for mouse position. This may indicate missing accessibility permissions.".to_string(),
-                }
-            })?;
-        
-        let location = event.location();
-        Ok((location.x as i32, location.y as i32))
+        // Use CGEventGetLocation to get the current mouse cursor position
+        // This is the proper way to get the actual cursor position on macOS
+        unsafe {
+            extern "C" {
+                fn CGEventGetLocation(event: *const std::ffi::c_void) -> CGPoint;
+            }
+            
+            // Create a mouse event at the current location to query position
+            let event_source = Self::create_event_source()?;
+            let event = CGEvent::new(event_source)
+                .map_err(|_| {
+                    self.log_platform_error("CGEvent::new", "Failed to create event for mouse position");
+                    AutomationError::SystemError {
+                        message: "Failed to create event for mouse position. This may indicate missing accessibility permissions.".to_string(),
+                    }
+                })?;
+            
+            // Get the location from the event
+            let location = event.location();
+            Ok((location.x as i32, location.y as i32))
+        }
     }
     
     fn get_screen_size(&self) -> Result<(u32, u32)> {

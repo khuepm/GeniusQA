@@ -36,8 +36,24 @@ impl LinuxAutomation {
             let display = XOpenDisplay(display_name.as_ptr());
             
             if display.is_null() {
+                let display_env = std::env::var("DISPLAY").unwrap_or_else(|_| "not set".to_string());
+                let wayland_env = std::env::var("WAYLAND_DISPLAY").unwrap_or_else(|_| "not set".to_string());
+                
+                let error_message = format!(
+                    "Failed to open X11 display.\n\
+                    DISPLAY environment variable: {}\n\
+                    WAYLAND_DISPLAY environment variable: {}\n\n\
+                    Troubleshooting:\n\
+                    1. Ensure X11 server is running\n\
+                    2. Check DISPLAY is set correctly (usually :0 or :1)\n\
+                    3. Verify you have permission to access the display\n\
+                    4. If using Wayland, ensure XWayland is installed and running\n\
+                    5. Try running: xhost +local: (to grant local access)",
+                    display_env, wayland_env
+                );
+                
                 return Err(AutomationError::SystemError {
-                    message: "Failed to open X11 display".to_string(),
+                    message: error_message,
                 });
             }
             
@@ -212,6 +228,8 @@ impl PlatformAutomation for LinuxAutomation {
         if let Some(logger) = get_logger() {
             let mut metadata = HashMap::new();
             metadata.insert("display_server".to_string(), json!(display_server));
+            metadata.insert("display_env".to_string(), json!(std::env::var("DISPLAY").unwrap_or_default()));
+            metadata.insert("wayland_display_env".to_string(), json!(std::env::var("WAYLAND_DISPLAY").unwrap_or_default()));
             
             logger.log_operation(
                 LogLevel::Info,
@@ -224,8 +242,12 @@ impl PlatformAutomation for LinuxAutomation {
         }
         
         if display_server == "unknown" {
+            let setup_instructions = self.get_display_server_setup_instructions();
             return Err(AutomationError::SystemError {
-                message: "No display server detected. Please ensure DISPLAY or WAYLAND_DISPLAY environment variable is set.".to_string(),
+                message: format!(
+                    "No display server detected. Please ensure DISPLAY or WAYLAND_DISPLAY environment variable is set.\n\n{}",
+                    setup_instructions
+                ),
             });
         }
         
@@ -243,6 +265,37 @@ impl PlatformAutomation for LinuxAutomation {
         }
         
         Ok(())
+    }
+    
+    /// Get setup instructions for missing display server
+    fn get_display_server_setup_instructions(&self) -> String {
+        let mut instructions = String::from("Display Server Setup Instructions:\n\n");
+        
+        instructions.push_str("For X11:\n");
+        instructions.push_str("  1. Ensure X11 is installed and running\n");
+        instructions.push_str("  2. Set the DISPLAY environment variable:\n");
+        instructions.push_str("     export DISPLAY=:0\n");
+        instructions.push_str("  3. Verify X11 is running:\n");
+        instructions.push_str("     echo $DISPLAY\n");
+        instructions.push_str("     xdpyinfo (should show display information)\n\n");
+        
+        instructions.push_str("For Wayland with XWayland:\n");
+        instructions.push_str("  1. Ensure XWayland is installed\n");
+        instructions.push_str("  2. XWayland should automatically set DISPLAY\n");
+        instructions.push_str("  3. Verify with: echo $DISPLAY\n\n");
+        
+        instructions.push_str("Common Linux Distributions:\n");
+        instructions.push_str("  Ubuntu/Debian: sudo apt-get install xorg xserver-xorg\n");
+        instructions.push_str("  Fedora/RHEL: sudo dnf install xorg-x11-server-Xorg\n");
+        instructions.push_str("  Arch: sudo pacman -S xorg-server\n\n");
+        
+        instructions.push_str("If running in a headless environment:\n");
+        instructions.push_str("  Consider using Xvfb (X Virtual Framebuffer):\n");
+        instructions.push_str("  1. Install: sudo apt-get install xvfb (Ubuntu/Debian)\n");
+        instructions.push_str("  2. Start: Xvfb :99 -screen 0 1024x768x24 &\n");
+        instructions.push_str("  3. Set: export DISPLAY=:99\n");
+        
+        instructions
     }
     
     fn check_permissions(&self) -> Result<bool> {

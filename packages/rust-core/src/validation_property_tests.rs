@@ -318,3 +318,159 @@ proptest! {
         }
     }
 }
+
+/// **Feature: rust-core-playback-fix, Property 37: Format difference handling**
+/// 
+/// Property 37: Format difference handling
+/// *For any* script with format differences, the system should handle them gracefully with warnings
+/// **Validates: Requirements 10.3**
+proptest! {
+    #[test]
+    fn test_format_difference_handling_property(
+        version_diff in prop::bool::ANY,
+        missing_optional_fields in prop::bool::ANY,
+        extra_fields in prop::bool::ANY,
+        platform_variation in prop::sample::select(vec!["linux", "windows", "macos", "darwin", "win32"]),
+        action_count in 1usize..10,
+    ) {
+        // Create a base script
+        let mut script = ScriptData::new("rust", "linux");
+        
+        for i in 0..action_count {
+            let timestamp = i as f64 * 0.5;
+            let action = create_test_action(timestamp);
+            script.add_action(action);
+        }
+        
+        // Serialize to JSON for manipulation
+        let mut script_json = serde_json::to_value(&script).unwrap();
+        
+        // Introduce format differences
+        if version_diff {
+            // Change version to simulate format difference
+            script_json["version"] = serde_json::json!("0.9");
+        }
+        
+        if missing_optional_fields {
+            // Remove optional fields only (screen_resolution is optional)
+            if let Some(metadata) = script_json["metadata"].as_object_mut() {
+                metadata.remove("screen_resolution");
+            }
+            // Remove optional action fields
+            if let Some(actions) = script_json["actions"].as_array_mut() {
+                for action in actions.iter_mut() {
+                    if let Some(action_obj) = action.as_object_mut() {
+                        action_obj.remove("modifiers");
+                        action_obj.remove("additional_data");
+                    }
+                }
+            }
+        }
+        
+        if extra_fields {
+            // Add extra fields that should be ignored
+            if let Some(metadata) = script_json["metadata"].as_object_mut() {
+                metadata.insert("extra_field".to_string(), serde_json::json!("should_be_ignored"));
+                metadata.insert("custom_data".to_string(), serde_json::json!({"key": "value"}));
+            }
+            script_json["extra_root_field"] = serde_json::json!("ignored_too");
+            
+            // Add extra fields to actions
+            if let Some(actions) = script_json["actions"].as_array_mut() {
+                for action in actions.iter_mut() {
+                    if let Some(action_obj) = action.as_object_mut() {
+                        action_obj.insert("extra_action_field".to_string(), serde_json::json!("also_ignored"));
+                    }
+                }
+            }
+        }
+        
+        // Apply platform variation
+        if let Some(metadata) = script_json["metadata"].as_object_mut() {
+            metadata.insert("platform".to_string(), serde_json::json!(platform_variation));
+        }
+        
+        // Test that the script can still be loaded
+        let script_str = serde_json::to_string(&script_json).unwrap();
+        let load_result: Result<ScriptData, serde_json::Error> = serde_json::from_str(&script_str);
+        
+        // Script should load successfully despite format differences
+        prop_assert!(
+            load_result.is_ok(),
+            "Script should load despite format differences: {:?}",
+            load_result.err()
+        );
+        
+        if let Ok(loaded_script) = load_result {
+            // Validate the loaded script
+            let validator = ScriptValidator::new();
+            let validation_result = validator.validate_script(&loaded_script).unwrap();
+            
+            // Script should either be compatible or have warnings/issues (graceful handling)
+            // The key is that it loaded successfully and validation provides feedback
+            let handles_gracefully = validation_result.is_compatible 
+                || !validation_result.warnings.is_empty()
+                || !validation_result.issues.is_empty();
+            
+            prop_assert!(
+                handles_gracefully,
+                "Script should be handled gracefully (compatible, warnings, or issues). Result: {:?}",
+                validation_result
+            );
+            
+            // If version differs, should have version-related feedback
+            if version_diff {
+                let has_version_feedback = validation_result.warnings.iter().any(|w| w.contains("version"))
+                    || validation_result.issues.iter().any(|i| i.field.contains("version"));
+                prop_assert!(
+                    has_version_feedback,
+                    "Should provide feedback about version difference"
+                );
+            }
+            
+            // Essential data should be preserved
+            prop_assert_eq!(
+                loaded_script.actions.len(),
+                action_count,
+                "Action count should be preserved"
+            );
+            
+            // Actions should be preserved correctly
+            for (i, action) in loaded_script.actions.iter().enumerate() {
+                prop_assert!(
+                    action.timestamp >= 0.0,
+                    "Action {} timestamp should be valid: {}",
+                    i,
+                    action.timestamp
+                );
+            }
+            
+            // Test cross-core compatibility with format differences
+            let compat_result = CompatibilityTester::test_cross_core_compatibility(
+                &script_str, "rust", "python"
+            ).unwrap();
+            
+            // Should handle format differences gracefully
+            // Either compatible or has warnings, but should not fail completely
+            let handles_gracefully = compat_result.is_compatible 
+                || !compat_result.warnings.is_empty()
+                || !compat_result.issues.is_empty();
+            
+            prop_assert!(
+                handles_gracefully,
+                "Should handle format differences gracefully"
+            );
+            
+            // If there are format differences, there should be warnings
+            let has_format_differences = version_diff || missing_optional_fields || extra_fields 
+                || platform_variation != "linux";
+            
+            if has_format_differences && !compat_result.is_compatible {
+                prop_assert!(
+                    !compat_result.warnings.is_empty() || !compat_result.issues.is_empty(),
+                    "Should have warnings or issues for format differences"
+                );
+            }
+        }
+    }
+}

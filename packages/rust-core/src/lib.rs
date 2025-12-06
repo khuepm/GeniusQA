@@ -42,6 +42,9 @@ mod validation_property_tests;
 #[cfg(test)]
 mod permission_property_tests;
 
+#[cfg(test)]
+mod playback_property_tests;
+
 pub use automation::{AutomationCore, AutomationCommand, CommandResult};
 pub use error::{AutomationError, Result, ErrorInfo, ErrorSeverity};
 pub use config::AutomationConfig;
