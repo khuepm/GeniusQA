@@ -25,6 +25,7 @@ import {
   IPCEvent,
   RecordingResult,
 } from '../types/recorder.types';
+import { CoreStatus, PerformanceMetrics, PerformanceComparison, UserSettings } from '../components/CoreSelector';
 
 /**
  * Configuration for IPC Bridge
@@ -33,13 +34,7 @@ interface IPCBridgeConfig {
   // Configuration options can be added here if needed in the future
 }
 
-/**
- * Tauri event payload structure
- */
-interface TauriEventPayload {
-  type: string;
-  data: any;
-}
+
 
 /**
  * IPC Bridge Service
@@ -49,7 +44,7 @@ export class IPCBridgeService {
   private eventListeners: Map<string, ((event: IPCEvent) => void)[]> = new Map();
   private unlistenFunctions: UnlistenFn[] = [];
 
-  constructor(config: IPCBridgeConfig = {}) {
+  constructor(_config: IPCBridgeConfig = {}) {
     // Initialize event listeners for Tauri events
     this.initializeEventListeners();
   }
@@ -145,9 +140,19 @@ export class IPCBridgeService {
    */
   public async startRecording(): Promise<void> {
     try {
-      console.log('[IPC Bridge] Invoking start_recording command...');
+      // Get current core status for logging (gracefully handle failures)
+      let coreType = 'unknown';
+      try {
+        const coreStatus = await this.getCoreStatus();
+        coreType = coreStatus.activeCoreType;
+      } catch {
+        // Ignore core status errors for logging purposes
+      }
+      
+      console.log(`[IPC Bridge] Invoking start_recording command with ${coreType} core...`);
+      
       await invoke('start_recording');
-      console.log('[IPC Bridge] start_recording command successful');
+      console.log(`[IPC Bridge] start_recording command successful with ${coreType} core`);
     } catch (error) {
       console.error('[IPC Bridge] start_recording command failed:', error);
       throw new Error(this.formatErrorMessage(error as Error));
@@ -178,13 +183,23 @@ export class IPCBridgeService {
    */
   public async stopRecording(): Promise<RecordingResult> {
     try {
-      console.log('[IPC Bridge] Invoking stop_recording command...');
+      // Get current core status for logging (gracefully handle failures)
+      let coreType = 'unknown';
+      try {
+        const coreStatus = await this.getCoreStatus();
+        coreType = coreStatus.activeCoreType;
+      } catch {
+        // Ignore core status errors for logging purposes
+      }
+      
+      console.log(`[IPC Bridge] Invoking stop_recording command with ${coreType} core...`);
+      
       const result = await invoke<RecordingResult>('stop_recording');
-      console.log('[IPC Bridge] stop_recording result:', result);
-      // Tauri returns the RecordingResult struct directly, add success field
+      console.log(`[IPC Bridge] stop_recording result with ${coreType} core:`, result);
+      // Tauri returns the RecordingResult struct directly
       return {
-        success: true,
         ...result,
+        success: true,
       };
     } catch (error) {
       console.error('[IPC Bridge] stop_recording command failed:', error);
@@ -233,13 +248,23 @@ export class IPCBridgeService {
    */
   public async startPlayback(scriptPath?: string, speed?: number, loopCount?: number): Promise<void> {
     try {
-      console.log('[IPC Bridge] Invoking start_playback command...', { scriptPath, speed, loopCount });
+      // Get current core status for logging (gracefully handle failures)
+      let coreType = 'unknown';
+      try {
+        const coreStatus = await this.getCoreStatus();
+        coreType = coreStatus.activeCoreType;
+      } catch {
+        // Ignore core status errors for logging purposes
+      }
+      
+      console.log(`[IPC Bridge] Invoking start_playback command with ${coreType} core...`, { scriptPath, speed, loopCount });
+      
       await invoke('start_playback', {
         scriptPath: scriptPath || null,
         speed: speed || 1.0,
         loopCount: loopCount || 1,
       });
-      console.log('[IPC Bridge] start_playback command successful');
+      console.log(`[IPC Bridge] start_playback command successful with ${coreType} core`);
     } catch (error) {
       console.error('[IPC Bridge] start_playback command failed:', error);
       throw new Error(this.formatErrorMessage(error as Error));
@@ -369,6 +394,35 @@ export class IPCBridgeService {
     // Handle empty or missing error messages
     if (!message || message.trim() === '' || message === 'Unknown error') {
       return 'An unknown error occurred. Please try again.';
+    }
+    
+    // Check for Rust core "not yet implemented" errors
+    if (message.includes('Rust core recording not yet fully integrated')) {
+      return 'Rust Core does not support recording yet.\n\n' +
+             'Please switch to Python Core to use recording features.\n\n' +
+             'Click on "Python Core" in the Core Selector above.';
+    }
+    
+    if (message.includes('Rust core playback not yet fully integrated')) {
+      return 'Rust Core does not support playback yet.\n\n' +
+             'Please switch to Python Core to use playback features.\n\n' +
+             'Click on "Python Core" in the Core Selector above.';
+    }
+    
+    if (message.includes('Rust core') && message.includes('not yet fully integrated')) {
+      return 'This feature is not yet available in Rust Core.\n\n' +
+             'Please switch to Python Core to use this feature.\n\n' +
+             'Click on "Python Core" in the Core Selector above.';
+    }
+    
+    // Check for fallback errors
+    if (message.includes('Failed to fallback') && message.includes('Python core is not healthy')) {
+      return 'Rust Core does not support this operation yet, and Python Core is not available.\n\n' +
+             'Please ensure Python Core is properly configured:\n' +
+             '1. Python 3.9+ is installed (python3 --version)\n' +
+             '2. Dependencies are installed (cd packages/python-core && pip3 install -r requirements.txt)\n' +
+             '3. Restart the application\n\n' +
+             'Then switch to Python Core to use this feature.';
     }
     
     // Check for Python process errors
@@ -518,6 +572,312 @@ export class IPCBridgeService {
       await invoke('delete_script', { scriptPath });
     } catch (error) {
       throw new Error(this.formatErrorMessage(error as Error));
+    }
+  }
+
+  /**
+   * Select automation core (Python or Rust)
+   * 
+   * Invokes the Tauri select_core command to switch between automation backends.
+   * Validates that the target core is available before switching.
+   * 
+   * @param {CoreType} coreType - The core to switch to ('python' or 'rust')
+   * 
+   * @throws {Error} If target core is unavailable
+   * @throws {Error} If core switching fails
+   * @throws {Error} If core validation fails
+   * 
+   * @example
+   * await ipcBridge.selectCore('rust');
+   * console.log('Switched to Rust core');
+   * 
+   * Requirements: 1.2, 1.3, 6.1, 10.1
+   */
+  public async selectCore(coreType: 'python' | 'rust'): Promise<void> {
+    try {
+      console.log('[IPC Bridge] Invoking select_core command...', { coreType });
+      await invoke('select_core', { coreType });
+      console.log('[IPC Bridge] select_core command successful');
+    } catch (error) {
+      console.error('[IPC Bridge] select_core command failed:', error);
+      throw new Error(this.formatErrorMessage(error as Error));
+    }
+  }
+
+  /**
+   * Get available automation cores
+   * 
+   * Invokes the Tauri get_available_cores command to detect which cores
+   * are installed and functional.
+   * 
+   * @returns {Promise<string[]>} Array of available core names
+   * 
+   * @throws {Error} If core detection fails
+   * 
+   * @example
+   * const cores = await ipcBridge.getAvailableCores();
+   * console.log('Available cores:', cores); // ['python', 'rust']
+   * 
+   * Requirements: 1.2, 1.3, 6.1, 10.1
+   */
+  public async getAvailableCores(): Promise<string[]> {
+    try {
+      console.log('[IPC Bridge] Invoking get_available_cores command...');
+      const result = await invoke<string[]>('get_available_cores');
+      console.log('[IPC Bridge] get_available_cores result:', result);
+      return result;
+    } catch (error) {
+      console.error('[IPC Bridge] get_available_cores command failed:', error);
+      throw new Error(this.formatErrorMessage(error as Error));
+    }
+  }
+
+  /**
+   * Get current core status
+   * 
+   * Invokes the Tauri get_core_status command to get information about
+   * the currently active core and health status of all cores.
+   * 
+   * @returns {Promise<CoreStatus>} Core status information
+   * 
+   * @throws {Error} If status retrieval fails
+   * 
+   * @example
+   * const status = await ipcBridge.getCoreStatus();
+   * console.log('Active core:', status.activeCoreType);
+   * console.log('Available cores:', status.availableCores);
+   * 
+   * Requirements: 1.2, 4.5, 8.1, 8.3
+   */
+  public async getCoreStatus(): Promise<CoreStatus> {
+    try {
+      console.log('[IPC Bridge] Invoking get_core_status command...');
+      const result = await invoke<CoreStatus>('get_core_status');
+      console.log('[IPC Bridge] get_core_status result:', result);
+      return result;
+    } catch (error) {
+      console.error('[IPC Bridge] get_core_status command failed:', error);
+      throw new Error(this.formatErrorMessage(error as Error));
+    }
+  }
+
+  /**
+   * Get performance metrics for cores
+   * 
+   * Invokes the Tauri get_core_performance_metrics command to retrieve
+   * performance data for all available cores.
+   * 
+   * @returns {Promise<PerformanceMetrics[]>} Array of performance metrics
+   * 
+   * @throws {Error} If metrics retrieval fails
+   * 
+   * @example
+   * const metrics = await ipcBridge.getCorePerformanceMetrics();
+   * metrics.forEach(m => {
+   *   console.log(`${m.coreType}: ${m.lastOperationTime}ms`);
+   * });
+   * 
+   * Requirements: 1.2, 1.3, 6.1, 10.1
+   */
+  public async getCorePerformanceMetrics(): Promise<PerformanceMetrics[]> {
+    try {
+      console.log('[IPC Bridge] Invoking get_core_performance_metrics command...');
+      const result = await invoke<PerformanceMetrics[]>('get_core_performance_metrics');
+      console.log('[IPC Bridge] get_core_performance_metrics result:', result);
+      return result;
+    } catch (error) {
+      console.error('[IPC Bridge] get_core_performance_metrics command failed:', error);
+      throw new Error(this.formatErrorMessage(error as Error));
+    }
+  }
+
+  /**
+   * Get performance comparison between cores
+   * 
+   * Invokes the Tauri get_performance_comparison command to retrieve
+   * a detailed comparison of performance metrics between Python and Rust cores,
+   * including recommendations for which core to use.
+   * 
+   * @returns {Promise<PerformanceComparison>} Performance comparison data
+   * 
+   * @throws {Error} If comparison retrieval fails
+   * 
+   * @example
+   * const comparison = await ipcBridge.getPerformanceComparison();
+   * console.log('Recommended core:', comparison.recommendation.recommendedCore);
+   * console.log('Confidence:', comparison.recommendation.confidence);
+   * console.log('Reasons:', comparison.recommendation.reasons);
+   * 
+   * Requirements: 10.2, 10.3, 10.4
+   */
+  public async getPerformanceComparison(): Promise<PerformanceComparison> {
+    try {
+      console.log('[IPC Bridge] Invoking get_performance_comparison command...');
+      const result = await invoke<PerformanceComparison>('get_performance_comparison');
+      console.log('[IPC Bridge] get_performance_comparison result:', result);
+      return result;
+    } catch (error) {
+      console.error('[IPC Bridge] get_performance_comparison command failed:', error);
+      throw new Error(this.formatErrorMessage(error as Error));
+    }
+  }
+
+  /**
+   * Get current user settings
+   * 
+   * @returns Promise<UserSettings | null> Current user settings or null if not available
+   * 
+   * @example
+   * const settings = await ipcBridge.getUserSettings();
+   * if (settings) {
+   *   console.log('Playback speed:', settings.playbackSpeed);
+   *   console.log('Loop count:', settings.loopCount);
+   * }
+   * 
+   * Requirements: 7.4, 7.5
+   */
+  public async getUserSettings(): Promise<UserSettings | null> {
+    try {
+      console.log('[IPC Bridge] Invoking get_user_settings command...');
+      const result = await invoke<UserSettings | null>('get_user_settings');
+      console.log('[IPC Bridge] get_user_settings result:', result);
+      return result;
+    } catch (error) {
+      console.error('[IPC Bridge] get_user_settings failed:', error);
+      throw new Error(`Failed to get user settings: ${error}`);
+    }
+  }
+
+  /**
+   * Update user settings
+   * 
+   * @param settings - The user settings to update
+   * 
+   * @example
+   * await ipcBridge.updateUserSettings({
+   *   playbackSpeed: 2.0,
+   *   loopCount: 3,
+   *   selectedScriptPath: '/path/to/script.json',
+   *   uiState: { showPreview: true, previewOpacity: 0.8 }
+   * });
+   * 
+   * Requirements: 7.4, 7.5
+   */
+  public async updateUserSettings(settings: UserSettings): Promise<void> {
+    try {
+      console.log('[IPC Bridge] Invoking update_user_settings command...', { settings });
+      await invoke<void>('update_user_settings', { settings });
+      console.log('[IPC Bridge] update_user_settings completed successfully');
+    } catch (error) {
+      console.error('[IPC Bridge] update_user_settings failed:', error);
+      throw new Error(`Failed to update user settings: ${error}`);
+    }
+  }
+
+  /**
+   * Set playback speed setting
+   * 
+   * @param speed - The playback speed (e.g., 0.5, 1.0, 1.5, 2.0, 5.0)
+   * 
+   * @example
+   * await ipcBridge.setPlaybackSpeed(2.0);
+   * 
+   * Requirements: 7.4, 7.5
+   */
+  public async setPlaybackSpeed(speed: number): Promise<void> {
+    try {
+      console.log('[IPC Bridge] Invoking set_playback_speed command...', { speed });
+      await invoke<void>('set_playback_speed', { speed });
+      console.log('[IPC Bridge] set_playback_speed completed successfully');
+    } catch (error) {
+      console.error('[IPC Bridge] set_playback_speed failed:', error);
+      throw new Error(`Failed to set playback speed: ${error}`);
+    }
+  }
+
+  /**
+   * Set loop count setting
+   * 
+   * @param count - The loop count (0 for infinite, positive number for specific count)
+   * 
+   * @example
+   * await ipcBridge.setLoopCount(3);
+   * await ipcBridge.setLoopCount(0); // Infinite loops
+   * 
+   * Requirements: 7.4, 7.5
+   */
+  public async setLoopCount(count: number): Promise<void> {
+    try {
+      console.log('[IPC Bridge] Invoking set_loop_count command...', { count });
+      await invoke<void>('set_loop_count', { count });
+      console.log('[IPC Bridge] set_loop_count completed successfully');
+    } catch (error) {
+      console.error('[IPC Bridge] set_loop_count failed:', error);
+      throw new Error(`Failed to set loop count: ${error}`);
+    }
+  }
+
+  /**
+   * Set selected script path
+   * 
+   * @param path - The script path to select (null to clear selection)
+   * 
+   * @example
+   * await ipcBridge.setSelectedScriptPath('/path/to/script.json');
+   * await ipcBridge.setSelectedScriptPath(null); // Clear selection
+   * 
+   * Requirements: 7.4, 7.5
+   */
+  public async setSelectedScriptPath(path: string | null): Promise<void> {
+    try {
+      console.log('[IPC Bridge] Invoking set_selected_script_path command...', { path });
+      await invoke<void>('set_selected_script_path', { path });
+      console.log('[IPC Bridge] set_selected_script_path completed successfully');
+    } catch (error) {
+      console.error('[IPC Bridge] set_selected_script_path failed:', error);
+      throw new Error(`Failed to set selected script path: ${error}`);
+    }
+  }
+
+  /**
+   * Set show preview setting
+   * 
+   * @param showPreview - Whether to show visual preview
+   * 
+   * @example
+   * await ipcBridge.setShowPreview(true);
+   * 
+   * Requirements: 7.4, 7.5
+   */
+  public async setShowPreview(showPreview: boolean): Promise<void> {
+    try {
+      console.log('[IPC Bridge] Invoking set_show_preview command...', { showPreview });
+      await invoke<void>('set_show_preview', { showPreview });
+      console.log('[IPC Bridge] set_show_preview completed successfully');
+    } catch (error) {
+      console.error('[IPC Bridge] set_show_preview failed:', error);
+      throw new Error(`Failed to set show preview: ${error}`);
+    }
+  }
+
+  /**
+   * Set preview opacity setting
+   * 
+   * @param opacity - The preview opacity (0.0 to 1.0)
+   * 
+   * @example
+   * await ipcBridge.setPreviewOpacity(0.8);
+   * 
+   * Requirements: 7.4, 7.5
+   */
+  public async setPreviewOpacity(opacity: number): Promise<void> {
+    try {
+      console.log('[IPC Bridge] Invoking set_preview_opacity command...', { opacity });
+      await invoke<void>('set_preview_opacity', { opacity });
+      console.log('[IPC Bridge] set_preview_opacity completed successfully');
+    } catch (error) {
+      console.error('[IPC Bridge] set_preview_opacity failed:', error);
+      throw new Error(`Failed to set preview opacity: ${error}`);
     }
   }
 

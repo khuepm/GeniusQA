@@ -180,13 +180,19 @@ class TestScreenshotCapture:
     def test_check_dependencies_includes_pillow(self):
         """Test that dependency check includes Pillow when screenshots enabled."""
         # Mock successful imports for pyautogui and pynput, but fail PIL
-        mock_modules = {
-            'pyautogui': MagicMock(),
-            'pynput': MagicMock()
-        }
-        
-        with patch.dict('sys.modules', mock_modules):
-            # PIL is not in the mocked modules, so import will fail
+        with patch('builtins.__import__') as mock_import:
+            def side_effect(name, *args, **kwargs):
+                if name == 'PIL':
+                    raise ImportError("No module named 'PIL'")
+                elif name in ['pyautogui', 'pynput']:
+                    return MagicMock()
+                else:
+                    # For other imports, use the real import
+                    return __import__(name, *args, **kwargs)
+            
+            mock_import.side_effect = side_effect
+            
+            # PIL is not available, so check should fail
             is_available, error_msg = Recorder.check_dependencies(check_pillow=True)
             
             # Should fail because PIL is not available
