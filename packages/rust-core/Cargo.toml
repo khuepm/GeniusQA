@@ -24,6 +24,8 @@ env_logger = "0.10"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-appender = "0.2"
+hostname = "0.3"
+rustc_version_runtime = "0.3"
 
 # Platform-specific dependencies
 [target.'cfg(windows)'.dependencies]

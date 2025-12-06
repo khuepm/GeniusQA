@@ -88,6 +88,101 @@ pub enum ErrorSeverity {
     Critical,
 }
 
+/// Playback-specific error with action context for better debugging and recovery
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlaybackError {
+    /// Index of the action that caused the error
+    pub action_index: usize,
+    /// Type of action that failed
+    pub action_type: String,
+    /// Coordinates where the action was attempted (if applicable)
+    pub coordinates: Option<(i32, i32)>,
+    /// The underlying automation error
+    pub underlying_error: AutomationError,
+    /// Whether playback should continue after this error
+    pub recoverable: bool,
+}
+
+impl PlaybackError {
+    /// Create a new playback error with action context
+    pub fn new(
+        action_index: usize,
+        action_type: String,
+        coordinates: Option<(i32, i32)>,
+        underlying_error: AutomationError,
+    ) -> Self {
+        let recoverable = Self::determine_recoverability(&underlying_error);
+        
+        Self {
+            action_index,
+            action_type,
+            coordinates,
+            underlying_error,
+            recoverable,
+        }
+    }
+
+    /// Determine if playback should continue after this error
+    pub fn should_continue(&self) -> bool {
+        self.recoverable
+    }
+
+    /// Convert error to user-friendly message
+    pub fn to_user_message(&self) -> String {
+        let coords_str = if let Some((x, y)) = self.coordinates {
+            format!(" at coordinates ({}, {})", x, y)
+        } else {
+            String::new()
+        };
+
+        format!(
+            "Playback error at action {}: {} action{} failed - {}",
+            self.action_index,
+            self.action_type,
+            coords_str,
+            self.underlying_error
+        )
+    }
+
+    /// Determine if an error is recoverable based on its type
+    fn determine_recoverability(error: &AutomationError) -> bool {
+        match error {
+            // Critical errors that should stop playback
+            AutomationError::UnsupportedPlatform { .. } => false,
+            AutomationError::PermissionDenied { .. } => false,
+            AutomationError::FallbackFailed { .. } => false,
+            AutomationError::DependencyMissing { .. } => false,
+            
+            // Errors that might be transient or action-specific
+            AutomationError::SystemError { .. } => true,
+            AutomationError::RuntimeFailure { .. } => true,
+            AutomationError::PlaybackError { .. } => true,
+            AutomationError::InvalidInput { .. } => true,
+            AutomationError::Timeout { .. } => true,
+            
+            // Core-related errors - recoverable if we can continue with current core
+            AutomationError::CoreUnavailable { .. } => false,
+            AutomationError::CoreHealthCheckFailed { .. } => false,
+            
+            // Other errors - generally recoverable
+            AutomationError::RecordingError { .. } => true,
+            AutomationError::ScriptError { .. } => false,
+            AutomationError::IoError { .. } => true,
+            AutomationError::SerializationError { .. } => false,
+            AutomationError::ConfigError { .. } => false,
+            AutomationError::PerformanceDegradation { .. } => true,
+        }
+    }
+}
+
+impl std::fmt::Display for PlaybackError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_user_message())
+    }
+}
+
+impl std::error::Error for PlaybackError {}
+
 /// Enhanced error information for better error handling and user feedback
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ErrorInfo {

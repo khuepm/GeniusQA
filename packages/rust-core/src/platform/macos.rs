@@ -8,11 +8,18 @@ use core_graphics::{
     display::CGDisplay,
 };
 
+#[cfg(target_os = "macos")]
+use core_foundation::{
+    base::TCFType,
+    boolean::CFBoolean,
+    dictionary::CFDictionary,
+    string::CFString,
+};
+
 use crate::{Result, AutomationError};
 use crate::logging::{get_logger, CoreType, OperationType, LogLevel};
 use super::PlatformAutomation;
 use std::collections::HashMap;
-use std::sync::Mutex;
 use serde_json::json;
 
 /// macOS-specific automation implementation
@@ -195,11 +202,9 @@ impl MacOSAutomation {
         }
     }
     
-    /// Check accessibility permissions
+    /// Check accessibility permissions using macOS APIs
+    #[cfg(target_os = "macos")]
     fn check_accessibility_permissions(&self) -> Result<bool> {
-        // On macOS, we need to check if the app has accessibility permissions
-        // This is a simplified check - in production, you'd use AXIsProcessTrusted()
-        // For now, we'll assume permissions are granted and log a warning
         if let Some(logger) = get_logger() {
             logger.log_operation(
                 LogLevel::Info,
@@ -210,7 +215,114 @@ impl MacOSAutomation {
                 None,
             );
         }
-        Ok(true)
+
+        // Use AXIsProcessTrusted to check if we have accessibility permissions
+        // This is the proper way to check on macOS
+        let trusted = unsafe {
+            // Declare the external function from ApplicationServices framework
+            extern "C" {
+                fn AXIsProcessTrusted() -> bool;
+            }
+            AXIsProcessTrusted()
+        };
+
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("has_permissions".to_string(), json!(trusted));
+            
+            logger.log_operation(
+                if trusted { LogLevel::Info } else { LogLevel::Warn },
+                CoreType::Rust,
+                OperationType::Playback,
+                "permission_check_result".to_string(),
+                format!("Accessibility permissions: {}", if trusted { "granted" } else { "denied" }),
+                Some(metadata),
+            );
+        }
+
+        Ok(trusted)
+    }
+
+    /// Request accessibility permissions with detailed instructions
+    #[cfg(target_os = "macos")]
+    fn request_accessibility_permissions_with_prompt(&self) -> Result<()> {
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("action".to_string(), json!("request_permissions"));
+            metadata.insert("platform".to_string(), json!("macos"));
+            
+            let instructions = self.get_permission_instructions();
+            metadata.insert("instructions".to_string(), json!(instructions));
+            
+            logger.log_operation(
+                LogLevel::Info,
+                CoreType::Rust,
+                OperationType::Playback,
+                "permission_request".to_string(),
+                "Requesting macOS accessibility permissions".to_string(),
+                Some(metadata),
+            );
+        }
+
+        // Attempt to trigger the permission prompt by using AXIsProcessTrustedWithOptions
+        unsafe {
+            extern "C" {
+                fn AXIsProcessTrustedWithOptions(options: *const std::ffi::c_void) -> bool;
+            }
+
+            // Create options dictionary to show the prompt
+            let prompt_key = CFString::from_static_string("AXTrustedCheckOptionPrompt");
+            let prompt_value = CFBoolean::true_value();
+            
+            // Build the dictionary using the proper API
+            use core_foundation::base::CFType;
+            let key_cftype = CFType::wrap_under_get_rule(prompt_key.as_concrete_TypeRef() as *const _);
+            let value_cftype = CFType::wrap_under_get_rule(prompt_value.as_concrete_TypeRef() as *const _);
+            
+            let pairs = vec![(key_cftype, value_cftype)];
+            let options = CFDictionary::from_CFType_pairs(&pairs);
+            
+            AXIsProcessTrustedWithOptions(options.as_concrete_TypeRef() as *const std::ffi::c_void);
+        }
+
+        Ok(())
+    }
+
+    /// Get detailed permission instructions for macOS
+    fn get_permission_instructions(&self) -> String {
+        format!(
+            "To enable automation, please grant Accessibility permissions:\n\n\
+            1. Open System Preferences (or System Settings on macOS 13+)\n\
+            2. Navigate to Security & Privacy > Privacy > Accessibility\n\
+               (On macOS 13+: Privacy & Security > Accessibility)\n\
+            3. Click the lock icon to make changes (you may need to enter your password)\n\
+            4. Find this application in the list and check the box next to it\n\
+            5. If the application is not in the list, click the '+' button to add it\n\
+            6. Restart the application after granting permissions\n\n\
+            Direct link: x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility\n\n\
+            Note: These permissions are required for the application to control your mouse and keyboard."
+        )
+    }
+
+    /// Log permission denial with detailed instructions
+    fn log_permission_denial(&self) {
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("platform".to_string(), json!("macos"));
+            metadata.insert("required_permission".to_string(), json!("Accessibility"));
+            metadata.insert("instructions".to_string(), json!(self.get_permission_instructions()));
+            metadata.insert("system_preferences_link".to_string(), 
+                json!("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"));
+            
+            logger.log_operation(
+                LogLevel::Error,
+                CoreType::Rust,
+                OperationType::Playback,
+                "permission_denied".to_string(),
+                "Accessibility permissions not granted. Automation cannot proceed.".to_string(),
+                Some(metadata),
+            );
+        }
     }
 }
 
@@ -226,18 +338,15 @@ impl PlatformAutomation for MacOSAutomation {
         let has_permissions = self.check_accessibility_permissions()?;
         
         if !has_permissions {
-            if let Some(logger) = get_logger() {
-                logger.log_operation(
-                    LogLevel::Error,
-                    CoreType::Rust,
-                    OperationType::Playback,
-                    "permission_denied".to_string(),
-                    "Accessibility permissions not granted. Please enable accessibility permissions in System Preferences > Security & Privacy > Privacy > Accessibility".to_string(),
-                    None,
-                );
-            }
+            self.log_permission_denial();
+            
             return Err(AutomationError::PermissionDenied {
-                operation: "macOS accessibility permissions required. Go to System Preferences > Security & Privacy > Privacy > Accessibility and enable access for this application.".to_string(),
+                operation: format!(
+                    "macOS Accessibility permissions required.\n\n{}\n\n\
+                    You can also open System Preferences directly using this link:\n\
+                    x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+                    self.get_permission_instructions()
+                ),
             });
         }
         
@@ -245,21 +354,29 @@ impl PlatformAutomation for MacOSAutomation {
     }
     
     fn request_permissions(&self) -> Result<bool> {
-        // On macOS, we need to request accessibility permissions
-        if let Some(logger) = get_logger() {
-            logger.log_operation(
-                LogLevel::Info,
-                CoreType::Rust,
-                OperationType::Playback,
-                "permission_request".to_string(),
-                "Requesting macOS accessibility permissions. Please grant access in System Preferences.".to_string(),
-                None,
-            );
+        // Request accessibility permissions with system prompt
+        self.request_accessibility_permissions_with_prompt()?;
+        
+        // Check if permissions were granted
+        let has_permissions = self.check_accessibility_permissions()?;
+        
+        if !has_permissions {
+            if let Some(logger) = get_logger() {
+                let mut metadata = HashMap::new();
+                metadata.insert("instructions".to_string(), json!(self.get_permission_instructions()));
+                
+                logger.log_operation(
+                    LogLevel::Warn,
+                    CoreType::Rust,
+                    OperationType::Playback,
+                    "permission_request_pending".to_string(),
+                    "Accessibility permissions not yet granted. Please follow the instructions to enable permissions.".to_string(),
+                    Some(metadata),
+                );
+            }
         }
         
-        // This would typically show a system dialog
-        // For now, we'll return true and rely on the system to handle the permission request
-        Ok(true)
+        Ok(has_permissions)
     }
     
     fn mouse_move(&self, x: i32, y: i32) -> Result<()> {
@@ -508,7 +625,7 @@ impl PlatformAutomation for MacOSAutomation {
     
     fn key_type(&self, text: &str) -> Result<()> {
         for ch in text.chars() {
-            if let Some(&key_code) = self.key_map.get(&ch.to_lowercase().to_string()) {
+            if self.key_map.contains_key(&ch.to_lowercase().to_string()) {
                 self.key_press(&ch.to_string())?;
                 self.key_release(&ch.to_string())?;
                 std::thread::sleep(std::time::Duration::from_millis(10));
@@ -594,5 +711,65 @@ impl MacOSAutomation {
         Err(AutomationError::UnsupportedPlatform {
             platform: "macOS automation on non-macOS platform".to_string(),
         })
+    }
+
+    #[allow(dead_code)]
+    fn check_accessibility_permissions(&self) -> Result<bool> {
+        Err(AutomationError::UnsupportedPlatform {
+            platform: "macOS automation on non-macOS platform".to_string(),
+        })
+    }
+
+    #[allow(dead_code)]
+    fn request_accessibility_permissions_with_prompt(&self) -> Result<()> {
+        Err(AutomationError::UnsupportedPlatform {
+            platform: "macOS automation on non-macOS platform".to_string(),
+        })
+    }
+
+    #[allow(dead_code)]
+    fn get_permission_instructions(&self) -> String {
+        "macOS automation not available on this platform".to_string()
+    }
+
+    #[allow(dead_code)]
+    fn log_permission_denial(&self) {}
+}
+
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_permission_instructions_format() {
+        let automation = MacOSAutomation::new().expect("Failed to create MacOSAutomation");
+        let instructions = automation.get_permission_instructions();
+        
+        // Verify instructions contain key information
+        assert!(instructions.contains("System Preferences"));
+        assert!(instructions.contains("Security & Privacy"));
+        assert!(instructions.contains("Privacy"));
+        assert!(instructions.contains("Accessibility"));
+        assert!(instructions.contains("x-apple.systempreferences"));
+    }
+
+    #[test]
+    fn test_check_permissions_returns_bool() {
+        let automation = MacOSAutomation::new().expect("Failed to create MacOSAutomation");
+        
+        // This should return a Result<bool> without panicking
+        let result = automation.check_accessibility_permissions();
+        assert!(result.is_ok());
+        
+        // The result should be a boolean
+        let has_permissions = result.unwrap();
+        println!("Accessibility permissions: {}", has_permissions);
+    }
+
+    #[test]
+    fn test_platform_name() {
+        let automation = MacOSAutomation::new().expect("Failed to create MacOSAutomation");
+        assert_eq!(automation.platform_name(), "macos");
     }
 }

@@ -19,6 +19,7 @@ pub mod validation;
 pub mod cross_core_testing;
 pub mod logging;
 pub mod monitoring;
+pub mod debug;
 
 #[cfg(test)]
 mod preferences_property_tests;

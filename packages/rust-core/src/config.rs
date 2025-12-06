@@ -26,6 +26,34 @@ pub struct AutomationConfig {
     
     /// Platform-specific settings
     pub platform_config: PlatformConfig,
+    
+    /// Playback debug configuration
+    pub debug_config: DebugConfig,
+}
+
+/// Debug configuration for playback
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DebugConfig {
+    /// Enable debug mode with verbose logging
+    pub enabled: bool,
+    
+    /// Enable action-by-action confirmation (requires user input before each action)
+    pub action_confirmation: bool,
+    
+    /// Pause duration between actions in debug mode (milliseconds)
+    pub pause_between_actions_ms: u64,
+    
+    /// Log level for debug mode (trace, debug, info, warn, error)
+    pub log_level: String,
+    
+    /// Enable timing diagnostics
+    pub timing_diagnostics: bool,
+    
+    /// Enable platform capability detection
+    pub platform_diagnostics: bool,
+    
+    /// Enable system information logging
+    pub system_info_logging: bool,
 }
 
 /// Platform-specific configuration
@@ -94,6 +122,21 @@ impl Default for AutomationConfig {
             screenshot_interval: 1000,
             max_recording_duration: 0,
             platform_config: PlatformConfig::default(),
+            debug_config: DebugConfig::default(),
+        }
+    }
+}
+
+impl Default for DebugConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            action_confirmation: false,
+            pause_between_actions_ms: 0,
+            log_level: "info".to_string(),
+            timing_diagnostics: false,
+            platform_diagnostics: false,
+            system_info_logging: false,
         }
     }
 }
