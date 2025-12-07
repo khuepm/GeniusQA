@@ -27,7 +27,8 @@ import {
   buildCorrectionPrompt,
   parseProviderResponse,
 } from './baseAdapter';
-import { validateScript, autoFixScript } from '../scriptValidationService';
+// Script validation imported for future use
+// import { validateScript, autoFixScript } from '../scriptValidationService';
 
 // ============================================================================
 // Gemini API Types
@@ -90,7 +91,7 @@ export class GeminiAdapter implements AIProviderAdapter {
   constructor() {
     // Set default model
     const defaultModel = this.config.models.find(m => m.isDefault);
-    this.currentModel = defaultModel?.id || 'gemini-2.0-flash';
+    this.currentModel = defaultModel?.id || 'gemini-2.5-flash';
   }
 
   /**
@@ -133,7 +134,7 @@ export class GeminiAdapter implements AIProviderAdapter {
    */
   getDefaultModel(): string {
     const defaultModel = this.config.models.find(m => m.isDefault);
-    return defaultModel?.id || 'gemini-2.0-flash';
+    return defaultModel?.id || 'gemini-2.5-flash';
   }
 
   /**

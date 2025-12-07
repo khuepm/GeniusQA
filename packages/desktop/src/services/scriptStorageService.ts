@@ -141,19 +141,29 @@ class ScriptStorageService {
 
   /**
    * Gets the home directory path
-   * Uses a simple heuristic based on platform
+   * Uses Tauri API or fallback to platform-specific default
    */
   private async getHomeDirectory(): Promise<string> {
-    // In a Tauri app, we can use environment variables
-    // For now, use a platform-specific default
-    const platform = getPlatform();
+    // Try to get home directory from Tauri API
+    try {
+      const tauri = window.__TAURI__ as Record<string, unknown> | undefined;
+      const pathModule = tauri?.path as Record<string, unknown> | undefined;
+      if (pathModule?.homeDir) {
+        const homeDir = pathModule.homeDir as () => Promise<string>;
+        return await homeDir();
+      }
+    } catch {
+      // Fallback if Tauri API not available
+    }
     
+    // Platform-specific fallback
+    const platform = getPlatform();
     if (platform === 'windows') {
-      return process.env.USERPROFILE || 'C:/Users/Default';
+      return 'C:/Users/Default';
     }
     
     // macOS and Linux
-    return process.env.HOME || '/tmp';
+    return '/tmp';
   }
 
   /**

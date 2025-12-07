@@ -243,6 +243,67 @@ interface ModelSelectorProps {
 }
 ```
 
+### 6. User Profile Service
+
+```typescript
+/**
+ * Service for managing user profile data in Firebase Firestore
+ */
+interface UserProfileService {
+  // Store user profile to Firebase
+  storeUserProfile(userId: string, profile: UserProfile): Promise<void>;
+  
+  // Retrieve user profile from Firebase
+  getUserProfile(userId: string): Promise<UserProfile | null>;
+  
+  // Update specific profile fields
+  updateUserProfile(userId: string, updates: Partial<UserProfile>): Promise<void>;
+  
+  // Delete user profile
+  deleteUserProfile(userId: string): Promise<void>;
+}
+
+interface UserProfile {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+```
+
+### 7. User Preferences Service
+
+```typescript
+/**
+ * Service for managing user AI provider preferences in Firebase Firestore
+ */
+interface UserPreferencesService {
+  // Store user preferences to Firebase
+  storeUserPreferences(userId: string, preferences: UserProviderPreferences): Promise<void>;
+  
+  // Retrieve user preferences from Firebase
+  getUserPreferences(userId: string): Promise<UserProviderPreferences | null>;
+  
+  // Update default provider
+  setDefaultProvider(userId: string, provider: AIProvider): Promise<void>;
+  
+  // Update model preference for a provider
+  setModelPreference(userId: string, provider: AIProvider, modelId: string): Promise<void>;
+  
+  // Delete user preferences
+  deleteUserPreferences(userId: string): Promise<void>;
+}
+
+interface UserProviderPreferences {
+  defaultProvider: AIProvider | null;
+  modelPreferences: Record<AIProvider, string>; // provider -> preferred model
+  lastUsedProvider: AIProvider | null;
+  updatedAt: Timestamp;
+}
+```
+
 ## Data Models
 
 ### Provider Types
@@ -435,6 +496,30 @@ interface UserProviderPreferences {
 *For any* sequence of requests to various providers, the usage statistics should accurately count requests per provider.
 
 **Validates: Requirements 6.4**
+
+### Property 19: User Profile Storage Round-Trip
+
+*For any* valid user profile data, storing it to Firebase and then retrieving it should return the same profile information.
+
+**Validates: Requirements 7.1, 7.3**
+
+### Property 20: User Profile Sync on Update
+
+*For any* user profile update, the changes should be reflected in Firebase immediately after the update operation completes.
+
+**Validates: Requirements 7.2**
+
+### Property 21: User Preferences Storage Round-Trip
+
+*For any* valid user preferences (default provider, model preferences), storing them to Firebase and then retrieving them should return the same preferences.
+
+**Validates: Requirements 8.1, 8.2, 8.3**
+
+### Property 22: User Preferences Sync on Change
+
+*For any* preference change, the new preference should be stored in Firebase immediately and retrievable.
+
+**Validates: Requirements 8.4**
 
 ## Error Handling
 

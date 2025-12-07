@@ -25,6 +25,7 @@ import {
 } from '../types/providerAdapter.types';
 import { providerManager, IProviderManager } from './providerManager';
 import { apiKeyService } from './apiKeyService';
+import { userPreferencesService } from './userPreferencesService';
 import { GeminiAdapter } from './providers/geminiAdapter';
 import { OpenAIAdapter } from './providers/openaiAdapter';
 import { AnthropicAdapter } from './providers/anthropicAdapter';
@@ -144,7 +145,7 @@ export class UnifiedAIService implements IUnifiedAIService {
   }
 
   /**
-   * Load persisted model preferences from localStorage
+   * Load persisted model preferences from localStorage (fallback)
    * Requirements: 3.5
    */
   private loadPersistedPreferences(): void {
@@ -171,10 +172,33 @@ export class UnifiedAIService implements IUnifiedAIService {
   }
 
   /**
-   * Persist model preferences to localStorage
+   * Load user preferences from Firebase
+   * Requirements: 8.3
+   */
+  private async loadFirebasePreferences(): Promise<void> {
+    if (!this.userId) return;
+
+    try {
+      const firebasePrefs = await userPreferencesService.getUserPreferences(this.userId);
+      if (firebasePrefs) {
+        this.userPreferences = {
+          defaultProvider: firebasePrefs.defaultProvider,
+          modelPreferences: (firebasePrefs.modelPreferences || {}) as Record<AIProvider, string>,
+          lastUsedProvider: firebasePrefs.lastUsedProvider,
+        };
+        // Also update localStorage as cache
+        this.persistPreferencesToLocalStorage();
+      }
+    } catch (error) {
+      console.warn('Failed to load preferences from Firebase, using local cache:', error);
+    }
+  }
+
+  /**
+   * Persist model preferences to localStorage (local cache)
    * Requirements: 3.5
    */
-  private persistPreferences(): void {
+  private persistPreferencesToLocalStorage(): void {
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(
@@ -183,7 +207,27 @@ export class UnifiedAIService implements IUnifiedAIService {
         );
       }
     } catch (error) {
-      console.warn('Failed to persist model preferences:', error);
+      console.warn('Failed to persist model preferences to localStorage:', error);
+    }
+  }
+
+  /**
+   * Persist model preferences to both localStorage and Firebase
+   * Requirements: 3.5, 8.4
+   */
+  private persistPreferences(): void {
+    // Always persist to localStorage for quick access
+    this.persistPreferencesToLocalStorage();
+    
+    // Also persist to Firebase if user is logged in
+    if (this.userId) {
+      userPreferencesService.storeUserPreferences(this.userId, {
+        defaultProvider: this.userPreferences.defaultProvider,
+        modelPreferences: this.userPreferences.modelPreferences,
+        lastUsedProvider: this.userPreferences.lastUsedProvider,
+      }).catch(error => {
+        console.warn('Failed to persist preferences to Firebase:', error);
+      });
     }
   }
 
@@ -193,7 +237,7 @@ export class UnifiedAIService implements IUnifiedAIService {
 
   /**
    * Initialize the service with user's API keys
-   * Requirements: 2.2, 2.3
+   * Requirements: 2.2, 2.3, 8.3
    */
   async initialize(userId: string): Promise<void> {
     if (!userId) {
@@ -207,6 +251,9 @@ export class UnifiedAIService implements IUnifiedAIService {
     
     // Register all adapters
     this.registerAdapters();
+    
+    // Load user preferences from Firebase (overrides localStorage cache)
+    await this.loadFirebasePreferences();
     
     // Load API keys and initialize adapters
     await this.loadApiKeys();

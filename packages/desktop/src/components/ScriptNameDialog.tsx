@@ -80,7 +80,7 @@ export function generateDefaultName(): string {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-  });
+  }).replace(/:/g, '-');
   return `AI Script ${dateStr} ${timeStr}`;
 }
 

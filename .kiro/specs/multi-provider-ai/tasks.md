@@ -260,3 +260,70 @@
 - [x] 12. Final Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
+## 13. Implement User Profile Service
+
+- [x] 13. Implement User Profile Service
+- [x] 13.1 Create User Profile Service
+  - Create `packages/desktop/src/services/userProfileService.ts`
+  - Implement storeUserProfile function to save user data to Firebase Firestore
+  - Implement getUserProfile function to retrieve user data from Firebase
+  - Implement updateUserProfile function for partial updates
+  - Define UserProfile interface with uid, email, displayName, photoURL, timestamps
+  - _Requirements: 7.1, 7.2, 7.3_
+
+- [ ]* 13.2 Write property test for User Profile Storage Round-Trip
+  - **Property 19: User Profile Storage Round-Trip**
+  - **Validates: Requirements 7.1, 7.3**
+
+- [ ]* 13.3 Write property test for User Profile Sync on Update
+  - **Property 20: User Profile Sync on Update**
+  - **Validates: Requirements 7.2**
+
+- [x] 13.4 Integrate User Profile Service with AuthContext
+  - Update `packages/desktop/src/contexts/AuthContext.tsx`
+  - Call storeUserProfile on successful login
+  - Call getUserProfile to load profile on app start
+  - Clear local data on logout while preserving Firebase data
+  - _Requirements: 7.1, 7.3, 7.4_
+
+## 14. Implement User Preferences Service
+
+- [x] 14. Implement User Preferences Service
+- [x] 14.1 Create User Preferences Service
+  - Create `packages/desktop/src/services/userPreferencesService.ts`
+  - Implement storeUserPreferences function to save preferences to Firebase
+  - Implement getUserPreferences function to retrieve preferences from Firebase
+  - Implement setDefaultProvider function
+  - Implement setModelPreference function
+  - Define UserProviderPreferences interface
+  - _Requirements: 8.1, 8.2, 8.3, 8.4_
+
+- [ ]* 14.2 Write property test for User Preferences Storage Round-Trip
+  - **Property 21: User Preferences Storage Round-Trip**
+  - **Validates: Requirements 8.1, 8.2, 8.3**
+
+- [ ]* 14.3 Write property test for User Preferences Sync on Change
+  - **Property 22: User Preferences Sync on Change**
+  - **Validates: Requirements 8.4**
+
+- [x] 14.4 Integrate User Preferences with Unified AI Service
+  - Update `packages/desktop/src/services/unifiedAIService.ts`
+  - Load user preferences on initialization
+  - Apply default provider from preferences
+  - Apply model preferences per provider
+  - _Requirements: 8.3, 8.5_
+
+- [x] 14.5 Update Provider Selector to save preferences
+  - Update `packages/desktop/src/components/ProviderSelector.tsx`
+  - Save default provider preference when user selects provider
+  - _Requirements: 8.1, 8.4_
+
+- [x] 14.6 Update Model Selector to save preferences
+  - Update `packages/desktop/src/components/ModelSelector.tsx`
+  - Save model preference when user selects model
+  - _Requirements: 8.2, 8.4_
+
+## 15. Final Checkpoint - Ensure all new tests pass
+- [x] 15. Final Checkpoint - Ensure all new tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+

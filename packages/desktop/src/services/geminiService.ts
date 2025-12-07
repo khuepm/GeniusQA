@@ -112,7 +112,7 @@ export const EXAMPLE_SCRIPTS: ScriptData[] = [
 // ============================================================================
 
 const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-2.5-flash';
 
 /**
  * Gemini API request body structure

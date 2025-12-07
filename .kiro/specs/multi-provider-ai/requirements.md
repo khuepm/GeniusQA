@@ -87,3 +87,26 @@ Tính năng Multi-Provider AI mở rộng AI Script Builder để hỗ trợ nhi
 4. WHEN a user views usage statistics THEN the System SHALL display request count per provider for the current session
 5. WHEN a provider has known limitations THEN the System SHALL display relevant warnings before use
 
+### Requirement 7
+
+**User Story:** As a user, I want my user profile and preferences to be stored in Firebase, so that I can access my settings from any device.
+
+#### Acceptance Criteria
+
+1. WHEN a user logs in THEN the System SHALL store user profile information (uid, email, displayName, photoURL) in Firebase Firestore
+2. WHEN a user updates their profile THEN the System SHALL sync the changes to Firebase Firestore
+3. WHEN a user logs in from a new device THEN the System SHALL retrieve and apply their stored profile from Firebase
+4. WHEN a user logs out THEN the System SHALL clear local profile data while preserving Firebase data
+
+### Requirement 8
+
+**User Story:** As a user, I want my AI provider preferences to be stored per user account, so that my preferred provider and model settings are available across devices.
+
+#### Acceptance Criteria
+
+1. WHEN a user selects a default provider THEN the System SHALL store the preference in Firebase under the user's account
+2. WHEN a user selects a preferred model for a provider THEN the System SHALL store the model preference in Firebase under the user's account
+3. WHEN a user logs in THEN the System SHALL load and apply their stored provider preferences from Firebase
+4. WHEN a user changes provider preferences THEN the System SHALL sync the changes to Firebase immediately
+5. WHEN a user has no stored preferences THEN the System SHALL use default provider settings
+
