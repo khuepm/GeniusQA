@@ -11,14 +11,25 @@ AI Script Builder là một tính năng cho phép người dùng tạo automatio
 - Preview và edit script trước khi lưu
 - Validation đảm bảo tương thích với rust-core
 
+### Extended Features (v2)
+- Save script và test playback trực tiếp từ AI Builder
+- Target OS selector (macOS, Windows, Universal)
+- Tích hợp AI scripts vào Desktop Recorder script selector
+- Unified interface gộp Script Editor và AI Script Builder
+
 ## Architecture
 
 ```mermaid
 flowchart TB
     subgraph Desktop["Desktop App (React)"]
-        UI[Chat Interface]
-        Preview[Script Preview Panel]
-        Editor[Script Editor]
+        UnifiedUI[Unified Script Manager]
+        subgraph Tabs["Tab Views"]
+            ScriptList[Script List Tab]
+            AIBuilder[AI Builder Tab]
+            Editor[Editor Tab]
+        end
+        OSSelector[OS Selector]
+        PlaybackControls[Playback Controls]
     end
     
     subgraph Services["Services Layer"]
@@ -26,6 +37,7 @@ flowchart TB
         FirebaseService[Firebase Service]
         ScriptService[Script Service]
         ValidationService[Validation Service]
+        PlaybackService[Playback Service]
     end
     
     subgraph External["External Services"]
@@ -38,10 +50,14 @@ flowchart TB
         Player[Playback Engine]
     end
     
-    UI --> GeminiService
-    UI --> Preview
-    Preview --> Editor
+    UnifiedUI --> Tabs
+    AIBuilder --> OSSelector
+    AIBuilder --> GeminiService
     Editor --> ValidationService
+    ScriptList --> ScriptService
+    
+    PlaybackControls --> PlaybackService
+    PlaybackService --> Player
     
     GeminiService --> FirebaseService
     GeminiService --> Gemini
@@ -169,7 +185,137 @@ interface ScriptPreviewProps {
   onEdit: (script: ScriptData) => void;
   onSave: (script: ScriptData) => void;
   onDiscard: () => void;
+  onPlay: (script: ScriptData) => void;
   validationResult: ValidationResult;
+  isSaved: boolean;
+  isPlaying: boolean;
+  playbackProgress?: PlaybackProgress;
+}
+
+interface PlaybackProgress {
+  currentAction: number;
+  totalActions: number;
+  status: 'playing' | 'paused' | 'completed' | 'error';
+  error?: string;
+}
+```
+
+### 6. OS Selector Component
+
+```typescript
+type TargetOS = 'macos' | 'windows' | 'universal';
+
+interface OSSelectorProps {
+  selectedOS: TargetOS;
+  onOSChange: (os: TargetOS) => void;
+  disabled?: boolean;
+}
+
+// OS-specific key mappings
+const OS_KEY_MAPPINGS: Record<TargetOS, Record<string, string>> = {
+  macos: {
+    copy: 'Cmd+C',
+    paste: 'Cmd+V',
+    cut: 'Cmd+X',
+    selectAll: 'Cmd+A',
+    save: 'Cmd+S',
+    undo: 'Cmd+Z',
+    redo: 'Cmd+Shift+Z',
+  },
+  windows: {
+    copy: 'Ctrl+C',
+    paste: 'Ctrl+V',
+    cut: 'Ctrl+X',
+    selectAll: 'Ctrl+A',
+    save: 'Ctrl+S',
+    undo: 'Ctrl+Z',
+    redo: 'Ctrl+Y',
+  },
+  universal: {
+    // Use generic descriptions, let playback engine handle
+    copy: 'Copy',
+    paste: 'Paste',
+    cut: 'Cut',
+    selectAll: 'SelectAll',
+    save: 'Save',
+    undo: 'Undo',
+    redo: 'Redo',
+  },
+};
+```
+
+### 7. Unified Script Manager Component
+
+```typescript
+type TabType = 'list' | 'builder' | 'editor';
+
+interface UnifiedScriptManagerProps {
+  initialTab?: TabType;
+  initialScriptPath?: string;
+}
+
+interface UnifiedScriptManagerState {
+  activeTab: TabType;
+  scripts: ScriptInfo[];
+  selectedScript: ScriptData | null;
+  selectedScriptPath: string | null;
+  filter: ScriptFilter;
+  isLoading: boolean;
+  error: string | null;
+}
+
+interface ScriptFilter {
+  source: 'all' | 'recorded' | 'ai_generated';
+  targetOS?: TargetOS;
+  searchQuery?: string;
+}
+
+interface ScriptInfo {
+  path: string;
+  filename: string;
+  createdAt: string;
+  duration: number;
+  actionCount: number;
+  source: 'recorded' | 'ai_generated';
+  targetOS?: TargetOS;
+}
+```
+
+### 8. Playback Service
+
+```typescript
+interface PlaybackService {
+  // Start playback of a script
+  startPlayback(
+    scriptPath: string,
+    options?: PlaybackOptions
+  ): Promise<void>;
+  
+  // Stop current playback
+  stopPlayback(): Promise<void>;
+  
+  // Pause/resume playback
+  togglePause(): Promise<boolean>;
+  
+  // Get current playback status
+  getStatus(): PlaybackStatus;
+  
+  // Subscribe to playback events
+  onProgress(callback: (progress: PlaybackProgress) => void): () => void;
+  onComplete(callback: () => void): () => void;
+  onError(callback: (error: string) => void): () => void;
+}
+
+interface PlaybackOptions {
+  speed?: number;
+  loopCount?: number;
+}
+
+interface PlaybackStatus {
+  isPlaying: boolean;
+  isPaused: boolean;
+  currentScript?: string;
+  progress?: PlaybackProgress;
 }
 ```
 
@@ -191,6 +337,10 @@ interface ScriptMetadata {
   core_type: string;
   platform: string;
   screen_resolution?: [number, number];
+  source: 'recorded' | 'ai_generated';
+  target_os?: TargetOS;
+  script_name?: string;
+  generated_at?: string;
   additional_data?: Record<string, unknown>;
 }
 
@@ -330,6 +480,60 @@ interface StoredApiKey {
 
 **Validates: Requirements 3.5, 4.4**
 
+### Property 11: Save and Play Button State
+
+*For any* valid generated script, the Save button should be visible. After successful save, the Play button should become visible.
+
+**Validates: Requirements 7.1, 7.4**
+
+### Property 12: AI Script Metadata Consistency
+
+*For any* saved AI-generated script, the metadata should contain: source='ai_generated', generated_at timestamp, script_name, and target_os.
+
+**Validates: Requirements 7.3, 8.6**
+
+### Property 13: OS-Specific Key Code Validation
+
+*For any* generated script with a target OS, all keyboard actions should use key codes valid for that OS. Universal scripts should only contain cross-platform compatible actions.
+
+**Validates: Requirements 8.3, 8.4, 8.5**
+
+### Property 14: OS Context in Prompt
+
+*For any* selected target OS, the AI prompt should include OS-specific context and key mappings.
+
+**Validates: Requirements 8.2**
+
+### Property 15: Script List Completeness
+
+*For any* combination of recorded and AI-generated scripts in storage, the script list should display all scripts with correct source type indicators.
+
+**Validates: Requirements 9.1, 9.2, 10.2**
+
+### Property 16: Script Filter Correctness
+
+*For any* filter selection (recorded, AI-generated, all), the filtered list should contain only scripts matching the filter criteria.
+
+**Validates: Requirements 9.4**
+
+### Property 17: AI Script Playback Compatibility
+
+*For any* AI-generated script, selecting it in the Recorder should load it with the same playback controls as recorded scripts.
+
+**Validates: Requirements 9.3**
+
+### Property 18: Unified Editor Consistency
+
+*For any* script (recorded or AI-generated), opening it in the Editor tab should provide the same editing tools and capabilities.
+
+**Validates: Requirements 10.3, 10.6**
+
+### Property 19: Tab Navigation Workflow
+
+*For any* generated AI script, the user should be able to transition from AI Builder tab to Editor tab with the script loaded for refinement.
+
+**Validates: Requirements 10.5**
+
 ## Error Handling
 
 ### API Key Errors
@@ -356,8 +560,18 @@ interface StoredApiKey {
 |-------|----------|
 | Invalid action type | Highlight error, suggest valid types |
 | Invalid coordinates | Show bounds, auto-correct if possible |
-| Invalid key code | Show valid key list |
+| Invalid key code | Show valid key list for selected OS |
 | Timestamp order violation | Auto-reorder or highlight conflict |
+| OS-incompatible action | Warn user, suggest alternative |
+
+### Playback Errors
+
+| Error | Handling |
+|-------|----------|
+| Script not found | Show error, refresh script list |
+| Playback engine unavailable | Show retry option, check core status |
+| Action execution failed | Display error with action details, allow edit |
+| Permission denied | Show permission request dialog |
 
 ## Testing Strategy
 
@@ -365,10 +579,13 @@ interface StoredApiKey {
 
 Unit tests sẽ được viết cho các component và service riêng lẻ:
 
-1. **GeminiService**: Test prompt construction, response parsing
+1. **GeminiService**: Test prompt construction, response parsing, OS-specific prompts
 2. **ApiKeyService**: Test encryption/decryption, Firebase operations
-3. **ValidationService**: Test validation rules, error detection
+3. **ValidationService**: Test validation rules, error detection, OS-specific validation
 4. **ChatInterface**: Test message handling, state management
+5. **OSSelector**: Test OS selection, key mapping retrieval
+6. **UnifiedScriptManager**: Test tab navigation, script filtering
+7. **PlaybackService**: Test playback controls, progress tracking
 
 ### Property-Based Testing
 
@@ -395,6 +612,29 @@ test('script serialization round-trip', () => {
     { numRuns: 100 }
   );
 });
+
+// Example OS-specific property test
+/**
+ * **Feature: ai-script-builder, Property 13: OS-Specific Key Code Validation**
+ * **Validates: Requirements 8.3, 8.4, 8.5**
+ */
+test('OS-specific key codes are valid', () => {
+  fc.assert(
+    fc.property(
+      fc.record({
+        targetOS: fc.constantFrom('macos', 'windows', 'universal'),
+        script: scriptDataArbitrary,
+      }),
+      ({ targetOS, script }) => {
+        const keyActions = script.actions.filter(a => a.type === 'key_press');
+        return keyActions.every(action => 
+          isValidKeyForOS(action.key, targetOS)
+        );
+      }
+    ),
+    { numRuns: 100 }
+  );
+});
 ```
 
 ### Integration Testing
@@ -402,4 +642,8 @@ test('script serialization round-trip', () => {
 1. **End-to-end chat flow**: User input → Gemini → Script generation → Preview
 2. **API key lifecycle**: Store → Retrieve → Update → Delete
 3. **Script save flow**: Generate → Edit → Validate → Save → Load
+4. **Playback flow**: Save script → Play → Monitor progress → Complete/Error
+5. **OS selection flow**: Select OS → Generate → Verify OS-specific actions
+6. **Unified interface flow**: List → Select → Edit → Save
+7. **Recorder integration**: Load AI script → Playback with recorder controls
 

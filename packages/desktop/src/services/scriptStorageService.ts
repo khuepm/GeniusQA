@@ -4,7 +4,7 @@
  * Handles saving, loading, and managing AI-generated scripts
  * through the IPC bridge to the Tauri backend.
  * 
- * Requirements: 4.3, 6.5
+ * Requirements: 4.3, 6.5, 9.1, 9.4
  */
 
 import { getIPCBridge } from './ipcBridgeService';
@@ -20,7 +20,31 @@ export interface ScriptSaveResult {
 }
 
 /**
+ * Script source type - indicates how the script was created
+ * Requirements: 9.1, 9.2
+ */
+export type ScriptSource = 'recorded' | 'ai_generated' | 'unknown';
+
+/**
+ * Target OS for AI-generated scripts
+ * Requirements: 8.6, 9.5
+ */
+export type TargetOS = 'macos' | 'windows' | 'universal';
+
+/**
+ * Filter options for listing scripts
+ * Requirements: 9.4
+ */
+export interface ScriptFilter {
+  source?: ScriptSource | 'all';
+  targetOS?: TargetOS;
+  searchQuery?: string;
+}
+
+/**
  * Script metadata from the storage
+ * Extended to include source type and target OS
+ * Requirements: 9.1, 9.2, 9.5
  */
 export interface StoredScriptInfo {
   filename: string;
@@ -28,6 +52,9 @@ export interface StoredScriptInfo {
   createdAt: string;
   duration: number;
   actionCount: number;
+  source: ScriptSource;
+  targetOS?: TargetOS;
+  scriptName?: string;
 }
 
 /**
@@ -167,23 +194,123 @@ class ScriptStorageService {
   }
 
   /**
-   * Lists all available scripts
-   * @returns Array of script information
+   * Lists all available scripts with source type information
+   * @returns Array of script information with source metadata
+   * Requirements: 9.1, 9.2
    */
   async listScripts(): Promise<StoredScriptInfo[]> {
     try {
       const scripts = await this.ipcBridge.listScripts();
-      return scripts.map((script: any) => ({
-        filename: script.filename || script.name,
-        path: script.path || script.scriptPath,
-        createdAt: script.created_at || script.createdAt,
-        duration: script.duration || 0,
-        actionCount: script.action_count || script.actionCount || 0,
-      }));
+      const enrichedScripts: StoredScriptInfo[] = [];
+
+      for (const script of scripts) {
+        const scriptInfo = await this.enrichScriptInfo(script);
+        enrichedScripts.push(scriptInfo);
+      }
+
+      return enrichedScripts;
     } catch (error) {
       console.error('[ScriptStorageService] Failed to list scripts:', error);
       return [];
     }
+  }
+
+  /**
+   * Lists scripts filtered by source type and/or target OS
+   * @param filter - Filter options for scripts
+   * @returns Array of filtered script information
+   * Requirements: 9.1, 9.4
+   */
+  async listScriptsBySource(filter: ScriptFilter): Promise<StoredScriptInfo[]> {
+    try {
+      const allScripts = await this.listScripts();
+      
+      return allScripts.filter(script => {
+        // Filter by source
+        if (filter.source && filter.source !== 'all') {
+          if (script.source !== filter.source) {
+            return false;
+          }
+        }
+
+        // Filter by target OS (only applicable for AI-generated scripts)
+        if (filter.targetOS) {
+          if (script.source === 'ai_generated' && script.targetOS !== filter.targetOS) {
+            return false;
+          }
+        }
+
+        // Filter by search query
+        if (filter.searchQuery) {
+          const query = filter.searchQuery.toLowerCase();
+          const filename = script.filename.toLowerCase();
+          const scriptName = (script.scriptName || '').toLowerCase();
+          if (!filename.includes(query) && !scriptName.includes(query)) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+    } catch (error) {
+      console.error('[ScriptStorageService] Failed to list scripts by source:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Enriches script info with source type and target OS by loading metadata
+   * @param script - Basic script info from IPC
+   * @returns Enriched script info with source metadata
+   */
+  private async enrichScriptInfo(script: any): Promise<StoredScriptInfo> {
+    const basicInfo: StoredScriptInfo = {
+      filename: script.filename || script.name,
+      path: script.path || script.scriptPath,
+      createdAt: script.created_at || script.createdAt,
+      duration: script.duration || 0,
+      actionCount: script.action_count || script.actionCount || 0,
+      source: 'unknown',
+    };
+
+    // Try to determine source from filename pattern
+    const source = this.determineSourceFromFilename(basicInfo.filename);
+    basicInfo.source = source;
+
+    // For AI-generated scripts, try to load additional metadata
+    if (source === 'ai_generated') {
+      try {
+        const scriptData = await this.loadScript(basicInfo.path);
+        if (scriptData?.metadata?.additional_data) {
+          const additionalData = scriptData.metadata.additional_data;
+          basicInfo.targetOS = additionalData.target_os as TargetOS;
+          basicInfo.scriptName = additionalData.script_name as string;
+        }
+      } catch {
+        // If we can't load the script, just use the basic info
+        console.warn('[ScriptStorageService] Could not load metadata for:', basicInfo.path);
+      }
+    }
+
+    return basicInfo;
+  }
+
+  /**
+   * Determines script source from filename pattern
+   * AI-generated scripts have 'ai_script_' prefix
+   * @param filename - The script filename
+   * @returns The determined source type
+   */
+  private determineSourceFromFilename(filename: string): ScriptSource {
+    if (filename.startsWith('ai_script_')) {
+      return 'ai_generated';
+    }
+    // Scripts from recorder typically have 'recording_' prefix or timestamp pattern
+    if (filename.startsWith('recording_') || /^\d{4}-\d{2}-\d{2}/.test(filename)) {
+      return 'recorded';
+    }
+    // Default to recorded for legacy scripts
+    return 'recorded';
   }
 
   /**

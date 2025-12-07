@@ -4,6 +4,8 @@
 
 Tính năng AI Script Builder cho phép người dùng tạo kịch bản automation test tự động thông qua giao diện chat với AI. Hệ thống sử dụng Gemini API để phân tích yêu cầu của người dùng và sinh ra các test case phù hợp với định dạng của rust-core. API key của Gemini được lưu trữ và quản lý thông qua Firebase.
 
+Phiên bản mở rộng bổ sung các tính năng: lưu script sau khi generate, test playback trực tiếp, chọn target OS cho script, tích hợp AI scripts vào Desktop Recorder, và gộp giao diện Script Editor với AI Script Builder thành một unified interface.
+
 ## Glossary
 
 - **AI Script Builder**: Module cho phép sinh kịch bản automation test tự động bằng AI
@@ -12,6 +14,9 @@ Tính năng AI Script Builder cho phép người dùng tạo kịch bản automa
 - **Chat Interface**: Giao diện hội thoại cho phép người dùng mô tả yêu cầu test bằng ngôn ngữ tự nhiên
 - **Firebase**: Backend service lưu trữ và quản lý API key của người dùng
 - **Script Action**: Một hành động đơn lẻ trong kịch bản (MouseClick, KeyPress, TypeText, Wait, etc.)
+- **Target OS**: Hệ điều hành mục tiêu cho script (macOS, Windows, Universal)
+- **AI-Generated Script**: Script được tạo bởi AI Script Builder, có metadata đánh dấu nguồn gốc
+- **Unified Script Editor**: Giao diện kết hợp giữa Script Editor và AI Script Builder
 
 ## Requirements
 
@@ -85,4 +90,55 @@ Tính năng AI Script Builder cho phép người dùng tạo kịch bản automa
 3. WHEN a script contains keyboard actions THEN the System SHALL use valid key codes recognized by rust-core
 4. WHEN a script contains timing THEN the System SHALL include delay values in milliseconds
 5. WHEN a script is saved THEN the System SHALL serialize it to JSON format compatible with rust-core storage
+
+### Requirement 7
+
+**User Story:** As a user, I want to save AI-generated scripts and test them immediately, so that I can verify the script works correctly before using it in production.
+
+#### Acceptance Criteria
+
+1. WHEN a valid script is generated THEN the System SHALL display a Save button in the script preview panel
+2. WHEN a user clicks Save THEN the System SHALL prompt for a script name and save the script to the user's library
+3. WHEN a script is saved THEN the System SHALL add metadata marking it as AI-generated with timestamp
+4. WHEN a script is saved successfully THEN the System SHALL display a Play button to test the script
+5. WHEN a user clicks Play THEN the System SHALL execute the script using the playback engine and display progress
+6. IF playback encounters an error THEN the System SHALL display the error message and allow the user to edit the script
+
+### Requirement 8
+
+**User Story:** As a user, I want to specify the target operating system for my script, so that the AI generates platform-appropriate actions.
+
+#### Acceptance Criteria
+
+1. WHEN a user opens the AI Script Builder THEN the System SHALL display an OS selector with options: macOS, Windows, Universal
+2. WHEN a user selects a target OS THEN the System SHALL include the OS context in the AI prompt
+3. WHEN generating a script for macOS THEN the System SHALL use macOS-specific key codes and shortcuts
+4. WHEN generating a script for Windows THEN the System SHALL use Windows-specific key codes and shortcuts
+5. WHEN generating a Universal script THEN the System SHALL use cross-platform compatible actions only
+6. WHEN a script is saved THEN the System SHALL store the target OS in the script metadata
+
+### Requirement 9
+
+**User Story:** As a user, I want to access AI-generated scripts from the Desktop Recorder, so that I can playback them alongside recorded scripts.
+
+#### Acceptance Criteria
+
+1. WHEN a user opens the script selector in Desktop Recorder THEN the System SHALL display both recorded and AI-generated scripts
+2. WHEN displaying scripts THEN the System SHALL visually distinguish AI-generated scripts from recorded scripts
+3. WHEN a user selects an AI-generated script THEN the System SHALL load it for playback with the same controls as recorded scripts
+4. WHEN filtering scripts THEN the System SHALL allow filtering by script source (recorded, AI-generated, all)
+5. WHEN an AI-generated script is selected THEN the System SHALL display its target OS in the script info
+
+### Requirement 10
+
+**User Story:** As a user, I want a unified interface for both editing recorded scripts and building AI scripts, so that I have a consistent experience managing all my scripts.
+
+#### Acceptance Criteria
+
+1. WHEN a user navigates to script management THEN the System SHALL display a unified interface with tabs for Script List, AI Builder, and Editor
+2. WHEN viewing the Script List tab THEN the System SHALL show all scripts with source type indicators
+3. WHEN a user selects a script THEN the System SHALL open it in the Editor tab with full editing capabilities
+4. WHEN a user wants to create a new AI script THEN the System SHALL switch to the AI Builder tab with chat interface
+5. WHEN an AI script is generated THEN the System SHALL allow seamless transition to the Editor tab for refinement
+6. WHEN editing any script THEN the System SHALL provide the same editing tools regardless of script source
 

@@ -1,6 +1,8 @@
 /**
  * App Navigator for GeniusQA Desktop
  * Manages navigation between authentication and main app screens
+ * 
+ * Requirements: 10.1 - Unified interface with tabs for Script List, AI Builder, and Editor
  */
 
 import React from 'react';
@@ -13,8 +15,11 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import RecorderScreen from '../screens/RecorderScreen';
-import ScriptEditorScreen from '../screens/ScriptEditorScreen';
-import AIScriptBuilderScreen from '../screens/AIScriptBuilderScreen';
+import UnifiedScriptManager from '../screens/UnifiedScriptManager';
+
+// Legacy imports - kept for backward compatibility redirects
+// import ScriptEditorScreen from '../screens/ScriptEditorScreen';
+// import AIScriptBuilderScreen from '../screens/AIScriptBuilderScreen';
 
 /**
  * Protected Route component
@@ -87,21 +92,46 @@ const AppNavigator: React.FC = () => {
             </ProtectedRoute>
           }
         />
+
+        {/* Unified Script Manager - Requirements: 10.1 */}
+        {/* Main route for script management with all tabs */}
         <Route
-          path="/script-editor"
+          path="/scripts"
           element={
             <ProtectedRoute>
-              <ScriptEditorScreen />
+              <UnifiedScriptManager initialTab="list" />
             </ProtectedRoute>
           }
         />
+
+        {/* Direct access to AI Builder tab - Requirements: 10.4 */}
         <Route
-          path="/ai-script-builder"
+          path="/scripts/builder"
           element={
             <ProtectedRoute>
-              <AIScriptBuilderScreen />
+              <UnifiedScriptManager initialTab="builder" />
             </ProtectedRoute>
           }
+        />
+
+        {/* Direct access to Editor tab - Requirements: 10.3 */}
+        <Route
+          path="/scripts/editor"
+          element={
+            <ProtectedRoute>
+              <UnifiedScriptManager initialTab="editor" />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Legacy route redirects for backward compatibility */}
+        <Route
+          path="/script-editor"
+          element={<Navigate to="/scripts/editor" replace />}
+        />
+        <Route
+          path="/ai-script-builder"
+          element={<Navigate to="/scripts/builder" replace />}
         />
 
         {/* Default redirect */}

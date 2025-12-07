@@ -858,3 +858,54 @@
   font-weight: bold;
   margin: 0 4px;
 }
+
+
+/* Script Selector Modal Enhancements */
+/* Requirements: 9.1, 9.2, 9.4, 9.5 */
+
+.script-selector-modal {
+  max-width: 700px;
+  max-height: 85%;
+}
+
+.script-filter-wrapper {
+  padding: 16px;
+  border-bottom: 1px solid #dadce0;
+  background-color: #f8f9fa;
+}
+
+/* Override ScriptFilter styles for modal context */
+.script-filter-wrapper .script-filter-container {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.script-filter-wrapper .script-filter-header {
+  margin-bottom: 12px;
+}
+
+.script-filter-wrapper .script-filter-section {
+  margin-bottom: 12px;
+}
+
+.script-filter-wrapper .script-filter-section:last-child {
+  margin-bottom: 0;
+}
+
+/* Script list with ScriptListItem */
+.script-selector-modal .script-list {
+  padding: 16px;
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+/* Ensure ScriptListItem works well in modal */
+.script-selector-modal .script-list-item {
+  margin-bottom: 8px;
+}
+
+.script-selector-modal .script-list-item:last-child {
+  margin-bottom: 0;
+}

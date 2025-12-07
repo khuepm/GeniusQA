@@ -20,12 +20,28 @@ const DashboardScreen: React.FC = () => {
     navigate('/recorder');
   };
 
-  const handleNavigateToScriptEditor = () => {
-    navigate('/script-editor');
+  /**
+   * Navigate to Unified Script Manager - Script List tab
+   * Requirements: 10.1
+   */
+  const handleNavigateToScripts = () => {
+    navigate('/scripts');
   };
 
+  /**
+   * Navigate to Unified Script Manager - Editor tab
+   * Requirements: 10.1, 10.3
+   */
+  const handleNavigateToScriptEditor = () => {
+    navigate('/scripts/editor');
+  };
+
+  /**
+   * Navigate to Unified Script Manager - AI Builder tab
+   * Requirements: 10.1, 10.4
+   */
   const handleNavigateToAIScriptBuilder = () => {
-    navigate('/ai-script-builder');
+    navigate('/scripts/builder');
   };
 
   return (
@@ -66,37 +82,37 @@ const DashboardScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* Script Editor Feature Card */}
+          {/* Script Manager Feature Card - Requirements: 10.1 */}
           <div className="dashboard-feature-card">
-            <h3 className="dashboard-feature-title">Script Editor</h3>
+            <h3 className="dashboard-feature-title">Script Manager</h3>
             <p className="dashboard-feature-description">
-              View, edit, and manage your recorded automation scripts
+              Unified interface to view, edit, and manage all your automation scripts
             </p>
             <div className="dashboard-feature-button-container">
               <AuthButton
-                title="Open Script Editor"
-                onPress={handleNavigateToScriptEditor}
+                title="Open Script Manager"
+                onPress={handleNavigateToScripts}
                 loading={false}
                 disabled={false}
                 variant="primary"
               />
             </div>
-          </div>
-
-          {/* AI Script Builder Feature Card */}
-          <div className="dashboard-feature-card">
-            <h3 className="dashboard-feature-title">AI Script Builder</h3>
-            <p className="dashboard-feature-description">
-              Generate automation scripts using AI by describing your test scenarios in natural language
-            </p>
-            <div className="dashboard-feature-button-container">
-              <AuthButton
-                title="Open AI Script Builder"
-                onPress={handleNavigateToAIScriptBuilder}
-                loading={false}
-                disabled={false}
-                variant="primary"
-              />
+            {/* Quick access buttons for specific tabs */}
+            <div className="dashboard-quick-access">
+              <button
+                className="dashboard-quick-button"
+                onClick={handleNavigateToScriptEditor}
+                title="Go directly to Script Editor"
+              >
+                ✏️ Editor
+              </button>
+              <button
+                className="dashboard-quick-button"
+                onClick={handleNavigateToAIScriptBuilder}
+                title="Go directly to AI Script Builder"
+              >
+                🤖 AI Builder
+              </button>
             </div>
           </div>
 

@@ -1,14 +1,17 @@
 /**
  * RecorderScreen Component
  * Main UI for Desktop Recorder MVP
- * Requirements: 1.2, 1.5, 2.5, 4.1, 4.2, 4.3, 4.4, 4.5
+ * Requirements: 1.2, 1.5, 2.5, 4.1, 4.2, 4.3, 4.4, 4.5, 9.1, 9.2, 9.3, 9.5
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthButton } from '../components/AuthButton';
 import { CoreSelector, CoreType, CoreStatus, PerformanceMetrics, PerformanceComparison } from '../components/CoreSelector';
+import { ScriptListItem } from '../components/ScriptListItem';
+import { ScriptFilter } from '../components/ScriptFilter';
 import { getIPCBridge } from '../services/ipcBridgeService';
+import { scriptStorageService, StoredScriptInfo, ScriptFilter as ScriptFilterType, ScriptSource, TargetOS } from '../services/scriptStorageService';
 import {
   RecorderStatus,
   IPCEvent,
@@ -17,12 +20,19 @@ import {
 } from '../types/recorder.types';
 import './RecorderScreen.css';
 
+/**
+ * Extended ScriptInfo interface with source and target OS
+ * Requirements: 9.1, 9.2, 9.5
+ */
 interface ScriptInfo {
   path: string;
   filename: string;
   created_at: string;
   duration: number;
   action_count: number;
+  source: ScriptSource;
+  targetOS?: TargetOS;
+  scriptName?: string;
 }
 
 const RecorderScreen: React.FC = () => {
@@ -33,6 +43,9 @@ const RecorderScreen: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [showScriptSelector, setShowScriptSelector] = useState<boolean>(false);
   const [availableScripts, setAvailableScripts] = useState<ScriptInfo[]>([]);
+  // Script filter state for filtering by source and OS
+  // Requirements: 9.4
+  const [scriptFilter, setScriptFilter] = useState<ScriptFilterType>({ source: 'all' });
   const [selectedScriptPath, setSelectedScriptPath] = useState<string | null>(null);
   const [currentAction, setCurrentAction] = useState<ActionData | null>(null);
   const [actionIndex, setActionIndex] = useState<number>(0);
@@ -396,14 +409,44 @@ const RecorderScreen: React.FC = () => {
   }, [status]);
 
   /**
-   * Load available scripts for selection
+   * Load available scripts for selection with source type information
+   * Requirements: 9.1, 9.2
    */
   const loadAvailableScripts = async () => {
     try {
-      const scripts = await ipcBridge.listScripts();
-      setAvailableScripts(scripts);
+      // Use scriptStorageService to get enriched script info with source and targetOS
+      const scripts = await scriptStorageService.listScripts();
+
+      // Map StoredScriptInfo to ScriptInfo format
+      const mappedScripts: ScriptInfo[] = scripts.map((script: StoredScriptInfo) => ({
+        path: script.path,
+        filename: script.filename,
+        created_at: script.createdAt,
+        duration: script.duration,
+        action_count: script.actionCount,
+        source: script.source,
+        targetOS: script.targetOS,
+        scriptName: script.scriptName,
+      }));
+
+      setAvailableScripts(mappedScripts);
     } catch (err) {
       console.error('Failed to load scripts:', err);
+      // Fallback to basic IPC bridge if scriptStorageService fails
+      try {
+        const scripts = await ipcBridge.listScripts();
+        const fallbackScripts: ScriptInfo[] = scripts.map((script: any) => ({
+          path: script.path,
+          filename: script.filename,
+          created_at: script.created_at,
+          duration: script.duration,
+          action_count: script.action_count,
+          source: 'recorded' as ScriptSource,
+        }));
+        setAvailableScripts(fallbackScripts);
+      } catch (fallbackErr) {
+        console.error('Fallback script loading also failed:', fallbackErr);
+      }
     }
   };
 
@@ -572,6 +615,47 @@ const RecorderScreen: React.FC = () => {
     const script = availableScripts.find(s => s.path === selectedScriptPath);
     return script ? script.filename : 'Latest recording';
   };
+
+  /**
+   * Filter scripts based on current filter settings
+   * Requirements: 9.4
+   */
+  const filteredScripts = useMemo(() => {
+    return availableScripts.filter(script => {
+      // Filter by source
+      if (scriptFilter.source && scriptFilter.source !== 'all') {
+        if (script.source !== scriptFilter.source) {
+          return false;
+        }
+      }
+
+      // Filter by target OS (only applicable for AI-generated scripts)
+      if (scriptFilter.targetOS) {
+        if (script.source === 'ai_generated' && script.targetOS !== scriptFilter.targetOS) {
+          return false;
+        }
+      }
+
+      // Filter by search query
+      if (scriptFilter.searchQuery) {
+        const query = scriptFilter.searchQuery.toLowerCase();
+        const filename = script.filename.toLowerCase();
+        const scriptName = (script.scriptName || '').toLowerCase();
+        if (!filename.includes(query) && !scriptName.includes(query)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [availableScripts, scriptFilter]);
+
+  /**
+   * Check if any AI-generated scripts exist (to show OS filter)
+   */
+  const hasAIScripts = useMemo(() => {
+    return availableScripts.some(script => script.source === 'ai_generated');
+  }, [availableScripts]);
 
   /**
    * Format action for display
@@ -1026,9 +1110,10 @@ const RecorderScreen: React.FC = () => {
         </div>
 
         {/* Script Selector Modal */}
+        {/* Requirements: 9.1, 9.2, 9.3, 9.4, 9.5 */}
         {showScriptSelector && (
           <div className="modal-overlay" onClick={() => setShowScriptSelector(false)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-content script-selector-modal" onClick={(e) => e.stopPropagation()}>
               <div className="modal-header">
                 <h2 className="modal-title">Select Script to Play</h2>
                 <button
@@ -1039,24 +1124,52 @@ const RecorderScreen: React.FC = () => {
                 </button>
               </div>
 
+              {/* Script Filter - Requirements: 9.4 */}
+              <div className="script-filter-wrapper">
+                <ScriptFilter
+                  filter={scriptFilter}
+                  onFilterChange={setScriptFilter}
+                  totalCount={availableScripts.length}
+                  filteredCount={filteredScripts.length}
+                  showOSFilter={hasAIScripts}
+                  showSearch={true}
+                  compact={true}
+                />
+              </div>
+
               <div className="script-list">
                 {availableScripts.length === 0 ? (
                   <p className="empty-text">No scripts available</p>
+                ) : filteredScripts.length === 0 ? (
+                  <p className="empty-text">No scripts match the current filter</p>
                 ) : (
-                  availableScripts.map((item) => (
-                    <button
+                  filteredScripts.map((item) => (
+                    <ScriptListItem
                       key={item.path}
-                      className={`script-item ${selectedScriptPath === item.path ? 'selected' : ''}`}
-                      onClick={() => handleScriptSelect(item)}
-                    >
-                      <span className="script-filename">{item.filename}</span>
-                      <span className="script-info">
-                        Created: {new Date(item.created_at).toLocaleString()}
-                      </span>
-                      <span className="script-info">
-                        Duration: {item.duration.toFixed(2)}s | Actions: {item.action_count}
-                      </span>
-                    </button>
+                      script={{
+                        filename: item.filename,
+                        path: item.path,
+                        createdAt: item.created_at,
+                        duration: item.duration,
+                        actionCount: item.action_count,
+                        source: item.source,
+                        targetOS: item.targetOS,
+                        scriptName: item.scriptName,
+                      }}
+                      selected={selectedScriptPath === item.path}
+                      onClick={(script) => handleScriptSelect({
+                        path: script.path,
+                        filename: script.filename,
+                        created_at: script.createdAt,
+                        duration: script.duration,
+                        action_count: script.actionCount,
+                        source: script.source,
+                        targetOS: script.targetOS,
+                        scriptName: script.scriptName,
+                      })}
+                      showDelete={false}
+                      compact={true}
+                    />
                   ))
                 )}
               </div>
