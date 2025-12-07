@@ -529,6 +529,26 @@ const RecorderScreen: React.FC = () => {
   };
 
   /**
+   * Keyboard shortcut handling for playback control
+   * ESC: Stop playback when playing (UI-level, does not rely on Rust rdev listener)
+   */
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && status === 'playing') {
+        event.preventDefault();
+        // Use existing stop handler to ensure consistent cleanup
+        void handleStopClick();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [status]);
+
+  /**
    * Handle Pause button click
    */
   const handlePauseClick = async () => {

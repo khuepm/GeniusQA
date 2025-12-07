@@ -14,6 +14,7 @@ import RegisterScreen from '../screens/RegisterScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import RecorderScreen from '../screens/RecorderScreen';
 import ScriptEditorScreen from '../screens/ScriptEditorScreen';
+import AIScriptBuilderScreen from '../screens/AIScriptBuilderScreen';
 
 /**
  * Protected Route component
@@ -91,6 +92,14 @@ const AppNavigator: React.FC = () => {
           element={
             <ProtectedRoute>
               <ScriptEditorScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ai-script-builder"
+          element={
+            <ProtectedRoute>
+              <AIScriptBuilderScreen />
             </ProtectedRoute>
           }
         />

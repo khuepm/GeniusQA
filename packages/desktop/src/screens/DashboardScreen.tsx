@@ -24,6 +24,10 @@ const DashboardScreen: React.FC = () => {
     navigate('/script-editor');
   };
 
+  const handleNavigateToAIScriptBuilder = () => {
+    navigate('/ai-script-builder');
+  };
+
   return (
     <div className="dashboard-container">
       <div className="dashboard-content">
@@ -72,6 +76,23 @@ const DashboardScreen: React.FC = () => {
               <AuthButton
                 title="Open Script Editor"
                 onPress={handleNavigateToScriptEditor}
+                loading={false}
+                disabled={false}
+                variant="primary"
+              />
+            </div>
+          </div>
+
+          {/* AI Script Builder Feature Card */}
+          <div className="dashboard-feature-card">
+            <h3 className="dashboard-feature-title">AI Script Builder</h3>
+            <p className="dashboard-feature-description">
+              Generate automation scripts using AI by describing your test scenarios in natural language
+            </p>
+            <div className="dashboard-feature-button-container">
+              <AuthButton
+                title="Open AI Script Builder"
+                onPress={handleNavigateToAIScriptBuilder}
                 loading={false}
                 disabled={false}
                 variant="primary"
