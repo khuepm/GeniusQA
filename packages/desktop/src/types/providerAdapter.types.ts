@@ -319,3 +319,64 @@ export const PROVIDER_DISPLAY_NAMES: Record<AIProvider, string> = {
   anthropic: 'Anthropic',
   azure: 'Azure OpenAI',
 };
+
+// ============================================================================
+// Custom Model Types
+// ============================================================================
+
+/**
+ * Custom model configuration for user-defined AI models
+ * Allows users to add any OpenAI-compatible API endpoint
+ * Requirements: 11.2, 11.3
+ */
+export interface CustomModelConfig {
+  /** Unique identifier (auto-generated UUID) */
+  id: string;
+  /** Display name for the model */
+  name: string;
+  /** Model ID to send to API (e.g., "gpt-4", "claude-3") */
+  modelId: string;
+  /** API endpoint URL */
+  apiBaseUrl: string;
+  /** Encrypted API key */
+  apiKey: string;
+  /** Optional description */
+  description?: string;
+  /** ISO 8601 timestamp when created */
+  createdAt: string;
+  /** ISO 8601 timestamp when last updated */
+  updatedAt: string;
+  /** Flag to identify custom models */
+  isCustom: true;
+}
+
+/**
+ * Form data for adding/editing custom models
+ * Used in the CustomModelDialog component
+ * Requirements: 11.2
+ */
+export interface CustomModelFormData {
+  /** Display name for the model */
+  name: string;
+  /** Model ID to send to API */
+  modelId: string;
+  /** API endpoint URL */
+  apiBaseUrl: string;
+  /** Plain text API key (will be encrypted before storage) */
+  apiKey: string;
+  /** Optional description */
+  description?: string;
+}
+
+/**
+ * Validation result for custom model API connection test
+ * Requirements: 11.4, 11.9
+ */
+export interface CustomModelValidationResult {
+  /** Whether the API connection was successful */
+  valid: boolean;
+  /** Error message if validation failed */
+  error?: string;
+  /** Response time in milliseconds */
+  responseTime?: number;
+}

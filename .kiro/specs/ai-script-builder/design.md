@@ -319,6 +319,88 @@ interface PlaybackStatus {
 }
 ```
 
+### 9. Custom Model Management
+
+```typescript
+/**
+ * Custom model configuration for user-defined AI models
+ */
+interface CustomModelConfig {
+  id: string;                    // Unique identifier (auto-generated)
+  name: string;                  // Display name
+  modelId: string;               // Model ID to send to API (e.g., "gpt-4", "claude-3")
+  apiBaseUrl: string;            // API endpoint URL
+  apiKey: string;                // Encrypted API key
+  description?: string;          // Optional description
+  createdAt: string;             // ISO 8601 timestamp
+  updatedAt: string;             // ISO 8601 timestamp
+  isCustom: true;                // Flag to identify custom models
+}
+
+/**
+ * Form data for adding/editing custom models
+ */
+interface CustomModelFormData {
+  name: string;
+  modelId: string;
+  apiBaseUrl: string;
+  apiKey: string;
+  description?: string;
+}
+
+/**
+ * Validation result for custom model API
+ */
+interface CustomModelValidationResult {
+  valid: boolean;
+  error?: string;
+  responseTime?: number;
+}
+
+/**
+ * Custom Model Service interface
+ */
+interface CustomModelService {
+  // Add a new custom model
+  addCustomModel(config: CustomModelFormData): Promise<CustomModelConfig>;
+  
+  // Update existing custom model
+  updateCustomModel(id: string, config: Partial<CustomModelFormData>): Promise<CustomModelConfig>;
+  
+  // Delete custom model
+  deleteCustomModel(id: string): Promise<void>;
+  
+  // Get all custom models
+  getCustomModels(): Promise<CustomModelConfig[]>;
+  
+  // Get single custom model by ID
+  getCustomModel(id: string): Promise<CustomModelConfig | null>;
+  
+  // Validate custom model API connection
+  validateCustomModel(config: CustomModelFormData): Promise<CustomModelValidationResult>;
+}
+```
+
+### 10. Custom Model Dialog Component
+
+```typescript
+interface CustomModelDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (config: CustomModelFormData) => Promise<void>;
+  editingModel?: CustomModelConfig;  // If provided, dialog is in edit mode
+  isValidating?: boolean;
+  validationError?: string;
+}
+
+interface CustomModelDialogState {
+  formData: CustomModelFormData;
+  errors: Record<string, string>;
+  isValidating: boolean;
+  validationResult?: CustomModelValidationResult;
+}
+```
+
 ## Data Models
 
 ### Script Data (rust-core compatible)
@@ -534,6 +616,30 @@ interface StoredApiKey {
 
 **Validates: Requirements 10.5**
 
+### Property 20: Custom Model Storage Round-Trip
+
+*For any* valid custom model configuration, saving the model and then retrieving it should return an equivalent configuration with all fields preserved.
+
+**Validates: Requirements 11.3**
+
+### Property 21: Custom Model List Completeness
+
+*For any* combination of pre-configured and custom models, the model selector should display all models with correct type indicators (pre-configured vs custom).
+
+**Validates: Requirements 11.5**
+
+### Property 22: Custom Model Validation Before Save
+
+*For any* custom model configuration submitted by the user, the system should validate the API connection before saving, and only save if validation succeeds.
+
+**Validates: Requirements 11.4, 11.9**
+
+### Property 23: Custom Model CRUD Operations
+
+*For any* custom model, the user should be able to edit all configuration fields and delete the model, with changes persisted correctly.
+
+**Validates: Requirements 11.7, 11.8**
+
 ## Error Handling
 
 ### API Key Errors
@@ -573,6 +679,17 @@ interface StoredApiKey {
 | Action execution failed | Display error with action details, allow edit |
 | Permission denied | Show permission request dialog |
 
+### Custom Model Errors
+
+| Error | Handling |
+|-------|----------|
+| Invalid API URL format | Show validation error, highlight field |
+| API connection failed | Display error with details, allow retry |
+| Authentication failed | Show auth error, prompt for correct API key |
+| Model ID not found | Display error, suggest checking model ID |
+| Rate limit exceeded | Show wait message, suggest retry later |
+| Duplicate model name | Prompt for unique name |
+
 ## Testing Strategy
 
 ### Unit Testing
@@ -586,6 +703,8 @@ Unit tests sẽ được viết cho các component và service riêng lẻ:
 5. **OSSelector**: Test OS selection, key mapping retrieval
 6. **UnifiedScriptManager**: Test tab navigation, script filtering
 7. **PlaybackService**: Test playback controls, progress tracking
+8. **CustomModelService**: Test CRUD operations, API validation, storage
+9. **CustomModelDialog**: Test form validation, edit mode, error display
 
 ### Property-Based Testing
 
@@ -635,6 +754,24 @@ test('OS-specific key codes are valid', () => {
     { numRuns: 100 }
   );
 });
+
+// Example custom model property test
+/**
+ * **Feature: ai-script-builder, Property 20: Custom Model Storage Round-Trip**
+ * **Validates: Requirements 11.3**
+ */
+test('custom model storage round-trip', () => {
+  fc.assert(
+    fc.property(customModelConfigArbitrary, async (config) => {
+      const saved = await customModelService.addCustomModel(config);
+      const retrieved = await customModelService.getCustomModel(saved.id);
+      expect(retrieved?.name).toEqual(config.name);
+      expect(retrieved?.modelId).toEqual(config.modelId);
+      expect(retrieved?.apiBaseUrl).toEqual(config.apiBaseUrl);
+    }),
+    { numRuns: 100 }
+  );
+});
 ```
 
 ### Integration Testing
@@ -646,4 +783,5 @@ test('OS-specific key codes are valid', () => {
 5. **OS selection flow**: Select OS → Generate → Verify OS-specific actions
 6. **Unified interface flow**: List → Select → Edit → Save
 7. **Recorder integration**: Load AI script → Playback with recorder controls
+8. **Custom model flow**: Add custom model → Validate API → Save → Use for generation → Edit → Delete
 

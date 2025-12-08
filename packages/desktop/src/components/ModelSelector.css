@@ -303,6 +303,134 @@
   border-radius: 4px;
 }
 
+/* Custom Model Tier Badge */
+.model-selector-tier.tier-custom {
+  background-color: #f3e8ff;
+  color: #7c3aed;
+}
+
+/* Section Styles */
+.model-selector-section {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.model-selector-section:last-of-type {
+  border-bottom: none;
+}
+
+.model-selector-custom-section {
+  background-color: #faf5ff;
+}
+
+.model-selector-section-header {
+  padding: 8px 12px 4px;
+  background-color: #f3e8ff;
+  border-bottom: 1px solid #e9d5ff;
+}
+
+.model-selector-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #7c3aed;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Custom Model Option */
+.model-selector-custom-option {
+  background-color: transparent;
+}
+
+.model-selector-custom-option:hover {
+  background-color: #ede9fe;
+}
+
+.model-selector-custom-option.active {
+  background-color: #ddd6fe;
+}
+
+.model-option-custom-badge {
+  font-size: 9px;
+  font-weight: 600;
+  color: #7c3aed;
+  background-color: #f3e8ff;
+  padding: 1px 4px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.model-option-model-id {
+  font-size: 10px;
+  color: #6b7280;
+  font-family: monospace;
+  background-color: #f3f4f6;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* API URL in Tooltip */
+.model-tooltip-api-url {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.model-tooltip-api-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+}
+
+.model-tooltip-api-value {
+  font-size: 11px;
+  color: #374151;
+  font-family: monospace;
+  word-break: break-all;
+}
+
+/* Add Custom Model Button */
+.model-selector-add-custom {
+  padding: 8px;
+  border-top: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+}
+
+.model-selector-add-custom-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  background-color: #ffffff;
+  border: 1px dashed #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.model-selector-add-custom-button:hover {
+  background-color: #f3e8ff;
+  border-color: #7c3aed;
+  color: #7c3aed;
+}
+
+.add-custom-icon {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.add-custom-text {
+  font-weight: 500;
+}
+
 /* Responsive adjustments */
 @media (max-width: 480px) {
   .model-selector-container {

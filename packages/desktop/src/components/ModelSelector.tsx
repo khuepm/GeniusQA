@@ -4,25 +4,40 @@
  * Provides UI for selecting AI models within a provider.
  * Displays available models with descriptions and pricing tiers.
  * Shows model descriptions on hover.
+ * Supports custom models with "Custom" badge and separate section.
  * 
- * Requirements: 3.1, 3.3, 3.4
+ * Requirements: 3.1, 3.3, 3.4, 11.1, 11.5
  */
 
 import React, { useState } from 'react';
-import { ProviderModel } from '../types/providerAdapter.types';
+import { ProviderModel, CustomModelConfig } from '../types/providerAdapter.types';
 import './ModelSelector.css';
 
 /**
+ * Extended model type that includes custom model indicator
+ */
+export interface ExtendedProviderModel extends ProviderModel {
+  /** Whether this is a custom model */
+  isCustom?: boolean;
+  /** Custom model configuration (only for custom models) */
+  customConfig?: CustomModelConfig;
+}
+
+/**
  * Props for ModelSelector component
- * Requirements: 3.1
+ * Requirements: 3.1, 11.1, 11.5
  */
 export interface ModelSelectorProps {
   /** List of available models for the current provider */
   models: ProviderModel[];
+  /** List of custom models */
+  customModels?: CustomModelConfig[];
   /** Currently active model ID */
   activeModel: string | null;
   /** Callback when a model is selected */
-  onModelSelect: (modelId: string) => void;
+  onModelSelect: (modelId: string, isCustom?: boolean) => void;
+  /** Callback when "Add Custom Model" is clicked */
+  onAddCustomModel?: () => void;
   /** Whether the selector is disabled */
   disabled?: boolean;
   /** Whether a model switch is in progress */
@@ -77,6 +92,41 @@ export function getModelsForProvider(models: ProviderModel[]): ProviderModel[] {
   return models;
 }
 
+/**
+ * Convert CustomModelConfig to ExtendedProviderModel for display
+ * Requirements: 11.5
+ */
+export function customModelToProviderModel(customModel: CustomModelConfig): ExtendedProviderModel {
+  return {
+    id: customModel.id,
+    name: customModel.name,
+    description: customModel.description || `Custom model: ${customModel.modelId}`,
+    capabilities: ['text-generation', 'code-generation'],
+    pricingTier: 'standard',
+    isDefault: false,
+    isCustom: true,
+    customConfig: customModel,
+  };
+}
+
+/**
+ * Combine provider models and custom models into a single list
+ * Requirements: 11.5
+ */
+export function combineModels(
+  providerModels: ProviderModel[],
+  customModels: CustomModelConfig[] = []
+): ExtendedProviderModel[] {
+  const extendedProviderModels: ExtendedProviderModel[] = providerModels.map(m => ({
+    ...m,
+    isCustom: false,
+  }));
+
+  const extendedCustomModels = customModels.map(customModelToProviderModel);
+
+  return [...extendedProviderModels, ...extendedCustomModels];
+}
+
 
 /**
  * ModelSelector Component
@@ -84,31 +134,41 @@ export function getModelsForProvider(models: ProviderModel[]): ProviderModel[] {
  * Renders a dropdown selector for choosing AI models.
  * Shows model descriptions on hover and pricing tier badges.
  * Pre-selects the default model when available.
+ * Displays custom models in a separate section with "Custom" badge.
  * 
- * Requirements: 3.1, 3.3, 3.4
+ * Requirements: 3.1, 3.3, 3.4, 11.1, 11.5
  */
 export const ModelSelector: React.FC<ModelSelectorProps> = ({
   models,
+  customModels = [],
   activeModel,
   onModelSelect,
+  onAddCustomModel,
   disabled = false,
   loading = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [hoveredModel, setHoveredModel] = useState<string | null>(null);
 
+  // Combine provider models and custom models
+  const allModels = combineModels(models, customModels);
+
+  // Separate provider models and custom models for grouped display
+  const providerModels = allModels.filter(m => !m.isCustom);
+  const customModelsList = allModels.filter(m => m.isCustom);
+
   /**
    * Get the currently active model info
    */
-  const activeModelInfo = models.find(m => m.id === activeModel);
+  const activeModelInfo = allModels.find(m => m.id === activeModel);
 
   /**
    * Handle model selection
    */
-  const handleModelClick = (model: ProviderModel) => {
+  const handleModelClick = (model: ExtendedProviderModel) => {
     if (disabled || loading) return;
 
-    onModelSelect(model.id);
+    onModelSelect(model.id, model.isCustom);
     setIsOpen(false);
   };
 
@@ -145,8 +205,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     setHoveredModel(null);
   };
 
-  // Don't render if no models available
-  if (models.length === 0) {
+  // Don't render if no models available (but still show if custom models can be added)
+  if (allModels.length === 0 && !onAddCustomModel) {
     return (
       <div className="model-selector-container" data-testid="model-selector">
         <div className="model-selector-empty">
@@ -179,9 +239,13 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         ) : activeModelInfo ? (
           <div className="model-selector-selected">
             <span className="model-selector-name">{activeModelInfo.name}</span>
-            <span className={`model-selector-tier ${getPricingTierClass(activeModelInfo.pricingTier)}`}>
-              {getPricingTierText(activeModelInfo.pricingTier)}
-            </span>
+            {activeModelInfo.isCustom ? (
+              <span className="model-selector-tier tier-custom">Custom</span>
+            ) : (
+              <span className={`model-selector-tier ${getPricingTierClass(activeModelInfo.pricingTier)}`}>
+                {getPricingTierText(activeModelInfo.pricingTier)}
+              </span>
+            )}
           </div>
         ) : (
           <div className="model-selector-placeholder">
@@ -200,57 +264,134 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
           role="listbox"
           data-testid="model-selector-dropdown"
         >
-          {models.map((model) => (
-            <button
-              key={model.id}
-              className={`model-selector-option ${model.id === activeModel ? 'active' : ''} ${model.isDefault ? 'default' : ''}`}
-              onClick={() => handleModelClick(model)}
-              onMouseEnter={() => handleModelHover(model.id)}
-              onMouseLeave={handleModelLeave}
-              role="option"
-              aria-selected={model.id === activeModel}
-              data-testid={`model-option-${model.id}`}
-            >
-              <div className="model-option-main">
-                <div className="model-option-header">
-                  <span className="model-option-name">{model.name}</span>
-                  {model.isDefault && (
-                    <span className="model-option-default-badge">Default</span>
-                  )}
-                </div>
-                <div className="model-option-meta">
-                  <span className={`model-option-tier ${getPricingTierClass(model.pricingTier)}`}>
-                    {getPricingTierText(model.pricingTier)}
-                  </span>
-                  {model.id === activeModel && (
-                    <span className="model-option-active-badge">Active</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Description Tooltip on Hover */}
-              {hoveredModel === model.id && (
-                <div
-                  className="model-option-tooltip"
-                  data-testid={`model-tooltip-${model.id}`}
+          {/* Provider Models Section */}
+          {providerModels.length > 0 && (
+            <div className="model-selector-section">
+              {providerModels.map((model) => (
+                <button
+                  key={model.id}
+                  className={`model-selector-option ${model.id === activeModel ? 'active' : ''} ${model.isDefault ? 'default' : ''}`}
+                  onClick={() => handleModelClick(model)}
+                  onMouseEnter={() => handleModelHover(model.id)}
+                  onMouseLeave={handleModelLeave}
+                  role="option"
+                  aria-selected={model.id === activeModel}
+                  data-testid={`model-option-${model.id}`}
                 >
-                  <p className="model-tooltip-description">{model.description}</p>
-                  {model.capabilities.length > 0 && (
-                    <div className="model-tooltip-capabilities">
-                      <span className="model-tooltip-capabilities-label">Capabilities:</span>
-                      <div className="model-tooltip-capabilities-list">
-                        {model.capabilities.map((cap, index) => (
-                          <span key={index} className="model-capability-tag">
-                            {cap}
-                          </span>
-                        ))}
-                      </div>
+                  <div className="model-option-main">
+                    <div className="model-option-header">
+                      <span className="model-option-name">{model.name}</span>
+                      {model.isDefault && (
+                        <span className="model-option-default-badge">Default</span>
+                      )}
+                    </div>
+                    <div className="model-option-meta">
+                      <span className={`model-option-tier ${getPricingTierClass(model.pricingTier)}`}>
+                        {getPricingTierText(model.pricingTier)}
+                      </span>
+                      {model.id === activeModel && (
+                        <span className="model-option-active-badge">Active</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Description Tooltip on Hover */}
+                  {hoveredModel === model.id && (
+                    <div
+                      className="model-option-tooltip"
+                      data-testid={`model-tooltip-${model.id}`}
+                    >
+                      <p className="model-tooltip-description">{model.description}</p>
+                      {model.capabilities.length > 0 && (
+                        <div className="model-tooltip-capabilities">
+                          <span className="model-tooltip-capabilities-label">Capabilities:</span>
+                          <div className="model-tooltip-capabilities-list">
+                            {model.capabilities.map((cap, index) => (
+                              <span key={index} className="model-capability-tag">
+                                {cap}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
-              )}
-            </button>
-          ))}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Custom Models Section */}
+          {customModelsList.length > 0 && (
+            <div className="model-selector-section model-selector-custom-section">
+              <div className="model-selector-section-header">
+                <span className="model-selector-section-title">Custom Models</span>
+              </div>
+              {customModelsList.map((model) => (
+                <button
+                  key={model.id}
+                  className={`model-selector-option model-selector-custom-option ${model.id === activeModel ? 'active' : ''}`}
+                  onClick={() => handleModelClick(model)}
+                  onMouseEnter={() => handleModelHover(model.id)}
+                  onMouseLeave={handleModelLeave}
+                  role="option"
+                  aria-selected={model.id === activeModel}
+                  data-testid={`model-option-${model.id}`}
+                >
+                  <div className="model-option-main">
+                    <div className="model-option-header">
+                      <span className="model-option-name">{model.name}</span>
+                      <span className="model-option-custom-badge">Custom</span>
+                    </div>
+                    <div className="model-option-meta">
+                      <span className="model-option-model-id">
+                        {model.customConfig?.modelId || model.id}
+                      </span>
+                      {model.id === activeModel && (
+                        <span className="model-option-active-badge">Active</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Description Tooltip on Hover */}
+                  {hoveredModel === model.id && (
+                    <div
+                      className="model-option-tooltip"
+                      data-testid={`model-tooltip-${model.id}`}
+                    >
+                      <p className="model-tooltip-description">{model.description}</p>
+                      {model.customConfig?.apiBaseUrl && (
+                        <div className="model-tooltip-api-url">
+                          <span className="model-tooltip-api-label">API:</span>
+                          <span className="model-tooltip-api-value">
+                            {model.customConfig.apiBaseUrl}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Add Custom Model Button */}
+          {onAddCustomModel && (
+            <div className="model-selector-add-custom">
+              <button
+                className="model-selector-add-custom-button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsOpen(false);
+                  onAddCustomModel();
+                }}
+                data-testid="add-custom-model-button"
+              >
+                <span className="add-custom-icon">+</span>
+                <span className="add-custom-text">Add Custom Model</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

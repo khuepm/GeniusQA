@@ -393,3 +393,127 @@
 - [x] 21. Final Checkpoint - Ensure all extended tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
+---
+
+# Custom AI Models Feature (v3)
+
+## 22. Implement Custom Model Types and Service
+
+- [x] 22. Implement Custom Model Types and Service
+
+- [x] 22.1 Create Custom Model types
+  - Add `CustomModelConfig` interface to `packages/desktop/src/types/providerAdapter.types.ts`
+  - Add `CustomModelFormData` interface
+  - Add `CustomModelValidationResult` interface
+  - _Requirements: 11.2, 11.3_
+
+- [x] 22.2 Create Custom Model Service
+  - Create `packages/desktop/src/services/customModelService.ts`
+  - Implement `addCustomModel` function with encryption for API key
+  - Implement `updateCustomModel` function
+  - Implement `deleteCustomModel` function
+  - Implement `getCustomModels` and `getCustomModel` functions
+  - Implement `validateCustomModel` function for API connection testing
+  - _Requirements: 11.3, 11.4, 11.7, 11.8, 11.9_
+
+- [ ]* 22.3 Write property test for Custom Model Storage Round-Trip
+  - **Property 20: Custom Model Storage Round-Trip**
+  - **Validates: Requirements 11.3**
+
+- [ ]* 22.4 Write property test for Custom Model CRUD Operations
+  - **Property 23: Custom Model CRUD Operations**
+  - **Validates: Requirements 11.7, 11.8**
+
+## 23. Implement Custom Model Dialog Component
+
+- [x] 23. Implement Custom Model Dialog Component
+
+- [x] 23.1 Create Custom Model Dialog UI
+  - Create `packages/desktop/src/components/CustomModelDialog.tsx`
+  - Create `packages/desktop/src/components/CustomModelDialog.css`
+  - Implement form with fields: Model Name, Model ID, API Base URL, API Key, Description
+  - Implement form validation (required fields, URL format)
+  - Implement edit mode for existing models
+  - _Requirements: 11.1, 11.2, 11.7_
+
+- [x] 23.2 Implement API validation in dialog
+  - Add "Test Connection" button
+  - Show validation progress indicator
+  - Display validation result (success/error)
+  - Enable save only after successful validation
+  - _Requirements: 11.4, 11.9_
+
+- [ ]* 23.3 Write property test for Custom Model Validation Before Save
+  - **Property 22: Custom Model Validation Before Save**
+  - **Validates: Requirements 11.4, 11.9**
+
+## 24. Update Model Selector for Custom Models
+
+- [x] 24. Update Model Selector for Custom Models
+
+- [x] 24.1 Update Model Selector to display custom models
+  - Modify `packages/desktop/src/components/ModelSelector.tsx`
+  - Add "Custom" badge for custom models
+  - Group custom models in separate section
+  - Add "Add Custom Model" button at bottom of dropdown
+  - _Requirements: 11.1, 11.5_
+
+- [x] 24.2 Update Provider Manager for custom models
+  - Modify `packages/desktop/src/services/providerManager.ts`
+  - Integrate custom models into available models list
+  - Handle custom model selection for API calls
+  - _Requirements: 11.5, 11.6_
+
+- [ ]* 24.3 Write property test for Custom Model List Completeness
+  - **Property 21: Custom Model List Completeness**
+  - **Validates: Requirements 11.5**
+
+## 25. Implement Custom Model API Adapter
+
+- [x] 25. Implement Custom Model API Adapter
+
+- [x] 25.1 Create Custom Model Adapter
+  - Create `packages/desktop/src/services/providers/customModelAdapter.ts`
+  - Implement OpenAI-compatible API calls
+  - Handle custom API base URL and model ID
+  - Implement response parsing for script generation
+  - _Requirements: 11.6_
+
+- [x] 25.2 Integrate adapter with Unified AI Service
+  - Modify `packages/desktop/src/services/unifiedAIService.ts`
+  - Add support for custom model selection
+  - Route requests to custom adapter when custom model selected
+  - _Requirements: 11.6_
+
+## 26. Update Provider Settings UI
+
+- [x] 26. Update Provider Settings UI
+
+- [x] 26.1 Add Custom Models section to Provider Settings
+  - Modify `packages/desktop/src/components/ProviderSettings.tsx`
+  - Add "Custom Models" section with list of user's custom models
+  - Add "Add Custom Model" button
+  - Add edit and delete buttons for each custom model
+  - _Requirements: 11.1, 11.7, 11.8_
+
+- [x] 26.2 Implement delete confirmation dialog
+  - Add confirmation dialog before deleting custom model
+  - Show model name in confirmation message
+  - _Requirements: 11.8_
+
+## 27. Integration Testing for Custom Models
+
+- [x] 27. Integration Testing for Custom Models
+
+- [x] 27.1 Write integration tests for custom model flow
+  - Test: Add custom model → Validate API → Save → Verify in list
+  - Test: Select custom model → Generate script → Verify API endpoint used
+  - Test: Edit custom model → Save → Verify changes
+  - Test: Delete custom model → Confirm → Verify removed
+  - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 11.9_
+
+## 28. Final Checkpoint - Ensure all custom model tests pass
+
+- [x] 28. Final Checkpoint - Ensure all custom model tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+

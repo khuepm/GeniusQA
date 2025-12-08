@@ -726,6 +726,9 @@ class IPCHandler:
             
             # Save the script
             try:
+                # Ensure target directory exists (e.g., ~/GeniusQA/recordings)
+                script_path.parent.mkdir(parents=True, exist_ok=True)
+
                 with open(script_path, 'w') as f:
                     json.dump(script_file.model_dump(mode='json'), f, indent=2, default=str)
             except PermissionError:

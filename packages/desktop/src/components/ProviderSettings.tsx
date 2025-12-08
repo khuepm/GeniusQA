@@ -4,8 +4,9 @@
  * Provides UI for managing API keys for multiple AI providers.
  * Displays all supported providers with their configuration status
  * and allows users to add, update, or delete API keys.
+ * Also manages custom AI models with OpenAI-compatible endpoints.
  *
- * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5
+ * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 11.1, 11.7, 11.8
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -13,8 +14,12 @@ import {
   AIProvider,
   PROVIDER_CONFIGS,
   SUPPORTED_PROVIDERS,
+  CustomModelConfig,
+  CustomModelFormData,
 } from '../types/providerAdapter.types';
 import { apiKeyService } from '../services/apiKeyService';
+import { customModelService } from '../services/customModelService';
+import { CustomModelDialog } from './CustomModelDialog';
 import './ProviderSettings.css';
 
 /**
@@ -126,6 +131,14 @@ export const ProviderSettings: React.FC<ProviderSettingsProps> = ({
   const [providerStates, setProviderStates] =
     useState<Record<AIProvider, ProviderState>>(initialProviderStates);
 
+  // Custom models state
+  const [customModels, setCustomModels] = useState<CustomModelConfig[]>([]);
+  const [customModelsLoading, setCustomModelsLoading] = useState(true);
+  const [customModelDialogOpen, setCustomModelDialogOpen] = useState(false);
+  const [editingCustomModel, setEditingCustomModel] = useState<CustomModelConfig | undefined>(undefined);
+  const [customModelSaving, setCustomModelSaving] = useState(false);
+  const [deleteConfirmModel, setDeleteConfirmModel] = useState<CustomModelConfig | null>(null);
+
   /**
    * Load configuration status for all providers on mount
    */
@@ -167,6 +180,28 @@ export const ProviderSettings: React.FC<ProviderSettingsProps> = ({
     if (userId) {
       loadConfigurationStatus();
     }
+  }, [userId]);
+
+  /**
+   * Load custom models on mount
+   * Requirements: 11.1
+   */
+  useEffect(() => {
+    const loadCustomModels = async () => {
+      if (!userId) return;
+
+      setCustomModelsLoading(true);
+      try {
+        const models = await customModelService.getCustomModels(userId);
+        setCustomModels(models);
+      } catch (error) {
+        console.error('Failed to load custom models:', error);
+      } finally {
+        setCustomModelsLoading(false);
+      }
+    };
+
+    loadCustomModels();
   }, [userId]);
 
   /**
@@ -307,6 +342,108 @@ export const ProviderSettings: React.FC<ProviderSettingsProps> = ({
     },
     [userId, updateProviderState, onConfigurationChange]
   );
+
+  /**
+   * Open dialog to add a new custom model
+   * Requirements: 11.1
+   */
+  const handleAddCustomModel = useCallback(() => {
+    setEditingCustomModel(undefined);
+    setCustomModelDialogOpen(true);
+  }, []);
+
+  /**
+   * Open dialog to edit an existing custom model
+   * Requirements: 11.7
+   */
+  const handleEditCustomModel = useCallback((model: CustomModelConfig) => {
+    setEditingCustomModel(model);
+    setCustomModelDialogOpen(true);
+  }, []);
+
+  /**
+   * Close the custom model dialog
+   */
+  const handleCloseCustomModelDialog = useCallback(() => {
+    setCustomModelDialogOpen(false);
+    setEditingCustomModel(undefined);
+  }, []);
+
+  /**
+   * Save a custom model (add or update)
+   * Requirements: 11.3, 11.7
+   */
+  const handleSaveCustomModel = useCallback(
+    async (formData: CustomModelFormData) => {
+      setCustomModelSaving(true);
+      try {
+        if (editingCustomModel) {
+          // Update existing model
+          const updated = await customModelService.updateCustomModel(
+            userId,
+            editingCustomModel.id,
+            formData
+          );
+          setCustomModels((prev) =>
+            prev.map((m) => (m.id === updated.id ? updated : m))
+          );
+        } else {
+          // Add new model
+          const newModel = await customModelService.addCustomModel(userId, formData);
+          setCustomModels((prev) => [...prev, newModel]);
+        }
+        handleCloseCustomModelDialog();
+      } catch (error) {
+        console.error('Failed to save custom model:', error);
+        throw error; // Re-throw to let dialog handle the error
+      } finally {
+        setCustomModelSaving(false);
+      }
+    },
+    [userId, editingCustomModel, handleCloseCustomModelDialog]
+  );
+
+  /**
+   * Validate a custom model API connection
+   * Requirements: 11.4, 11.9
+   */
+  const handleValidateCustomModel = useCallback(
+    async (formData: CustomModelFormData) => {
+      return await customModelService.validateCustomModel(formData);
+    },
+    []
+  );
+
+  /**
+   * Show delete confirmation for a custom model
+   * Requirements: 11.8
+   */
+  const handleDeleteCustomModelClick = useCallback((model: CustomModelConfig) => {
+    setDeleteConfirmModel(model);
+  }, []);
+
+  /**
+   * Cancel delete confirmation
+   */
+  const handleCancelDelete = useCallback(() => {
+    setDeleteConfirmModel(null);
+  }, []);
+
+  /**
+   * Confirm and delete a custom model
+   * Requirements: 11.8
+   */
+  const handleConfirmDeleteCustomModel = useCallback(async () => {
+    if (!deleteConfirmModel) return;
+
+    try {
+      await customModelService.deleteCustomModel(userId, deleteConfirmModel.id);
+      setCustomModels((prev) => prev.filter((m) => m.id !== deleteConfirmModel.id));
+      setDeleteConfirmModel(null);
+    } catch (error) {
+      console.error('Failed to delete custom model:', error);
+    }
+  }, [userId, deleteConfirmModel]);
 
   /**
    * Render a single provider card
@@ -479,6 +616,142 @@ export const ProviderSettings: React.FC<ProviderSettingsProps> = ({
     );
   };
 
+  /**
+   * Render a single custom model card
+   * Requirements: 11.1, 11.7, 11.8
+   */
+  const renderCustomModelCard = (model: CustomModelConfig) => {
+    return (
+      <div
+        key={model.id}
+        className="custom-model-card"
+        data-testid={`custom-model-card-${model.id}`}
+      >
+        <div className="custom-model-card-info">
+          <span className="custom-model-card-icon">🔧</span>
+          <div className="custom-model-card-details">
+            <span className="custom-model-card-name">{model.name}</span>
+            <span className="custom-model-card-description">
+              {model.description || `Model: ${model.modelId}`}
+            </span>
+            <span className="custom-model-card-url">{model.apiBaseUrl}</span>
+          </div>
+        </div>
+        <div className="custom-model-card-actions">
+          <button
+            type="button"
+            className="custom-model-action-button edit"
+            onClick={() => handleEditCustomModel(model)}
+            title="Edit model"
+            data-testid={`custom-model-edit-${model.id}`}
+          >
+            ✏️
+          </button>
+          <button
+            type="button"
+            className="custom-model-action-button delete"
+            onClick={() => handleDeleteCustomModelClick(model)}
+            title="Delete model"
+            data-testid={`custom-model-delete-${model.id}`}
+          >
+            🗑️
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  /**
+   * Render the Custom Models section
+   * Requirements: 11.1
+   */
+  const renderCustomModelsSection = () => {
+    return (
+      <div className="custom-models-section" data-testid="custom-models-section">
+        <div className="custom-models-header">
+          <div className="custom-models-title-wrapper">
+            <h3 className="custom-models-title">Custom Models</h3>
+            <span className="custom-models-badge">{customModels.length}</span>
+          </div>
+          <button
+            type="button"
+            className="add-custom-model-button"
+            onClick={handleAddCustomModel}
+            data-testid="add-custom-model-button"
+          >
+            + Add Custom Model
+          </button>
+        </div>
+        <p className="custom-models-description">
+          Add custom AI models using any OpenAI-compatible API endpoint.
+        </p>
+
+        {customModelsLoading ? (
+          <div className="custom-models-loading">
+            <span className="button-spinner" style={{ width: 20, height: 20 }} />
+            <span>Loading custom models...</span>
+          </div>
+        ) : customModels.length === 0 ? (
+          <div className="custom-models-empty">
+            <span className="custom-models-empty-icon">🔌</span>
+            <span className="custom-models-empty-text">
+              No custom models configured. Click "Add Custom Model" to get started.
+            </span>
+          </div>
+        ) : (
+          <div className="custom-models-list">
+            {customModels.map((model) => renderCustomModelCard(model))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  /**
+   * Render delete confirmation dialog
+   * Requirements: 11.8
+   */
+  const renderDeleteConfirmDialog = () => {
+    if (!deleteConfirmModel) return null;
+
+    return (
+      <div
+        className="delete-confirm-overlay"
+        onClick={handleCancelDelete}
+        data-testid="delete-confirm-dialog"
+      >
+        <div
+          className="delete-confirm-dialog"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h3 className="delete-confirm-title">Delete Custom Model</h3>
+          <p className="delete-confirm-message">
+            Are you sure you want to delete <strong>{deleteConfirmModel.name}</strong>?
+            This action cannot be undone.
+          </p>
+          <div className="delete-confirm-actions">
+            <button
+              type="button"
+              className="delete-confirm-cancel"
+              onClick={handleCancelDelete}
+              data-testid="delete-confirm-cancel"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="delete-confirm-confirm"
+              onClick={handleConfirmDeleteCustomModel}
+              data-testid="delete-confirm-confirm"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Main content
   const content = (
     <div className="provider-settings-container" data-testid="provider-settings">
@@ -492,6 +765,22 @@ export const ProviderSettings: React.FC<ProviderSettingsProps> = ({
       <div className="provider-settings-list">
         {SUPPORTED_PROVIDERS.map((providerId) => renderProviderCard(providerId))}
       </div>
+
+      {/* Custom Models Section */}
+      {renderCustomModelsSection()}
+
+      {/* Custom Model Dialog */}
+      <CustomModelDialog
+        isOpen={customModelDialogOpen}
+        onClose={handleCloseCustomModelDialog}
+        onSave={handleSaveCustomModel}
+        onValidate={handleValidateCustomModel}
+        editingModel={editingCustomModel}
+        isLoading={customModelSaving}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      {renderDeleteConfirmDialog()}
     </div>
   );
 
@@ -530,8 +819,24 @@ export const ProviderSettings: React.FC<ProviderSettingsProps> = ({
             <div className="provider-settings-list" style={{ marginTop: '16px' }}>
               {SUPPORTED_PROVIDERS.map((providerId) => renderProviderCard(providerId))}
             </div>
+
+            {/* Custom Models Section in Modal */}
+            {renderCustomModelsSection()}
           </div>
         </div>
+
+        {/* Custom Model Dialog */}
+        <CustomModelDialog
+          isOpen={customModelDialogOpen}
+          onClose={handleCloseCustomModelDialog}
+          onSave={handleSaveCustomModel}
+          onValidate={handleValidateCustomModel}
+          editingModel={editingCustomModel}
+          isLoading={customModelSaving}
+        />
+
+        {/* Delete Confirmation Dialog */}
+        {renderDeleteConfirmDialog()}
       </div>
     );
   }

@@ -3,8 +3,9 @@
  * 
  * Manages AI provider adapters, handles provider selection,
  * tracks provider status, and maintains session statistics.
+ * Supports custom models alongside pre-configured providers.
  * 
- * Requirements: 2.2, 6.1, 6.4
+ * Requirements: 2.2, 6.1, 6.4, 11.5, 11.6
  */
 
 import {
@@ -14,6 +15,8 @@ import {
   ProviderError,
   SessionStatistics,
   SUPPORTED_PROVIDERS,
+  CustomModelConfig,
+  ProviderModel,
 } from '../types/providerAdapter.types';
 
 // ============================================================================
@@ -22,7 +25,7 @@ import {
 
 /**
  * Interface for the Provider Manager
- * Requirements: 2.2, 6.1
+ * Requirements: 2.2, 6.1, 11.5, 11.6
  */
 export interface IProviderManager {
   // Provider registration
@@ -40,8 +43,15 @@ export interface IProviderManager {
   getAllProviderStatuses(): Map<AIProvider, ProviderStatus>;
   
   // Model management
-  setActiveModel(modelId: string): void;
+  setActiveModel(modelId: string, isCustomModel?: boolean): void;
   getActiveModel(): string | null;
+  
+  // Custom model management
+  setCustomModels(models: CustomModelConfig[]): void;
+  getCustomModels(): CustomModelConfig[];
+  getActiveCustomModel(): CustomModelConfig | null;
+  isUsingCustomModel(): boolean;
+  getAllAvailableModels(): ProviderModel[];
   
   // Statistics
   getSessionStats(): SessionStatistics;
@@ -66,8 +76,9 @@ export interface IProviderManager {
  * 
  * Central service for managing AI provider adapters.
  * Handles registration, selection, status tracking, and statistics.
+ * Supports custom models alongside pre-configured providers.
  * 
- * Requirements: 2.2, 6.1, 6.4
+ * Requirements: 2.2, 6.1, 6.4, 11.5, 11.6
  */
 export class ProviderManager implements IProviderManager {
   // Registered adapters
@@ -84,6 +95,11 @@ export class ProviderManager implements IProviderManager {
   private successfulRequests: number = 0;
   private totalResponseTime: number = 0;
   private requestsByProvider: Map<AIProvider, number> = new Map();
+
+  // Custom model management
+  private customModels: CustomModelConfig[] = [];
+  private activeCustomModelId: string | null = null;
+  private usingCustomModel: boolean = false;
 
   constructor() {
     // Initialize status for all supported providers
@@ -261,14 +277,31 @@ export class ProviderManager implements IProviderManager {
 
   /**
    * Set the active model for the current provider
+   * Supports both provider models and custom models
+   * Requirements: 11.5, 11.6
    */
-  setActiveModel(modelId: string): void {
+  setActiveModel(modelId: string, isCustomModel: boolean = false): void {
+    if (isCustomModel) {
+      // Find the custom model
+      const customModel = this.customModels.find(m => m.id === modelId);
+      if (!customModel) {
+        throw new Error(`Custom model '${modelId}' not found`);
+      }
+      
+      this.activeCustomModelId = modelId;
+      this.usingCustomModel = true;
+      return;
+    }
+
+    // Regular provider model
     const adapter = this.getActiveAdapter();
     
     if (!adapter) {
       throw new Error('No active provider. Please select a provider first.');
     }
 
+    this.usingCustomModel = false;
+    this.activeCustomModelId = null;
     adapter.setModel(modelId);
   }
 
@@ -276,6 +309,11 @@ export class ProviderManager implements IProviderManager {
    * Get the current model for the active provider
    */
   getActiveModel(): string | null {
+    // If using custom model, return custom model ID
+    if (this.usingCustomModel && this.activeCustomModelId) {
+      return this.activeCustomModelId;
+    }
+
     const adapter = this.getActiveAdapter();
     
     if (!adapter) {
@@ -283,6 +321,79 @@ export class ProviderManager implements IProviderManager {
     }
 
     return adapter.getCurrentModel();
+  }
+
+  // ============================================================================
+  // Custom Model Management
+  // ============================================================================
+
+  /**
+   * Set the list of custom models
+   * Requirements: 11.5
+   */
+  setCustomModels(models: CustomModelConfig[]): void {
+    this.customModels = [...models];
+    
+    // If active custom model was removed, clear it
+    if (this.activeCustomModelId && !models.find(m => m.id === this.activeCustomModelId)) {
+      this.activeCustomModelId = null;
+      this.usingCustomModel = false;
+    }
+  }
+
+  /**
+   * Get all custom models
+   * Requirements: 11.5
+   */
+  getCustomModels(): CustomModelConfig[] {
+    return [...this.customModels];
+  }
+
+  /**
+   * Get the currently active custom model configuration
+   * Requirements: 11.6
+   */
+  getActiveCustomModel(): CustomModelConfig | null {
+    if (!this.usingCustomModel || !this.activeCustomModelId) {
+      return null;
+    }
+    
+    return this.customModels.find(m => m.id === this.activeCustomModelId) || null;
+  }
+
+  /**
+   * Check if currently using a custom model
+   * Requirements: 11.6
+   */
+  isUsingCustomModel(): boolean {
+    return this.usingCustomModel;
+  }
+
+  /**
+   * Get all available models (provider models + custom models)
+   * Returns provider models from the active adapter combined with custom models
+   * Requirements: 11.5
+   */
+  getAllAvailableModels(): ProviderModel[] {
+    const providerModels: ProviderModel[] = [];
+    
+    // Get models from active adapter
+    const adapter = this.getActiveAdapter();
+    if (adapter) {
+      providerModels.push(...adapter.getAvailableModels());
+    }
+    
+    // Convert custom models to ProviderModel format
+    const customProviderModels: ProviderModel[] = this.customModels.map(cm => ({
+      id: cm.id,
+      name: cm.name,
+      description: cm.description || `Custom model: ${cm.modelId}`,
+      capabilities: ['text-generation', 'code-generation'],
+      pricingTier: 'standard' as const,
+      isDefault: false,
+    }));
+    
+    return [...providerModels, ...customProviderModels];
   }
 
   // ============================================================================
@@ -388,6 +499,11 @@ export class ProviderManager implements IProviderManager {
     this.totalRequests = 0;
     this.successfulRequests = 0;
     this.totalResponseTime = 0;
+    
+    // Reset custom model state
+    this.customModels = [];
+    this.activeCustomModelId = null;
+    this.usingCustomModel = false;
     
     // Reset all provider statuses
     this.initializeProviderStatuses();

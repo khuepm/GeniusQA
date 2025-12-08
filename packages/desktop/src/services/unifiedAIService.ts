@@ -22,13 +22,16 @@ import {
   UserProviderPreferences,
   PROVIDER_CONFIGS,
   SUPPORTED_PROVIDERS,
+  CustomModelConfig,
 } from '../types/providerAdapter.types';
 import { providerManager, IProviderManager } from './providerManager';
 import { apiKeyService } from './apiKeyService';
 import { userPreferencesService } from './userPreferencesService';
+import { customModelService } from './customModelService';
 import { GeminiAdapter } from './providers/geminiAdapter';
 import { OpenAIAdapter } from './providers/openaiAdapter';
 import { AnthropicAdapter } from './providers/anthropicAdapter';
+import { CustomModelAdapter, createCustomModelAdapter } from './providers/customModelAdapter';
 
 // ============================================================================
 // Types
@@ -99,6 +102,14 @@ export interface IUnifiedAIService {
   getAvailableModels(): ProviderModel[];
   getConfiguredProviders(): AIProvider[];
   
+  // Custom model management (Requirements: 11.5, 11.6)
+  getCustomModels(): CustomModelConfig[];
+  selectCustomModel(customModelId: string): void;
+  isUsingCustomModel(): boolean;
+  getActiveCustomModel(): CustomModelConfig | null;
+  refreshCustomModels(): Promise<void>;
+  getAllAvailableModels(): ProviderModel[];
+  
   // Error handling
   getErrorLog(): ErrorLogEntry[];
   clearErrorLog(): void;
@@ -137,6 +148,11 @@ export class UnifiedAIService implements IUnifiedAIService {
     modelPreferences: {} as Record<AIProvider, string>,
     lastUsedProvider: null,
   };
+  
+  // Custom model management
+  // Requirements: 11.5, 11.6
+  private customModelAdapters: Map<string, CustomModelAdapter> = new Map();
+  private customModels: CustomModelConfig[] = [];
 
   constructor(manager?: IProviderManager) {
     this.manager = manager || providerManager;
@@ -237,7 +253,7 @@ export class UnifiedAIService implements IUnifiedAIService {
 
   /**
    * Initialize the service with user's API keys
-   * Requirements: 2.2, 2.3, 8.3
+   * Requirements: 2.2, 2.3, 8.3, 11.5, 11.6
    */
   async initialize(userId: string): Promise<void> {
     if (!userId) {
@@ -249,6 +265,10 @@ export class UnifiedAIService implements IUnifiedAIService {
     // Reset manager state
     this.manager.reset();
     
+    // Clear custom model adapters
+    this.customModelAdapters.clear();
+    this.customModels = [];
+    
     // Register all adapters
     this.registerAdapters();
     
@@ -257,6 +277,10 @@ export class UnifiedAIService implements IUnifiedAIService {
     
     // Load API keys and initialize adapters
     await this.loadApiKeys();
+    
+    // Load custom models
+    // Requirements: 11.5, 11.6
+    await this.loadCustomModels();
     
     // Auto-select provider if only one is configured
     this.autoSelectProvider();
@@ -313,6 +337,35 @@ export class UnifiedAIService implements IUnifiedAIService {
       } catch (error) {
         this.logError(providerId, 'auth_error', `Failed to load API key: ${error}`);
       }
+    }
+  }
+
+  /**
+   * Load custom models from Firebase and create adapters
+   * Requirements: 11.5, 11.6
+   */
+  private async loadCustomModels(): Promise<void> {
+    if (!this.userId) return;
+
+    try {
+      // Fetch custom models from Firebase
+      this.customModels = await customModelService.getCustomModels(this.userId);
+      
+      // Create adapters for each custom model
+      for (const model of this.customModels) {
+        try {
+          const adapter = createCustomModelAdapter(model);
+          this.customModelAdapters.set(model.id, adapter);
+        } catch (error) {
+          console.warn(`Failed to create adapter for custom model ${model.name}:`, error);
+        }
+      }
+      
+      // Update the provider manager with custom models
+      this.manager.setCustomModels(this.customModels);
+    } catch (error) {
+      console.warn('Failed to load custom models:', error);
+      // Don't throw - custom models are optional
     }
   }
 
@@ -412,7 +465,7 @@ export class UnifiedAIService implements IUnifiedAIService {
 
   /**
    * Generate a script from a user prompt
-   * Requirements: 2.2, 3.2, 5.2, 6.3
+   * Requirements: 2.2, 3.2, 5.2, 6.3, 11.6
    */
   async generateScript(
     prompt: string,
@@ -423,6 +476,12 @@ export class UnifiedAIService implements IUnifiedAIService {
         success: false,
         message: 'Service not initialized. Please initialize with a user ID first.',
       };
+    }
+
+    // Check if using a custom model
+    // Requirements: 11.6
+    if (this.manager.isUsingCustomModel()) {
+      return this.generateScriptWithCustomModel(prompt, context);
     }
 
     const adapter = this.manager.getActiveAdapter();
@@ -499,8 +558,68 @@ export class UnifiedAIService implements IUnifiedAIService {
   }
 
   /**
+   * Generate a script using a custom model adapter
+   * Requirements: 11.6
+   */
+  private async generateScriptWithCustomModel(
+    prompt: string,
+    context: ConversationContext
+  ): Promise<UnifiedGenerationResult> {
+    const customModel = this.manager.getActiveCustomModel();
+    if (!customModel) {
+      return {
+        success: false,
+        message: 'No custom model selected. Please select a model first.',
+      };
+    }
+
+    const adapter = this.customModelAdapters.get(customModel.id);
+    if (!adapter) {
+      return {
+        success: false,
+        message: `Custom model adapter not found for "${customModel.name}".`,
+      };
+    }
+
+    const startTime = Date.now();
+
+    try {
+      const response = await adapter.generateScript(prompt, context);
+      const processingTimeMs = Date.now() - startTime;
+
+      if (!response.success) {
+        return {
+          success: false,
+          message: response.message,
+          modelId: customModel.modelId,
+          processingTimeMs,
+        };
+      }
+
+      return {
+        success: true,
+        script: response.script,
+        message: response.message,
+        needsClarification: response.needsClarification,
+        clarificationQuestions: response.clarificationQuestions,
+        modelId: customModel.modelId,
+        processingTimeMs: response.metadata.processingTimeMs,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      
+      return {
+        success: false,
+        message: `Custom model error: ${errorMessage}`,
+        modelId: customModel.modelId,
+        processingTimeMs: Date.now() - startTime,
+      };
+    }
+  }
+
+  /**
    * Refine an existing script based on user feedback
-   * Requirements: 3.2, 5.2, 6.3
+   * Requirements: 3.2, 5.2, 6.3, 11.6
    */
   async refineScript(
     currentScript: ScriptData,
@@ -511,6 +630,12 @@ export class UnifiedAIService implements IUnifiedAIService {
         success: false,
         message: 'Service not initialized. Please initialize with a user ID first.',
       };
+    }
+
+    // Check if using a custom model
+    // Requirements: 11.6
+    if (this.manager.isUsingCustomModel()) {
+      return this.refineScriptWithCustomModel(currentScript, feedback);
     }
 
     const adapter = this.manager.getActiveAdapter();
@@ -578,6 +703,66 @@ export class UnifiedAIService implements IUnifiedAIService {
         modelId: adapter.getCurrentModel(),
         processingTimeMs: Date.now() - startTime,
         fallbackSuggestions: fallback.alternatives,
+      };
+    }
+  }
+
+  /**
+   * Refine a script using a custom model adapter
+   * Requirements: 11.6
+   */
+  private async refineScriptWithCustomModel(
+    currentScript: ScriptData,
+    feedback: string
+  ): Promise<UnifiedGenerationResult> {
+    const customModel = this.manager.getActiveCustomModel();
+    if (!customModel) {
+      return {
+        success: false,
+        message: 'No custom model selected. Please select a model first.',
+      };
+    }
+
+    const adapter = this.customModelAdapters.get(customModel.id);
+    if (!adapter) {
+      return {
+        success: false,
+        message: `Custom model adapter not found for "${customModel.name}".`,
+      };
+    }
+
+    const startTime = Date.now();
+
+    try {
+      const response = await adapter.refineScript(currentScript, feedback);
+      const processingTimeMs = Date.now() - startTime;
+
+      if (!response.success) {
+        return {
+          success: false,
+          message: response.message,
+          modelId: customModel.modelId,
+          processingTimeMs,
+        };
+      }
+
+      return {
+        success: true,
+        script: response.script,
+        message: response.message,
+        needsClarification: response.needsClarification,
+        clarificationQuestions: response.clarificationQuestions,
+        modelId: customModel.modelId,
+        processingTimeMs: response.metadata.processingTimeMs,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      
+      return {
+        success: false,
+        message: `Custom model error: ${errorMessage}`,
+        modelId: customModel.modelId,
+        processingTimeMs: Date.now() - startTime,
       };
     }
   }
@@ -777,6 +962,83 @@ export class UnifiedAIService implements IUnifiedAIService {
   }
 
   // ============================================================================
+  // Custom Model Management
+  // ============================================================================
+
+  /**
+   * Get all custom models
+   * Requirements: 11.5
+   */
+  getCustomModels(): CustomModelConfig[] {
+    return [...this.customModels];
+  }
+
+  /**
+   * Select a custom model for script generation
+   * Requirements: 11.6
+   */
+  selectCustomModel(customModelId: string): void {
+    if (!this.initialized) {
+      throw new Error('Service not initialized. Call initialize() first.');
+    }
+
+    const customModel = this.customModels.find(m => m.id === customModelId);
+    if (!customModel) {
+      throw new Error(`Custom model '${customModelId}' not found.`);
+    }
+
+    const adapter = this.customModelAdapters.get(customModelId);
+    if (!adapter) {
+      throw new Error(`Custom model adapter not found for '${customModel.name}'.`);
+    }
+
+    // Set the custom model as active in the manager
+    this.manager.setActiveModel(customModelId, true);
+  }
+
+  /**
+   * Check if currently using a custom model
+   * Requirements: 11.6
+   */
+  isUsingCustomModel(): boolean {
+    return this.manager.isUsingCustomModel();
+  }
+
+  /**
+   * Get the currently active custom model
+   * Requirements: 11.6
+   */
+  getActiveCustomModel(): CustomModelConfig | null {
+    return this.manager.getActiveCustomModel();
+  }
+
+  /**
+   * Refresh custom models from Firebase
+   * Call this after adding, updating, or deleting a custom model
+   * Requirements: 11.5, 11.6
+   */
+  async refreshCustomModels(): Promise<void> {
+    if (!this.userId) {
+      throw new Error('Service not initialized. Call initialize() first.');
+    }
+
+    // Clear existing adapters
+    this.customModelAdapters.clear();
+
+    // Reload custom models
+    await this.loadCustomModels();
+  }
+
+  /**
+   * Get all available models including custom models
+   * Returns provider models combined with custom models
+   * Requirements: 11.5
+   */
+  getAllAvailableModels(): ProviderModel[] {
+    return this.manager.getAllAvailableModels();
+  }
+
+  // ============================================================================
   // Preferences
   // ============================================================================
 
@@ -818,6 +1080,11 @@ export class UnifiedAIService implements IUnifiedAIService {
       modelPreferences: {} as Record<AIProvider, string>,
       lastUsedProvider: null,
     };
+    
+    // Clear custom model state
+    // Requirements: 11.5, 11.6
+    this.customModelAdapters.clear();
+    this.customModels = [];
   }
 }
 

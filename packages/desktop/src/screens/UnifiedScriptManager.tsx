@@ -33,6 +33,7 @@ import { getIPCBridge } from '../services/ipcBridgeService';
 // Types
 import { ScriptData, ValidationResult, Action } from '../types/aiScriptBuilder.types';
 import { AIProvider, ProviderInfo, ProviderModel, SessionStatistics } from '../types/providerAdapter.types';
+import { save } from '@tauri-apps/api/dialog';
 
 import './UnifiedScriptManager.css';
 
@@ -93,6 +94,9 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
   const [selectedScript, setSelectedScript] = useState<StoredScriptInfo | null>(null);
   const [scriptData, setScriptData] = useState<ScriptData | null>(null);
   const [editMode, setEditMode] = useState<boolean>(false);
+  const [textEditMode, setTextEditMode] = useState<boolean>(false);
+  const [jsonText, setJsonText] = useState<string>('');
+  const [jsonEditError, setJsonEditError] = useState<string | null>(null);
 
   // AI Builder state - Requirements: 10.4
   const [generatedScript, setGeneratedScript] = useState<ScriptData | null>(null);
@@ -349,7 +353,7 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
             scriptName: scriptName,
           });
           setGeneratedScript(null);
-          setActiveTab('editor');
+          setActiveTab('list');
         }
       } else {
         setSaveError(result.error || 'Failed to save script');
@@ -392,6 +396,98 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
       console.error('Save script error:', err);
     }
   }, [selectedScript, scriptData, ipcBridge]);
+
+  /**
+   * Handle start of raw JSON edit mode
+   */
+  const handleTextEditStart = useCallback(() => {
+    if (!scriptData) return;
+    setJsonEditError(null);
+    try {
+      const formatted = JSON.stringify(scriptData, null, 2);
+      setJsonText(formatted);
+      setTextEditMode(true);
+    } catch (err) {
+      setJsonEditError('Không thể chuyển script hiện tại thành JSON.');
+    }
+  }, [scriptData]);
+
+  /**
+   * Handle saving raw JSON back to file
+   */
+  const handleJsonSave = useCallback(async () => {
+    if (!selectedScript) return;
+
+    try {
+      setJsonEditError(null);
+      const parsed = JSON.parse(jsonText) as ScriptData;
+      setScriptData(parsed);
+      await ipcBridge.saveScript(selectedScript.path, parsed);
+      setEditMode(false);
+      setTextEditMode(false);
+      await loadScripts();
+      alert('Script saved successfully');
+    } catch (err) {
+      if (err instanceof SyntaxError) {
+        setJsonEditError('JSON không hợp lệ. Vui lòng kiểm tra lại cú pháp.');
+      } else {
+        setJsonEditError(err instanceof Error ? err.message : 'Failed to save script');
+      }
+    }
+  }, [jsonText, selectedScript, ipcBridge, loadScripts]);
+
+  /**
+   * Handle saving script text to a separate text file on disk
+   */
+  const handleSaveScriptTextToFile = useCallback(async () => {
+    if (!scriptData && !textEditMode) return;
+
+    try {
+      let dataToSave: ScriptData;
+
+      if (textEditMode) {
+        try {
+          const parsed = JSON.parse(jsonText) as ScriptData;
+          dataToSave = parsed;
+        } catch (err) {
+          setJsonEditError('JSON không hợp lệ. Vui lòng kiểm tra lại cú pháp.');
+          return;
+        }
+      } else {
+        if (!scriptData) return;
+        dataToSave = scriptData;
+      }
+
+      const baseName = selectedScript?.filename || 'script';
+      const defaultName = baseName.endsWith('.json')
+        ? `${baseName.slice(0, -5)}.txt`
+        : `${baseName}.txt`;
+
+      const filePath = await save({
+        title: 'Save script text',
+        defaultPath: defaultName,
+        filters: [
+          {
+            name: 'Text File',
+            extensions: ['txt'],
+          },
+        ],
+      });
+
+      if (!filePath || Array.isArray(filePath)) {
+        // User cancelled or multi-select not expected
+        return;
+      }
+
+      // Use core (Python/Rust) save_script path to write JSON to the chosen location
+      await ipcBridge.saveScript(filePath, dataToSave);
+      alert('Script text saved successfully');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save script text';
+      setError(errorMessage);
+      console.error('Save script text error:', err);
+    }
+  }, [scriptData, textEditMode, jsonText, selectedScript, ipcBridge]);
 
   /**
    * Handle action update in editor
@@ -706,9 +802,14 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
                   </button>
                 </>
               ) : (
-                <button className="edit-button" onClick={() => setEditMode(true)}>
-                  ✏️ Edit
-                </button>
+                <>
+                  <button className="edit-button" onClick={() => setEditMode(true)}>
+                    ✏️ Edit
+                  </button>
+                  <button className="edit-button" onClick={handleTextEditStart}>
+                    🧾 Edit text
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -782,6 +883,41 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
               ))}
             </div>
           </div>
+
+          {/* Raw JSON Text Editor */}
+          {textEditMode && (
+            <div className="actions-section">
+              <h3 className="section-title">Raw JSON</h3>
+              {jsonEditError && (
+                <div className="error-container">
+                  <p className="error-text">{jsonEditError}</p>
+                </div>
+              )}
+              <textarea
+                className="json-editor-textarea"
+                value={jsonText}
+                onChange={(e) => setJsonText(e.target.value)}
+                rows={20}
+              />
+              <div className="editor-actions">
+                <button className="save-button" onClick={handleJsonSave}>
+                  💾 Save JSON
+                </button>
+                <button className="save-button" onClick={handleSaveScriptTextToFile}>
+                  💾 Save script text
+                </button>
+                <button
+                  className="cancel-button"
+                  onClick={() => {
+                    setTextEditMode(false);
+                    setJsonEditError(null);
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

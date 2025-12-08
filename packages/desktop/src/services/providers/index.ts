@@ -27,3 +27,6 @@ export { OpenAIAdapter, openaiAdapter } from './openaiAdapter';
 
 // Anthropic adapter
 export { AnthropicAdapter, anthropicAdapter } from './anthropicAdapter';
+
+// Custom model adapter
+export { CustomModelAdapter, createCustomModelAdapter } from './customModelAdapter';

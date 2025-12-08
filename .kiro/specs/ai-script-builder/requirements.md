@@ -142,3 +142,19 @@ Phiên bản mở rộng bổ sung các tính năng: lưu script sau khi generat
 5. WHEN an AI script is generated THEN the System SHALL allow seamless transition to the Editor tab for refinement
 6. WHEN editing any script THEN the System SHALL provide the same editing tools regardless of script source
 
+### Requirement 11
+
+**User Story:** As a user, I want to add custom AI models freely, so that I can use any OpenAI-compatible API endpoint or new models not pre-configured in the system.
+
+#### Acceptance Criteria
+
+1. WHEN a user opens the provider settings THEN the System SHALL display an "Add Custom Model" button
+2. WHEN a user clicks "Add Custom Model" THEN the System SHALL display a form with fields: Model Name, Model ID, API Base URL, API Key, and optional Description
+3. WHEN a user submits a valid custom model configuration THEN the System SHALL save the model and add it to the available models list
+4. WHEN a custom model is added THEN the System SHALL validate the API connection before saving
+5. WHEN displaying the model selector THEN the System SHALL show custom models alongside pre-configured models with a "Custom" badge
+6. WHEN a user selects a custom model THEN the System SHALL use the custom API endpoint and model ID for script generation
+7. WHEN a user wants to edit a custom model THEN the System SHALL allow modification of all configuration fields
+8. WHEN a user wants to delete a custom model THEN the System SHALL remove the model after confirmation
+9. IF the custom model API validation fails THEN the System SHALL display an error message with details and allow retry
+
