@@ -6,6 +6,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User as FirebaseUser } from 'firebase/auth';
 import firebaseService from '../services/firebaseService';
+import { userProfileService } from '../services/userProfileService';
 import { User, AuthContextType } from '../types/auth.types';
 
 // Storage key for persisting auth state
@@ -42,6 +43,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       emailVerified: firebaseUser.emailVerified,
       providerId: firebaseUser.providerData[0]?.providerId || 'unknown',
     };
+  };
+
+  // Store user profile to Firebase Firestore
+  const storeUserProfileToFirebase = async (userData: User): Promise<void> => {
+    try {
+      await userProfileService.storeUserProfile(userData.uid, {
+        uid: userData.uid,
+        email: userData.email,
+        displayName: userData.displayName,
+        photoURL: userData.photoURL,
+        emailVerified: userData.emailVerified,
+        providerId: userData.providerId,
+      });
+    } catch (err) {
+      console.error('Failed to store user profile to Firebase:', err);
+      // Don't throw - profile storage failure shouldn't block login
+    }
   };
 
   // Persist user to localStorage
@@ -82,10 +100,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         loadPersistedUser();
 
         // Setup auth state listener
-        unsubscribe = firebaseService.onAuthStateChanged((firebaseUser) => {
+        unsubscribe = firebaseService.onAuthStateChanged(async (firebaseUser) => {
           const mappedUser = mapFirebaseUser(firebaseUser);
           setUser(mappedUser);
           persistUser(mappedUser);
+
+          // Store user profile to Firebase on login
+          if (mappedUser) {
+            await storeUserProfileToFirebase(mappedUser);
+          }
+
           setLoading(false);
         });
       } catch (err: any) {

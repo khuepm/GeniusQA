@@ -97,6 +97,41 @@
   margin-top: 8px;
 }
 
+/* Quick access buttons for unified script manager - Requirements: 10.1 */
+.dashboard-quick-access {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.dashboard-quick-button {
+  flex: 1;
+  padding: 8px 12px;
+  background-color: #f8f9fa;
+  border: 1px solid #dadce0;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #5f6368;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.dashboard-quick-button:hover {
+  background-color: #e8f0fe;
+  border-color: #1a73e8;
+  color: #1a73e8;
+}
+
+.dashboard-quick-button:active {
+  background-color: #d2e3fc;
+}
+
 .dashboard-footer {
   padding-top: 16px;
 }

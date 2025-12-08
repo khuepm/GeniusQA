@@ -413,145 +413,151 @@ impl Recorder {
         let is_recording = Arc::clone(&self.is_recording);
         let recorded_actions = Arc::clone(&self.recorded_actions);
         let start_time = self.start_time;
-        
-        // Use a channel to communicate events from rdev callback to processing thread
-        // Use bounded channel to prevent memory buildup
-        let (tx, rx) = std::sync::mpsc::sync_channel::<(rdev::EventType, f64)>(1000);
-        
-        // Spawn thread to run rdev::listen (blocking)
-        let is_recording_listener = Arc::clone(&self.is_recording);
-        thread::spawn(move || {
-            let tx = tx;
-            let start = start_time;
-            let is_rec = is_recording_listener;
-            
-            // Use catch_unwind to prevent panics from crashing the app
-            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                let callback = move |event: rdev::Event| {
-                    // Check if still recording - exit early
-                    if !is_rec.load(Ordering::SeqCst) {
-                        return;
-                    }
-                    
-                    let timestamp = start
-                        .map(|s| s.elapsed().as_secs_f64())
-                        .unwrap_or(0.0);
-                    
-                    // Send event through channel (non-blocking with try_send)
-                    let _ = tx.try_send((event.event_type, timestamp));
-                };
-                
-                // This blocks until error - we can't stop it gracefully
-                let _ = rdev::listen(callback);
-            }));
-            
-            if let Err(e) = result {
-                eprintln!("Event listener thread panicked: {:?}", e);
-            }
-        });
-        
-        // Spawn thread to process events from channel
-        thread::spawn(move || {
-            let mut last_mouse_pos: Option<(i32, i32)> = None;
-            let mouse_move_threshold = 10; // Minimum pixels to record a move
-            let max_actions = 50000; // Limit to prevent memory issues
-            let mut last_move_time = 0.0f64;
-            let min_move_interval = 0.05; // Minimum 50ms between mouse moves
-            
-            while is_recording.load(Ordering::SeqCst) {
-                // Use recv_timeout to allow checking is_recording periodically
-                match rx.recv_timeout(std::time::Duration::from_millis(100)) {
-                    Ok((event_type, timestamp)) => {
-                        // Handle ESC key - stop recording immediately
-                        if let rdev::EventType::KeyPress(rdev::Key::Escape) = event_type {
-                            // Set flag to stop recording
-                            is_recording.store(false, Ordering::SeqCst);
+
+        // On macOS, disable the rdev-based global listener to avoid native crashes
+        // when pressing system shortcuts like Cmd+Tab. Recording with the Rust core
+        // on macOS will not capture input events for now, but the app will remain stable.
+        #[cfg(not(target_os = "macos"))]
+        {
+            // Use a channel to communicate events from rdev callback to processing thread
+            // Use bounded channel to prevent memory buildup
+            let (tx, rx) = std::sync::mpsc::sync_channel::<(rdev::EventType, f64)>(1000);
+
+            // Spawn thread to run rdev::listen (blocking)
+            let is_recording_listener = Arc::clone(&self.is_recording);
+            thread::spawn(move || {
+                let tx = tx;
+                let start = start_time;
+                let is_rec = is_recording_listener;
+
+                // Use catch_unwind to prevent panics from crashing the app
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    let callback = move |event: rdev::Event| {
+                        // Check if still recording - exit early
+                        if !is_rec.load(Ordering::SeqCst) {
+                            return;
+                        }
+
+                        let timestamp = start
+                            .map(|s| s.elapsed().as_secs_f64())
+                            .unwrap_or(0.0);
+
+                        // Send event through channel (non-blocking with try_send)
+                        let _ = tx.try_send((event.event_type, timestamp));
+                    };
+
+                    // This blocks until error - we can't stop it gracefully
+                    let _ = rdev::listen(callback);
+                }));
+
+                if let Err(e) = result {
+                    eprintln!("Event listener thread panicked: {:?}", e);
+                }
+            });
+
+            // Spawn thread to process events from channel
+            thread::spawn(move || {
+                let mut last_mouse_pos: Option<(i32, i32)> = None;
+                let mouse_move_threshold = 10; // Minimum pixels to record a move
+                let max_actions = 50000; // Limit to prevent memory issues
+                let mut last_move_time = 0.0f64;
+                let min_move_interval = 0.05; // Minimum 50ms between mouse moves
+
+                while is_recording.load(Ordering::SeqCst) {
+                    // Use recv_timeout to allow checking is_recording periodically
+                    match rx.recv_timeout(std::time::Duration::from_millis(100)) {
+                        Ok((event_type, timestamp)) => {
+                            // Handle ESC key - stop recording immediately
+                            if let rdev::EventType::KeyPress(rdev::Key::Escape) = event_type {
+                                // Set flag to stop recording
+                                is_recording.store(false, Ordering::SeqCst);
+                                break;
+                            }
+
+                            // Check action limit
+                            let action_count = {
+                                if let Ok(actions) = recorded_actions.try_lock() {
+                                    actions.len()
+                                } else {
+                                    continue; // Skip if can't get lock
+                                }
+                            };
+
+                            if action_count >= max_actions {
+                                continue; // Skip if too many actions
+                            }
+
+                            match event_type {
+                                rdev::EventType::MouseMove { x, y } => {
+                                    let current_pos = (x as i32, y as i32);
+
+                                    // Throttle mouse moves
+                                    if timestamp - last_move_time < min_move_interval {
+                                        last_mouse_pos = Some(current_pos);
+                                        continue;
+                                    }
+
+                                    // Only record if moved significantly
+                                    let should_record = if let Some(last_pos) = last_mouse_pos {
+                                        let dx = (current_pos.0 - last_pos.0).abs();
+                                        let dy = (current_pos.1 - last_pos.1).abs();
+                                        dx >= mouse_move_threshold || dy >= mouse_move_threshold
+                                    } else {
+                                        true
+                                    };
+
+                                    if should_record {
+                                        if let Ok(mut actions) = recorded_actions.try_lock() {
+                                            let action = Action::mouse_move(current_pos.0, current_pos.1, timestamp);
+                                            actions.push(action);
+                                            last_mouse_pos = Some(current_pos);
+                                            last_move_time = timestamp;
+                                        }
+                                    } else {
+                                        last_mouse_pos = Some(current_pos);
+                                    }
+                                }
+                                rdev::EventType::ButtonPress(button) => {
+                                    // Get current mouse position for click
+                                    let pos = last_mouse_pos.unwrap_or((0, 0));
+                                    let button_str = match button {
+                                        rdev::Button::Left => "left",
+                                        rdev::Button::Right => "right",
+                                        rdev::Button::Middle => "middle",
+                                        _ => "unknown",
+                                    };
+                                    if let Ok(mut actions) = recorded_actions.try_lock() {
+                                        let action = Action::mouse_click(pos.0, pos.1, button_str, timestamp);
+                                        actions.push(action);
+                                    }
+                                }
+                                rdev::EventType::KeyPress(key) => {
+                                    // Skip ESC key from being recorded
+                                    if matches!(key, rdev::Key::Escape) {
+                                        continue;
+                                    }
+                                    let key_str = format!("{:?}", key);
+                                    if let Ok(mut actions) = recorded_actions.try_lock() {
+                                        let action = Action::key_press(&key_str, timestamp, None);
+                                        actions.push(action);
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                            // Continue checking is_recording
+                            continue;
+                        }
+                        Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                            // Channel closed, exit
                             break;
                         }
-                        
-                        // Check action limit
-                        let action_count = {
-                            if let Ok(actions) = recorded_actions.try_lock() {
-                                actions.len()
-                            } else {
-                                continue; // Skip if can't get lock
-                            }
-                        };
-                        
-                        if action_count >= max_actions {
-                            continue; // Skip if too many actions
-                        }
-                        
-                        match event_type {
-                            rdev::EventType::MouseMove { x, y } => {
-                                let current_pos = (x as i32, y as i32);
-                                
-                                // Throttle mouse moves
-                                if timestamp - last_move_time < min_move_interval {
-                                    last_mouse_pos = Some(current_pos);
-                                    continue;
-                                }
-                                
-                                // Only record if moved significantly
-                                let should_record = if let Some(last_pos) = last_mouse_pos {
-                                    let dx = (current_pos.0 - last_pos.0).abs();
-                                    let dy = (current_pos.1 - last_pos.1).abs();
-                                    dx >= mouse_move_threshold || dy >= mouse_move_threshold
-                                } else {
-                                    true
-                                };
-                                
-                                if should_record {
-                                    if let Ok(mut actions) = recorded_actions.try_lock() {
-                                        let action = Action::mouse_move(current_pos.0, current_pos.1, timestamp);
-                                        actions.push(action);
-                                        last_mouse_pos = Some(current_pos);
-                                        last_move_time = timestamp;
-                                    }
-                                } else {
-                                    last_mouse_pos = Some(current_pos);
-                                }
-                            }
-                            rdev::EventType::ButtonPress(button) => {
-                                // Get current mouse position for click
-                                let pos = last_mouse_pos.unwrap_or((0, 0));
-                                let button_str = match button {
-                                    rdev::Button::Left => "left",
-                                    rdev::Button::Right => "right",
-                                    rdev::Button::Middle => "middle",
-                                    _ => "unknown",
-                                };
-                                if let Ok(mut actions) = recorded_actions.try_lock() {
-                                    let action = Action::mouse_click(pos.0, pos.1, button_str, timestamp);
-                                    actions.push(action);
-                                }
-                            }
-                            rdev::EventType::KeyPress(key) => {
-                                // Skip ESC key from being recorded
-                                if matches!(key, rdev::Key::Escape) {
-                                    continue;
-                                }
-                                let key_str = format!("{:?}", key);
-                                if let Ok(mut actions) = recorded_actions.try_lock() {
-                                    let action = Action::key_press(&key_str, timestamp, None);
-                                    actions.push(action);
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                        // Continue checking is_recording
-                        continue;
-                    }
-                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-                        // Channel closed, exit
-                        break;
                     }
                 }
-            }
-        });
-        
+            });
+        }
+
         Ok(())
     }
 

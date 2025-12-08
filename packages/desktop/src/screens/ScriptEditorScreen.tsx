@@ -3,16 +3,22 @@
  * UI for viewing and editing recorded scripts
  * 
  * This screen allows users to:
- * - View a list of all recorded scripts
+ * - View a list of all recorded scripts with source filtering
+ * - Filter scripts by source (Recorded, AI Generated, All)
  * - Select a script to view/edit
  * - Edit script metadata and actions
  * - Save changes to the script file
  * - Delete scripts
+ * 
+ * Requirements: 9.1, 9.2, 9.4, 9.5
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthButton } from '../components/AuthButton';
+import { ScriptFilter } from '../components/ScriptFilter';
+import { ScriptListItem } from '../components/ScriptListItem';
+import { scriptStorageService, StoredScriptInfo, ScriptFilter as ScriptFilterType } from '../services/scriptStorageService';
 import { getIPCBridge } from '../services/ipcBridgeService';
 import './ScriptEditorScreen.css';
 
@@ -45,12 +51,16 @@ interface ScriptData {
 }
 
 const ScriptEditorScreen: React.FC = () => {
-  const [scripts, setScripts] = useState<ScriptInfo[]>([]);
+  const [allScripts, setAllScripts] = useState<StoredScriptInfo[]>([]);
+  const [filteredScripts, setFilteredScripts] = useState<StoredScriptInfo[]>([]);
+  const [scripts, setScripts] = useState<ScriptInfo[]>([]); // Legacy for compatibility
   const [selectedScript, setSelectedScript] = useState<ScriptInfo | null>(null);
+  const [selectedStoredScript, setSelectedStoredScript] = useState<StoredScriptInfo | null>(null);
   const [scriptData, setScriptData] = useState<ScriptData | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [editMode, setEditMode] = useState<boolean>(false);
+  const [filter, setFilter] = useState<ScriptFilterType>({ source: 'all' });
 
   const navigate = useNavigate();
   const ipcBridge = getIPCBridge();
@@ -63,12 +73,23 @@ const ScriptEditorScreen: React.FC = () => {
   }, []);
 
   /**
-   * Load all available scripts
+   * Load all available scripts with source metadata
+   * Requirements: 9.1
    */
   const loadScripts = async () => {
     try {
       setLoading(true);
       setError(null);
+
+      // Load scripts with enriched metadata using the storage service
+      const enrichedScripts = await scriptStorageService.listScripts();
+      setAllScripts(enrichedScripts);
+
+      // Apply current filter
+      const filtered = await scriptStorageService.listScriptsBySource(filter);
+      setFilteredScripts(filtered);
+
+      // Also load legacy format for compatibility
       const scriptList = await ipcBridge.listScripts();
       setScripts(scriptList);
     } catch (err) {
@@ -81,6 +102,20 @@ const ScriptEditorScreen: React.FC = () => {
   };
 
   /**
+   * Handle filter change
+   * Requirements: 9.4
+   */
+  const handleFilterChange = useCallback(async (newFilter: ScriptFilterType) => {
+    setFilter(newFilter);
+    try {
+      const filtered = await scriptStorageService.listScriptsBySource(newFilter);
+      setFilteredScripts(filtered);
+    } catch (err) {
+      console.error('Filter scripts error:', err);
+    }
+  }, []);
+
+  /**
    * Load a specific script for viewing/editing
    */
   const loadScript = async (script: ScriptInfo) => {
@@ -90,6 +125,35 @@ const ScriptEditorScreen: React.FC = () => {
       const data = await ipcBridge.loadScript(script.path);
       setScriptData(data);
       setSelectedScript(script);
+      setEditMode(false);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load script';
+      setError(errorMessage);
+      console.error('Load script error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Load a specific script from StoredScriptInfo
+   * Requirements: 9.3
+   */
+  const loadStoredScript = async (script: StoredScriptInfo) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await ipcBridge.loadScript(script.path);
+      setScriptData(data);
+      setSelectedStoredScript(script);
+      // Also set legacy selectedScript for compatibility
+      setSelectedScript({
+        path: script.path,
+        filename: script.filename,
+        created_at: script.createdAt,
+        duration: script.duration,
+        action_count: script.actionCount,
+      });
       setEditMode(false);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load script';
@@ -151,6 +215,34 @@ const ScriptEditorScreen: React.FC = () => {
   };
 
   /**
+   * Delete a script from StoredScriptInfo
+   */
+  const deleteStoredScript = async (script: StoredScriptInfo) => {
+    if (!confirm(`Are you sure you want to delete ${script.filename}?`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      await ipcBridge.deleteScript(script.path);
+      if (selectedStoredScript?.path === script.path) {
+        setSelectedStoredScript(null);
+        setSelectedScript(null);
+        setScriptData(null);
+      }
+      await loadScripts();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete script';
+      setError(errorMessage);
+      alert(`Error: ${errorMessage}`);
+      console.error('Delete script error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
    * Update action in the script
    */
   const updateAction = (index: number, field: string, value: any) => {
@@ -190,39 +282,44 @@ const ScriptEditorScreen: React.FC = () => {
   };
 
   /**
-   * Render script list
+   * Check if any AI-generated scripts exist (for showing OS filter)
+   */
+  const hasAIScripts = allScripts.some(s => s.source === 'ai_generated');
+
+  /**
+   * Render script list with filtering
+   * Requirements: 9.1, 9.2, 9.4, 9.5
    */
   const renderScriptList = () => (
     <div className="script-list">
       <h2 className="section-title">Available Scripts</h2>
-      {scripts.length === 0 ? (
-        <p className="empty-text">No scripts found. Record a session first.</p>
+
+      {/* Script Filter Component */}
+      <ScriptFilter
+        filter={filter}
+        onFilterChange={handleFilterChange}
+        totalCount={allScripts.length}
+        filteredCount={filteredScripts.length}
+        showOSFilter={hasAIScripts}
+        showSearch={true}
+      />
+
+      {filteredScripts.length === 0 ? (
+        <p className="empty-text">
+          {allScripts.length === 0
+            ? 'No scripts found. Record a session or create an AI script first.'
+            : 'No scripts match the current filter.'}
+        </p>
       ) : (
-        scripts.map((script, index) => (
-          <div
-            key={index}
-            className={`script-item ${selectedScript?.path === script.path ? 'selected' : ''}`}
-            onClick={() => loadScript(script)}
-          >
-            <div className="script-item-header">
-              <span className="script-filename">{script.filename}</span>
-              <button
-                className="delete-button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteScript(script);
-                }}
-              >
-                Delete
-              </button>
-            </div>
-            <p className="script-info">
-              Created: {new Date(script.created_at).toLocaleString()}
-            </p>
-            <p className="script-info">
-              Duration: {script.duration.toFixed(2)}s | Actions: {script.action_count}
-            </p>
-          </div>
+        filteredScripts.map((script) => (
+          <ScriptListItem
+            key={script.path}
+            script={script}
+            selected={selectedStoredScript?.path === script.path}
+            onClick={loadStoredScript}
+            onDelete={deleteStoredScript}
+            showDelete={true}
+          />
         ))
       )}
     </div>

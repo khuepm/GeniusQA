@@ -1,0 +1,266 @@
+/* UsageStatistics Component Styles */
+
+/* ============================================================================
+   Panel Variant
+   ============================================================================ */
+
+.usage-statistics-panel {
+  background-color: #ffffff;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  padding: 16px;
+  min-width: 280px;
+}
+
+.usage-statistics-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e8eaed;
+}
+
+.usage-statistics-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #202124;
+}
+
+/* ============================================================================
+   Tooltip Variant
+   ============================================================================ */
+
+.usage-statistics-tooltip {
+  position: relative;
+  display: inline-block;
+}
+
+.usage-statistics-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background-color: #f8f9fa;
+  border: 1px solid #dadce0;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 13px;
+  color: #5f6368;
+}
+
+.usage-statistics-trigger:hover {
+  background-color: #e8f0fe;
+  border-color: #1a73e8;
+  color: #1a73e8;
+}
+
+.usage-statistics-trigger:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+}
+
+.usage-statistics-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.usage-statistics-count {
+  font-weight: 500;
+}
+
+.usage-statistics-popup {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background-color: #ffffff;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 16px;
+  min-width: 280px;
+  z-index: 1000;
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================================================
+   Content Styles
+   ============================================================================ */
+
+.usage-statistics-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Summary Stats */
+.usage-statistics-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.usage-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 8px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+}
+
+.usage-stat-label {
+  font-size: 11px;
+  color: #5f6368;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+.usage-stat-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: #202124;
+}
+
+/* Success Rate Colors */
+.usage-stat-value.success-rate-excellent {
+  color: #34a853;
+}
+
+.usage-stat-value.success-rate-good {
+  color: #1a73e8;
+}
+
+.usage-stat-value.success-rate-fair {
+  color: #fbbc04;
+}
+
+.usage-stat-value.success-rate-poor {
+  color: #ea4335;
+}
+
+/* Per-Provider Stats */
+.usage-statistics-providers {
+  border-top: 1px solid #e8eaed;
+  padding-top: 12px;
+}
+
+.usage-providers-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: #5f6368;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.usage-providers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.usage-provider-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+.usage-provider-icon {
+  font-size: 16px;
+  line-height: 1;
+  z-index: 1;
+}
+
+.usage-provider-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: #202124;
+  z-index: 1;
+}
+
+.usage-provider-count {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a73e8;
+  z-index: 1;
+}
+
+.usage-provider-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background-color: rgba(26, 115, 232, 0.1);
+  transition: width 0.3s ease;
+}
+
+/* Empty State */
+.usage-statistics-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.usage-statistics-empty-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+  opacity: 0.6;
+}
+
+.usage-statistics-empty-text {
+  font-size: 13px;
+  color: #5f6368;
+  font-style: italic;
+}
+
+/* ============================================================================
+   Responsive Adjustments
+   ============================================================================ */
+
+@media (max-width: 480px) {
+  .usage-statistics-panel {
+    min-width: 100%;
+  }
+
+  .usage-statistics-popup {
+    min-width: 260px;
+    right: -20px;
+  }
+
+  .usage-statistics-summary {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .usage-stat-item {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 10px 12px;
+  }
+
+  .usage-stat-label {
+    margin-bottom: 0;
+  }
+}

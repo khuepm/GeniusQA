@@ -916,26 +916,29 @@ impl Player {
         let platform = create_platform_automation()?;
         
         // Spawn ESC key listener thread to stop playback
-        let is_playing_esc = Arc::clone(&self.is_playing);
-        thread::spawn(move || {
-            let is_playing_ref = is_playing_esc;
-            
-            // Use catch_unwind to prevent panics from crashing
-            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                let callback = move |event: rdev::Event| {
-                    if !is_playing_ref.load(Ordering::SeqCst) {
-                        return;
-                    }
-                    
-                    if let rdev::EventType::KeyPress(rdev::Key::Escape) = event.event_type {
-                        // Stop playback when ESC is pressed
-                        is_playing_ref.store(false, Ordering::SeqCst);
-                    }
-                };
+        #[cfg(not(target_os = "macos"))]
+        {
+            let is_playing_esc = Arc::clone(&self.is_playing);
+            thread::spawn(move || {
+                let is_playing_ref = is_playing_esc;
                 
-                let _ = rdev::listen(callback);
-            }));
-        });
+                // Use catch_unwind to prevent panics from crashing
+                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    let callback = move |event: rdev::Event| {
+                        if !is_playing_ref.load(Ordering::SeqCst) {
+                            return;
+                        }
+                        
+                        if let rdev::EventType::KeyPress(rdev::Key::Escape) = event.event_type {
+                            // Stop playback when ESC is pressed
+                            is_playing_ref.store(false, Ordering::SeqCst);
+                        }
+                    };
+                    
+                    let _ = rdev::listen(callback);
+                }));
+            });
+        }
         
         thread::spawn(move || {
             if let Some(script) = script {

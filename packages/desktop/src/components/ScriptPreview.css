@@ -1,0 +1,373 @@
+/**
+ * Script Preview Component Styles
+ * 
+ * Styling for the script preview panel used in AI Script Builder.
+ * Requirements: 3.5, 4.1, 4.2
+ */
+
+/* Container */
+.script-preview-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #ffffff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Empty State */
+.script-preview-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.script-preview-empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.script-preview-empty-text {
+  font-size: 16px;
+  color: #5f6368;
+  margin: 0 0 8px 0;
+}
+
+.script-preview-empty-hint {
+  font-size: 14px;
+  color: #9aa0a6;
+  margin: 0;
+  font-style: italic;
+}
+
+/* Header */
+.script-preview-header {
+  padding: 16px 20px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.script-preview-title {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #202124;
+}
+
+.script-preview-meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.script-meta-item {
+  font-size: 13px;
+  color: #5f6368;
+}
+
+/* Global Validation Messages */
+.script-preview-global-errors,
+.script-preview-global-warnings {
+  padding: 12px 16px;
+  margin: 0;
+}
+
+.script-preview-global-errors {
+  background-color: #fce8e6;
+  border-bottom: 1px solid #f5c6cb;
+}
+
+.script-preview-global-warnings {
+  background-color: #fef7e0;
+  border-bottom: 1px solid #f5e6a3;
+}
+
+.validation-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.validation-error {
+  font-size: 13px;
+  color: #c5221f;
+  margin: 4px 0;
+}
+
+.validation-warning {
+  font-size: 13px;
+  color: #b36b00;
+  margin: 4px 0;
+}
+
+/* Actions Section */
+.script-preview-actions {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.actions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #202124;
+}
+
+.validation-status {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 12px;
+}
+
+.validation-status-valid {
+  background-color: #e6f4ea;
+  color: #137333;
+}
+
+.validation-status-warning {
+  background-color: #fef7e0;
+  color: #b36b00;
+}
+
+.validation-status-invalid {
+  background-color: #fce8e6;
+  color: #c5221f;
+}
+
+.actions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Action Item */
+.action-item {
+  background-color: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 12px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.action-item:hover {
+  border-color: #dadce0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.action-item-error {
+  border-color: #f5c6cb;
+  background-color: #fef8f8;
+}
+
+.action-item-warning {
+  border-color: #f5e6a3;
+  background-color: #fffef8;
+}
+
+.action-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.action-index {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background-color: #1a73e8;
+  color: #ffffff;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.action-type-badge {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 8px;
+  background-color: #e8f0fe;
+  color: #1a73e8;
+  border-radius: 4px;
+}
+
+.action-timestamp {
+  font-size: 12px;
+  color: #9aa0a6;
+  margin-left: auto;
+}
+
+.action-edit-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 14px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.action-edit-button:hover {
+  opacity: 1;
+}
+
+.action-description {
+  font-size: 14px;
+  color: #202124;
+  line-height: 1.4;
+}
+
+.action-errors,
+.action-warnings {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e0e0e0;
+}
+
+/* Edit Form */
+.action-edit-form {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.action-edit-field {
+  margin-bottom: 12px;
+}
+
+.action-edit-field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #5f6368;
+  margin-bottom: 4px;
+}
+
+.action-edit-field input,
+.action-edit-field select,
+.action-edit-field textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #dadce0;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+
+.action-edit-field input:focus,
+.action-edit-field select:focus,
+.action-edit-field textarea:focus {
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+}
+
+.action-edit-field textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.action-edit-errors {
+  margin-bottom: 12px;
+}
+
+.validation-error-inline {
+  font-size: 12px;
+  color: #c5221f;
+  margin: 4px 0;
+}
+
+.action-edit-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.action-save-button,
+.action-cancel-button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.action-save-button {
+  background-color: #1a73e8;
+  color: #ffffff;
+}
+
+.action-save-button:hover {
+  background-color: #1557b0;
+}
+
+.action-cancel-button {
+  background-color: #f1f3f4;
+  color: #5f6368;
+}
+
+.action-cancel-button:hover {
+  background-color: #e8eaed;
+}
+
+/* Bottom Buttons */
+.script-preview-buttons {
+  display: flex;
+  gap: 12px;
+  padding: 16px 20px;
+  background-color: #f8f9fa;
+  border-top: 1px solid #e0e0e0;
+}
+
+.script-save-button,
+.script-discard-button {
+  flex: 1;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, opacity 0.2s;
+}
+
+.script-save-button {
+  background-color: #1a73e8;
+  color: #ffffff;
+}
+
+.script-save-button:hover:not(:disabled) {
+  background-color: #1557b0;
+}
+
+.script-save-button:disabled {
+  background-color: #dadce0;
+  color: #9aa0a6;
+  cursor: not-allowed;
+}
+
+.script-discard-button {
+  background-color: #ffffff;
+  color: #c5221f;
+  border: 1px solid #dadce0;
+}
+
+.script-discard-button:hover {
+  background-color: #fce8e6;
+  border-color: #f5c6cb;
+}
