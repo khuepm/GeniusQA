@@ -9,6 +9,7 @@ use python_process::PythonProcessManager;
 use rust_automation_core::preferences::UserSettings;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::path::Path;
 use tauri::State;
 
 // Core router state wrapper
@@ -632,6 +633,277 @@ async fn get_monitoring_stats(
     Ok(monitor.monitor.get_monitoring_stats().await)
 }
 
+// ============================================================================
+// AI Vision Capture Commands
+// Requirements: 1.1, 3.3, 4.9
+// ============================================================================
+
+/// AI Vision Request structure for analyze_vision command
+#[derive(Debug, Serialize, Deserialize)]
+struct AIVisionRequest {
+    screenshot: String,
+    prompt: String,
+    reference_images: Vec<String>,
+    roi: Option<VisionROI>,
+}
+
+/// Vision Region of Interest
+#[derive(Debug, Serialize, Deserialize)]
+struct VisionROI {
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+}
+
+/// AI Vision Response structure
+#[derive(Debug, Serialize, Deserialize)]
+struct AIVisionResponse {
+    success: bool,
+    x: Option<i32>,
+    y: Option<i32>,
+    confidence: Option<f64>,
+    error: Option<String>,
+}
+
+/// Cache data for vision actions
+#[derive(Debug, Serialize, Deserialize)]
+struct CacheData {
+    cached_x: Option<i32>,
+    cached_y: Option<i32>,
+    cache_dim: Option<[i32; 2]>,
+}
+
+/// Capture a vision marker during recording
+/// 
+/// This command is a placeholder that returns an error since vision marker
+/// capture is handled by the Rust recorder module directly via hotkey detection.
+/// The UI should not call this directly during recording.
+/// 
+/// Requirements: 1.1, 1.2, 1.4
+#[tauri::command]
+async fn capture_vision_marker() -> Result<serde_json::Value, String> {
+    // Vision marker capture is handled by the recorder module via hotkey
+    // This command is provided for manual triggering from UI if needed
+    Err("Vision marker capture is handled automatically by the recorder via Cmd+F6/Ctrl+F6 hotkey. Use the hotkey during recording to capture vision markers.".to_string())
+}
+
+/// Analyze a screenshot using AI Vision service
+/// 
+/// This command is a placeholder - the actual AI analysis is performed
+/// by the frontend AIVisionService since it requires API key management
+/// and network calls that are better handled in the frontend.
+/// 
+/// Requirements: 3.3, 4.6, 4.8, 4.10
+#[tauri::command]
+async fn analyze_vision(request: AIVisionRequest) -> Result<AIVisionResponse, String> {
+    // AI analysis is performed by the frontend AIVisionService
+    // This command exists for potential future backend AI integration
+    log::info!(
+        "[AI Vision] analyze_vision called with prompt: {}",
+        request.prompt.chars().take(50).collect::<String>()
+    );
+    
+    // Return error indicating frontend should handle this
+    Ok(AIVisionResponse {
+        success: false,
+        x: None,
+        y: None,
+        confidence: None,
+        error: Some("AI analysis should be performed via frontend AIVisionService. This backend command is reserved for future use.".to_string()),
+    })
+}
+
+/// Update vision cache data in a script file
+/// 
+/// Persists cache_data (cached_x, cached_y, cache_dim) for an ai_vision_capture
+/// action to the script file.
+/// 
+/// Requirements: 4.9, 5.8
+#[tauri::command]
+async fn update_vision_cache(
+    script_path: String,
+    action_id: String,
+    cache_data: CacheData,
+) -> Result<(), String> {
+    log::info!(
+        "[AI Vision] update_vision_cache called for action {} in {}",
+        action_id,
+        script_path
+    );
+    
+    // Read the script file
+    let script_content = std::fs::read_to_string(&script_path)
+        .map_err(|e| format!("Failed to read script file: {}", e))?;
+    
+    // Parse as JSON
+    let mut script: serde_json::Value = serde_json::from_str(&script_content)
+        .map_err(|e| format!("Failed to parse script JSON: {}", e))?;
+    
+    // Find and update the action with matching ID
+    let actions = script
+        .get_mut("actions")
+        .and_then(|a| a.as_array_mut())
+        .ok_or("Script does not contain actions array")?;
+    
+    let mut found = false;
+    for action in actions.iter_mut() {
+        if action.get("id").and_then(|id| id.as_str()) == Some(&action_id) {
+            if action.get("type").and_then(|t| t.as_str()) == Some("ai_vision_capture") {
+                // Update cache_data
+                action["cache_data"] = serde_json::json!({
+                    "cached_x": cache_data.cached_x,
+                    "cached_y": cache_data.cached_y,
+                    "cache_dim": cache_data.cache_dim,
+                });
+                found = true;
+                log::info!(
+                    "[AI Vision] Updated cache_data for action {}: cached_x={:?}, cached_y={:?}",
+                    action_id,
+                    cache_data.cached_x,
+                    cache_data.cached_y
+                );
+                break;
+            }
+        }
+    }
+    
+    if !found {
+        return Err(format!(
+            "Action with ID {} not found or is not an ai_vision_capture action",
+            action_id
+        ));
+    }
+    
+    // Write back to file
+    let updated_content = serde_json::to_string_pretty(&script)
+        .map_err(|e| format!("Failed to serialize script: {}", e))?;
+    
+    std::fs::write(&script_path, updated_content)
+        .map_err(|e| format!("Failed to write script file: {}", e))?;
+    
+    log::info!("[AI Vision] Successfully updated vision cache in {}", script_path);
+    Ok(())
+}
+
+/// Get current screen dimensions
+/// 
+/// Returns the current screen width and height as [width, height].
+/// 
+/// Requirements: 4.4, 4.5
+#[tauri::command]
+async fn get_screen_dimensions() -> Result<[i32; 2], String> {
+    // Use platform automation to get screen dimensions
+    use rust_automation_core::platform::create_platform_automation;
+    
+    let platform = create_platform_automation()
+        .map_err(|e| format!("Failed to create platform automation: {}", e))?;
+    
+    match platform.get_screen_size() {
+        Ok((width, height)) => {
+            log::info!("[AI Vision] Screen dimensions: {}x{}", width, height);
+            Ok([width as i32, height as i32])
+        }
+        Err(e) => {
+            log::error!("[AI Vision] Failed to get screen dimensions: {}", e);
+            Err(format!("Failed to get screen dimensions: {}", e))
+        }
+    }
+}
+
+/// Capture current screen screenshot
+/// 
+/// Captures a screenshot of the current screen and returns it as base64.
+/// 
+/// Requirements: 4.6
+#[tauri::command]
+async fn capture_screenshot() -> Result<String, String> {
+    // Use platform automation to capture screenshot
+    use rust_automation_core::platform::create_platform_automation;
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    
+    let platform = create_platform_automation()
+        .map_err(|e| format!("Failed to create platform automation: {}", e))?;
+    
+    match platform.take_screenshot() {
+        Ok(screenshot_data) => {
+            log::info!("[AI Vision] Screenshot captured successfully ({} bytes)", screenshot_data.len());
+            Ok(STANDARD.encode(&screenshot_data))
+        }
+        Err(e) => {
+            log::error!("[AI Vision] Failed to capture screenshot: {}", e);
+            Err(format!("Failed to capture screenshot: {}", e))
+        }
+    }
+}
+
+/// Save an asset file (e.g., reference image)
+/// 
+/// Saves binary data (base64 encoded) to the specified path.
+/// Creates parent directories if they don't exist.
+/// 
+/// Requirements: 5.5, 2.6
+#[tauri::command]
+async fn save_asset(asset_path: String, base64_data: String) -> Result<(), String> {
+    log::info!("[Asset Manager] Saving asset to: {}", asset_path);
+    
+    // Decode base64
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    let data = STANDARD.decode(&base64_data)
+        .map_err(|e| format!("Failed to decode base64 data: {}", e))?;
+    
+    // Create parent directories if needed
+    if let Some(parent) = Path::new(&asset_path).parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create asset directory: {}", e))?;
+    }
+    
+    // Write file
+    std::fs::write(&asset_path, data)
+        .map_err(|e| format!("Failed to write asset file: {}", e))?;
+    
+    log::info!("[Asset Manager] Asset saved successfully: {}", asset_path);
+    Ok(())
+}
+
+/// Load an asset file (e.g., reference image)
+/// 
+/// Loads binary data from the specified path and returns it as base64.
+/// 
+/// Requirements: 5.10
+#[tauri::command]
+async fn load_asset(asset_path: String) -> Result<String, String> {
+    log::info!("[Asset Manager] Loading asset from: {}", asset_path);
+    
+    // Read file
+    let data = std::fs::read(&asset_path)
+        .map_err(|e| format!("Failed to read asset file: {}", e))?;
+    
+    // Encode to base64
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    let base64_data = STANDARD.encode(&data);
+    
+    log::info!("[Asset Manager] Asset loaded successfully: {}", asset_path);
+    Ok(base64_data)
+}
+
+/// Delete an asset file (e.g., reference image)
+/// 
+/// Permanently deletes the asset file at the specified path.
+/// 
+/// Requirements: 2.6
+#[tauri::command]
+async fn delete_asset(asset_path: String) -> Result<(), String> {
+    log::info!("[Asset Manager] Deleting asset: {}", asset_path);
+    
+    // Delete file
+    std::fs::remove_file(&asset_path)
+        .map_err(|e| format!("Failed to delete asset file: {}", e))?;
+    
+    log::info!("[Asset Manager] Asset deleted successfully: {}", asset_path);
+    Ok(())
+}
+
 fn main() {
     // Initialize logging system
     if let Err(e) = init_logging() {
@@ -698,6 +970,16 @@ fn main() {
             load_script,
             save_script,
             delete_script,
+            // AI Vision Capture commands
+            capture_vision_marker,
+            analyze_vision,
+            update_vision_cache,
+            get_screen_dimensions,
+            capture_screenshot,
+            // Asset management commands
+            save_asset,
+            load_asset,
+            delete_asset,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

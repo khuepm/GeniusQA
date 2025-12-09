@@ -135,7 +135,7 @@
 .roi-tool-marker {
   position: absolute;
   pointer-events: none;
-
+}
 
 .roi-tool-marker-crosshair {
   stroke: #00ff00;

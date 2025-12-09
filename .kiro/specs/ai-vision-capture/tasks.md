@@ -143,7 +143,7 @@ Mục tiêu: Thực thi logic Playback (Static & Cache) cực nhanh bằng Rust.
 - [x] 11. Checkpoint - Player handles Static and Cached actions correctly 
   - Ensure all tests pass, ask the user if questions arise.
 
-a o83ed7## Phase 5: AI Vision Service & Dynamic Integration
+## Phase 5: AI Vision Service & Dynamic Integration
 
 Mục tiêu: Kết nối trí tuệ nhân tạo (Gemini).
 
@@ -195,20 +195,20 @@ Mục tiêu: Kết nối trí tuệ nhân tạo (Gemini).
     - **Validates: Requirements 4.11**
     - Verify cache cleared after AI failure
 
-- [-] 14. Checkpoint - Dynamic Mode with AI integration works
+- [x] 14. Checkpoint - Dynamic Mode with AI integration works
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Phase 6: Vision Editor Component (UI)
 
 Mục tiêu: Giao diện cho người dùng tương tác với dữ liệu đã có.
-1
-- [ ] 15. Implement ROI Tool Component
-  - [ ] 15.1 Create ROITool.tsx with canvas-based drawing
+
+- [x] 15. Implement ROI Tool Component
+  - [x] 15.1 Create ROITool.tsx with canvas-based drawing
     - Render image with overlay canvas
     - Implement mouse handlers for drawing ROI rectangle
     - Display dashed red border with corner handles
     - _Requirements: 2.2, 6.1_
-  - [ ] 15.2 Implement Interactive Resize Handles
+  - [x] 15.2 Implement Interactive Resize Handles
     - Implement resize handles (corners and edges)
     - Change cursor on handle hover
     - Display coordinates/dimensions in tooltip during drag
@@ -223,109 +223,109 @@ Mục tiêu: Giao diện cho người dùng tương tác với dữ liệu đã 
     - **Validates: Requirements 2.2, 2.3, 2.4**
     - Generate random ROI values, verify bounds constraints
 
-- [ ] 16. Implement Vision Editor main component
-  - [ ] 16.1 Create VisionEditor.tsx with layout structure
+- [x] 16. Implement Vision Editor main component
+  - [x] 16.1 Create VisionEditor.tsx with layout structure
     - Display screenshot with ROITool
     - Add prompt textarea input
     - Add interaction type selector (Click, Double Click, Right Click, Hover)
     - Add Search Scope toggle (Global/Regional)
     - _Requirements: 2.1, 2.3, 2.4, 2.7_
-  - [ ] 16.2 Implement Cache Invalidation Logic
+  - [x] 16.2 Implement Cache Invalidation Logic
     - Watch for changes to prompt, roi, reference_images
     - Reset cache_data to null when dynamic_config changes
     - Preserve cache when only interaction_type or is_dynamic changes
     - _Requirements: 7.1, 7.2, 7.3, 7.4_
-  - [ ] 16.3 Implement mode toggle and status indicators
+  - [x] 16.3 Implement mode toggle and status indicators
     - Add "Find at Runtime (Dynamic)" toggle
     - Display green icon for Static Mode (saved)
     - Display blue/purple icon for Dynamic Mode
     - Display "Ready for Playback (0 Token Cost)" indicator
     - _Requirements: 4.2, 6.6, 6.7, 3.6_
-  - [ ] 16.4 Implement Analyze button and AI integration
+  - [x] 16.4 Implement Analyze button and AI integration
     - Call AIVisionService.analyze() on click
     - Display spinner overlay during analysis
     - Update marker position on success
     - Display error message on failure
     - _Requirements: 3.2, 3.3, 3.4, 3.7, 6.5_
-  - [ ] 16.5 Write property test for default mode
+  - [x] 16.5 Write property test for default mode
     - **Property 12: Default Mode Invariant**
     - **Validates: Requirements 3.1**
     - Create new actions, verify is_dynamic = false
-  - [ ] 16.6 Write property test for editor cache invalidation
+  - [x] 16.6 Write property test for editor cache invalidation
     - **Property 15: Editor Cache Invalidation**
     - **Validates: Requirements 7.1, 7.2, 7.3**
     - Generate actions with cache, modify dynamic_config, verify cache reset
 
-- [ ] 17. Implement Reference Image Manager
-  - [ ] 17.1 Create ReferenceImageManager.tsx
+- [x] 17. Implement Reference Image Manager
+  - [x] 17.1 Create ReferenceImageManager.tsx
     - Display thumbnail grid of reference images
     - Implement paste handler (Ctrl+V / Cmd+V)
     - Implement drag-and-drop handler
     - Implement remove button for each thumbnail
     - _Requirements: 2.5, 2.6, 2.8_
-  - [ ] 17.2 Write property test for asset persistence
+  - [x] 17.2 Write property test for asset persistence
     - **Property 9: Reference Image Asset Persistence**
     - **Validates: Requirements 5.5, 2.6**
     - Generate random images, verify file creation and path validity
 
-- [ ] 18. Checkpoint - Vision Editor UI is functional
+- [x] 18. Checkpoint - Vision Editor UI is functional
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Phase 7: TypeScript Asset Manager
 
-- [ ] 19. Implement Asset Manager service (TypeScript)
-  - [ ] 19.1 Create assetManager.ts with core file operations
+- [x] 19. Implement Asset Manager service (TypeScript)
+  - [x] 19.1 Create assetManager.ts with core file operations
     - Implement constructor with scriptPath
     - Implement getAssetsDir() to return ./assets/ relative path
     - Implement saveReferenceImage() with unique filename generation
     - Implement loadReferenceImage() and deleteReferenceImage()
     - _Requirements: 5.5, 2.6_
-  - [ ] 19.2 Implement path normalization utilities (TypeScript)
+  - [x] 19.2 Implement path normalization utilities (TypeScript)
     - Implement toPosixPath() - convert any path to forward slashes
     - Implement toNativePath() - convert POSIX to OS-native (use path.sep)
     - Implement generateUniqueFilename() with pattern vision_{actionId}_{timestamp}.{ext}
     - _Requirements: 5.9, 5.10, 5.11_
-  - [ ] 19.3 Write property test for TS path normalization
+  - [x] 19.3 Write property test for TS path normalization
     - **Property 16: Asset Path Normalization (Cross-Platform)**
     - **Validates: Requirements 5.9, 5.10**
     - Generate paths with mixed separators, verify POSIX output
-  - [ ] 19.4 Write property test for TS filename uniqueness
+  - [x] 19.4 Write property test for TS filename uniqueness
     - **Property 17: Asset File Naming Uniqueness**
     - **Validates: Requirements 5.11**
     - Generate multiple images, verify unique filenames
 
-- [ ] 20. Checkpoint - TypeScript Asset Manager works
+- [x] 20. Checkpoint - TypeScript Asset Manager works
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Phase 8: Integration and Script Editor
 
-- [ ] 21. Integrate VisionEditor into ScriptEditorScreen
-  - [ ] 21.1 Add VisionEditor rendering for ai_vision_capture actions
+- [x] 21. Integrate VisionEditor into ScriptEditorScreen
+  - [x] 21.1 Add VisionEditor rendering for ai_vision_capture actions
     - Detect action type and render VisionEditor
     - Wire up onUpdate callback to script state
     - Wire up onAnalyze to AIVisionService
     - _Requirements: 2.1_
-  - [ ] 21.2 Add CSS styles for VisionEditor
+  - [x] 21.2 Add CSS styles for VisionEditor
     - Style ROI tool with dashed red border
     - Style reference image thumbnails
     - Style mode indicators and buttons
     - _Requirements: 6.1, 6.6, 6.7_
 
-- [ ] 22. Update script storage to handle ai_vision_capture
-  - [ ] 22.1 Extend scriptStorageService.ts
+- [x] 22. Update script storage to handle ai_vision_capture
+  - [x] 22.1 Extend scriptStorageService.ts
     - Handle ai_vision_capture action serialization
     - Ensure assets folder is created when saving
     - Validate ai_vision_capture actions on load
     - _Requirements: 5.5, 5.6_
 
-- [ ] 23. Implement IPC bridge for vision capture
-  - [ ] 23.1 Add IPC commands for vision capture
+- [x] 23. Implement IPC bridge for vision capture
+  - [x] 23.1 Add IPC commands for vision capture
     - Add "capture_vision_marker" command to trigger from UI
     - Add "analyze_vision" command to call AI from Desktop
     - Add "update_vision_cache" command to persist cache
     - _Requirements: 1.1, 3.3, 4.9_
 
-- [ ] 24. Checkpoint - Full integration works end-to-end
+- [x] 24. Checkpoint - Full integration works end-to-end
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Phase 9: Python Support (Legacy/Hybrid - Optional)

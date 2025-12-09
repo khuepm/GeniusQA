@@ -300,3 +300,199 @@
   color: #5f6368;
   font-family: monospace;
 }
+
+/* ============================================================================
+   AI Vision Capture Action Styles
+   Requirements: 6.1, 6.6, 6.7
+   ============================================================================ */
+
+/* Action item selected state */
+.action-item.selected {
+  border-color: #6366f1;
+  background-color: #f0f0ff;
+}
+
+/* Vision action type badge */
+.action-type.vision-action {
+  color: #6366f1;
+  background-color: rgba(99, 102, 241, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* Expand/collapse button for vision actions */
+.action-expand-button {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background-color: #e8f0fe;
+  border: none;
+  color: #1a73e8;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-left: 8px;
+  transition: background-color 0.2s;
+}
+
+.action-expand-button:hover {
+  background-color: #d2e3fc;
+}
+
+/* VisionEditor container within action item */
+.vision-editor-container {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #dadce0;
+}
+
+/* Reference images section */
+.reference-images-section {
+  margin-top: 16px;
+}
+
+/* ============================================================================
+   ROI Tool Styles (Requirement: 6.1)
+   Dashed red border for ROI rectangles
+   ============================================================================ */
+
+/* These styles are applied via canvas drawing in ROITool component,
+   but we define CSS variables for consistency */
+:root {
+  --roi-border-color: #ff0000;
+  --roi-border-width: 2px;
+  --roi-border-style: dashed;
+  --roi-handle-size: 10px;
+  --roi-handle-color: #ffffff;
+  --roi-handle-border: #ff0000;
+}
+
+/* ============================================================================
+   Mode Indicator Styles (Requirements: 6.6, 6.7)
+   ============================================================================ */
+
+/* Static mode indicator - green */
+.mode-indicator-static {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background-color: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.mode-indicator-static::before {
+  content: '●';
+  font-size: 8px;
+}
+
+/* Dynamic mode indicator - purple/blue */
+.mode-indicator-dynamic {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background-color: rgba(139, 92, 246, 0.15);
+  color: #8b5cf6;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.mode-indicator-dynamic::before {
+  content: '◆';
+  font-size: 8px;
+}
+
+/* Ready for playback indicator */
+.ready-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background-color: rgba(34, 197, 94, 0.1);
+  color: #16a34a;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.ready-indicator::before {
+  content: '✓';
+}
+
+/* ============================================================================
+   Reference Image Thumbnail Styles (Requirement: 2.8)
+   ============================================================================ */
+
+.reference-thumbnail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.reference-thumbnail {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #dadce0;
+  background-color: #f8f9fa;
+}
+
+.reference-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.reference-thumbnail-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: rgba(217, 48, 37, 0.9);
+  border: none;
+  color: #ffffff;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.reference-thumbnail:hover .reference-thumbnail-remove {
+  opacity: 1;
+}
+
+/* ============================================================================
+   Responsive Adjustments for Vision Editor
+   ============================================================================ */
+
+@media (max-width: 1200px) {
+  .vision-editor-container {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .action-expand-button {
+    width: 20px;
+    height: 20px;
+    font-size: 10px;
+  }
+
+  .reference-thumbnail-grid {
+    grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+  }
+}
