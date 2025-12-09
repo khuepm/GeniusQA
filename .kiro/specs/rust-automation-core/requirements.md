@@ -127,14 +127,19 @@ This document specifies the requirements for adding a Rust-based automation core
 4. WHEN a core becomes unavailable during operation THEN the system SHALL gracefully handle the failure and offer core switching
 5. WHEN core availability changes THEN the system SHALL update the UI to reflect current options and status
 
-### Requirement 10
+### Requirement 10a
 
-**User Story:** As a user, I want performance metrics and comparison between cores, so that I can make informed decisions about which backend to use.
-
+**User Story:** As a user, I want performance metrics and comparison between cores,4my48a  so that I can make informed decisions about which backend to use.2u
+s3iúhoo
 #### Acceptance Criteria
 
-1. WHEN automation operations complete THEN the system SHALL record performance metrics including execution time and resource usage
-2. WHEN both cores are available THEN the system SHALL provide a comparison view showing relative performance characteristics
+1. WHEN automation operations complete THEN the system SHALL record2 performance metrics including execution time and resource usage
+2. WHEN both cores  1are available THEN the system SHALL provide a comparison view showing relative performance characteristics
 3. WHEN displaying core selection THEN the system SHALL show estimated performance benefits and trade-offs for each option
 4. WHEN switching cores THEN the system SHALL provide feedback about expected performance changes
-5. WHEN performance issues occur THEN the system SHALL suggest trying the alternative automation core
+5. WHEN performance1 issues occur THEN the system SHALL suggest trying the alternative automation core
+1 by
+a
+txhw6mt4cqtp2vedt9e
+c
+t4so8v

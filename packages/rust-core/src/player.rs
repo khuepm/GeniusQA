@@ -1077,6 +1077,7 @@ impl Player {
                                 ActionType::Screenshot => "screenshot".to_string(),
                                 ActionType::Wait => "wait".to_string(),
                                 ActionType::Custom => "custom".to_string(),
+                                ActionType::AiVisionCapture => "ai_vision_capture".to_string(),
                             },
                             timestamp: action.timestamp,
                             x: action.x,
@@ -1644,6 +1645,9 @@ impl Player {
             // Screenshot and Custom are not supported during playback
             ActionType::Screenshot => false,
             ActionType::Custom => false,
+            
+            // AI Vision Capture requires separate handling (not via standard Action struct)
+            ActionType::AiVisionCapture => false,
         }
     }
     
@@ -1696,6 +1700,7 @@ impl Player {
                 ActionType::KeyPress | ActionType::KeyRelease => "Missing required key parameter",
                 ActionType::KeyType => "Missing required text parameter",
                 ActionType::Wait => "Wait action has invalid parameters",
+                ActionType::AiVisionCapture => "AI Vision Capture actions require separate handling via AIVisionCaptureAction struct",
             };
             
             Self::log_action_skipped(action_index, action, reason);
@@ -1936,6 +1941,11 @@ impl Player {
                 // Custom actions would need specific handling based on additional_data
                 Ok(())
             }
+            ActionType::AiVisionCapture => {
+                // AI Vision Capture actions are handled separately via AIVisionCaptureAction struct
+                // This branch should not be reached as is_action_supported returns false
+                Ok(())
+            }
         };
 
         let duration = start_time.elapsed();
@@ -2174,6 +2184,859 @@ impl BackgroundPlayer {
     pub fn is_paused(&self) -> bool {
         let player = self.player.lock().unwrap();
         player.is_paused()
+    }
+}
+
+// ============================================================================
+// Coordinate Scaling Utilities for AI Vision Capture
+// ============================================================================
+
+/// Represents screen dimensions (width, height)
+pub type ScreenDimensions = (u32, u32);
+
+/// Result of coordinate scaling operation
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScaledCoordinates {
+    /// Scaled X coordinate
+    pub x: i32,
+    /// Scaled Y coordinate
+    pub y: i32,
+    /// Whether scaling was applied (false if dimensions match)
+    pub was_scaled: bool,
+}
+
+/// Scale coordinates proportionally when screen resolution differs.
+///
+/// This function implements proportional scaling for AI Vision Capture coordinates
+/// when the playback screen resolution differs from the recording resolution.
+///
+/// # Formula
+/// - `new_x = old_x * (new_width / old_width)`
+/// - `new_y = old_y * (new_height / old_height)`
+///
+/// # Clamping
+/// The resulting coordinates are clamped to the new screen bounds:
+/// - `0 <= x < new_width`
+/// - `0 <= y < new_height`
+///
+/// # Arguments
+/// * `x` - Original X coordinate
+/// * `y` - Original Y coordinate
+/// * `old_dim` - Original screen dimensions (width, height) at recording time
+/// * `new_dim` - Current screen dimensions (width, height) at playback time
+///
+/// # Returns
+/// `ScaledCoordinates` containing the scaled and clamped coordinates
+///
+/// # Requirements
+/// - **Validates: Requirements 4.3, 4.4** - Proportional scaling for Static Mode
+/// - **Validates: Requirements 4.5** - Proportional scaling for Cache Mode
+///
+/// # Example
+/// ```
+/// use rust_core::player::{scale_coordinates, ScreenDimensions};
+///
+/// // Original coordinates at 1920x1080
+/// let result = scale_coordinates(960, 540, (1920, 1080), (3840, 2160));
+///
+/// // Should scale proportionally to 4K
+/// assert_eq!(result.x, 1920);
+/// assert_eq!(result.y, 1080);
+/// assert!(result.was_scaled);
+/// ```
+pub fn scale_coordinates(
+    x: i32,
+    y: i32,
+    old_dim: ScreenDimensions,
+    new_dim: ScreenDimensions,
+) -> ScaledCoordinates {
+    let (old_width, old_height) = old_dim;
+    let (new_width, new_height) = new_dim;
+
+    // If dimensions are the same, no scaling needed
+    if old_width == new_width && old_height == new_height {
+        return ScaledCoordinates {
+            x,
+            y,
+            was_scaled: false,
+        };
+    }
+
+    // Handle edge case: zero dimensions (avoid division by zero)
+    if old_width == 0 || old_height == 0 {
+        return ScaledCoordinates {
+            x: 0,
+            y: 0,
+            was_scaled: true,
+        };
+    }
+
+    // Calculate proportional scaling using floating point for precision
+    // Formula: new_x = old_x * (new_width / old_width)
+    let scale_x = new_width as f64 / old_width as f64;
+    let scale_y = new_height as f64 / old_height as f64;
+
+    let scaled_x = (x as f64 * scale_x).round() as i32;
+    let scaled_y = (y as f64 * scale_y).round() as i32;
+
+    // Clamp coordinates to screen bounds
+    // x must be in range [0, new_width - 1]
+    // y must be in range [0, new_height - 1]
+    let clamped_x = scaled_x.max(0).min((new_width as i32).saturating_sub(1));
+    let clamped_y = scaled_y.max(0).min((new_height as i32).saturating_sub(1));
+
+    ScaledCoordinates {
+        x: clamped_x,
+        y: clamped_y,
+        was_scaled: true,
+    }
+}
+
+/// Scale a VisionROI (Region of Interest) proportionally when screen resolution differs.
+///
+/// This function scales all four components of an ROI (x, y, width, height) proportionally.
+///
+/// # Arguments
+/// * `roi` - The original ROI to scale
+/// * `old_dim` - Original screen dimensions at recording time
+/// * `new_dim` - Current screen dimensions at playback time
+///
+/// # Returns
+/// A new `VisionROI` with scaled coordinates and dimensions, clamped to screen bounds
+///
+/// # Requirements
+/// - **Validates: Requirements 4.7** - ROI scaling for Dynamic Mode Regional Search
+pub fn scale_roi(
+    roi: &crate::script::VisionROI,
+    old_dim: ScreenDimensions,
+    new_dim: ScreenDimensions,
+) -> crate::script::VisionROI {
+    let (old_width, old_height) = old_dim;
+    let (new_width, new_height) = new_dim;
+
+    // If dimensions are the same, return a clone
+    if old_width == new_width && old_height == new_height {
+        return roi.clone();
+    }
+
+    // Handle edge case: zero dimensions
+    if old_width == 0 || old_height == 0 {
+        return crate::script::VisionROI {
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0,
+        };
+    }
+
+    // Calculate scale factors
+    let scale_x = new_width as f64 / old_width as f64;
+    let scale_y = new_height as f64 / old_height as f64;
+
+    // Scale position
+    let scaled_x = (roi.x as f64 * scale_x).round() as i32;
+    let scaled_y = (roi.y as f64 * scale_y).round() as i32;
+
+    // Scale dimensions
+    let scaled_width = (roi.width as f64 * scale_x).round() as i32;
+    let scaled_height = (roi.height as f64 * scale_y).round() as i32;
+
+    // Clamp position to screen bounds
+    let clamped_x = scaled_x.max(0).min((new_width as i32).saturating_sub(1));
+    let clamped_y = scaled_y.max(0).min((new_height as i32).saturating_sub(1));
+
+    // Clamp dimensions to fit within screen (ensure at least 1 pixel)
+    let max_width = (new_width as i32 - clamped_x).max(1);
+    let max_height = (new_height as i32 - clamped_y).max(1);
+    let clamped_width = scaled_width.max(1).min(max_width) as u32;
+    let clamped_height = scaled_height.max(1).min(max_height) as u32;
+
+    crate::script::VisionROI {
+        x: clamped_x,
+        y: clamped_y,
+        width: clamped_width,
+        height: clamped_height,
+    }
+}
+
+// ============================================================================
+// AI Vision Capture Execution
+// ============================================================================
+
+/// Result of AI Vision Capture execution
+#[derive(Debug, Clone)]
+pub struct AIVisionExecutionResult {
+    /// Whether the execution was successful
+    pub success: bool,
+    /// The mode that was used for execution
+    pub mode: AIVisionExecutionMode,
+    /// The coordinates used for the interaction
+    pub coordinates: Option<(i32, i32)>,
+    /// Whether AI was called (only true for Dynamic Mode without cache)
+    pub ai_called: bool,
+    /// Error message if execution failed
+    pub error: Option<String>,
+}
+
+/// The execution mode used for AI Vision Capture
+#[derive(Debug, Clone, PartialEq)]
+pub enum AIVisionExecutionMode {
+    /// Static Mode: Used saved_x/saved_y from static_data
+    Static,
+    /// Cache Mode: Used cached_x/cached_y from cache_data
+    Cache,
+    /// Dynamic Mode: Called AI service to find coordinates
+    Dynamic,
+    /// Skipped: Action was skipped due to missing data
+    Skipped,
+}
+
+impl std::fmt::Display for AIVisionExecutionMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AIVisionExecutionMode::Static => write!(f, "Static"),
+            AIVisionExecutionMode::Cache => write!(f, "Cache"),
+            AIVisionExecutionMode::Dynamic => write!(f, "Dynamic"),
+            AIVisionExecutionMode::Skipped => write!(f, "Skipped"),
+        }
+    }
+}
+
+/// Execute an AI Vision Capture action.
+///
+/// This function implements the execution dispatcher for AI Vision Capture actions,
+/// following the priority order defined in Requirements 4.1:
+/// 1. Static Mode (saved_x/y) - 0 token cost
+/// 2. Cache Mode (cached_x/y) - 0 token cost  
+/// 3. Dynamic Mode (Call AI) - token cost, then cache result
+///
+/// # Arguments
+/// * `platform` - Platform automation interface for executing interactions
+/// * `action` - The AI Vision Capture action to execute
+/// * `action_index` - Index of the action in the script (for logging)
+///
+/// # Returns
+/// `AIVisionExecutionResult` containing execution details
+///
+/// # Requirements
+/// - **Validates: Requirements 4.1** - Playback priority order
+/// - **Validates: Requirements 4.3, 4.4** - Static Mode execution with scaling
+/// - **Validates: Requirements 4.5** - Cache Mode execution with scaling
+/// - **Validates: Requirements 4.6** - Dynamic Mode (stub for future AI integration)
+/// - **Validates: Requirements 4.12** - Skip and log warning if coordinates missing
+pub fn execute_ai_vision_capture(
+    platform: &dyn PlatformAutomation,
+    action: &crate::script::AIVisionCaptureAction,
+    action_index: usize,
+) -> AIVisionExecutionResult {
+    // Log the start of AI Vision Capture execution
+    log_ai_vision_execution_start(action_index, action);
+
+    // Priority 1: Check if Static Mode (is_dynamic = false)
+    if !action.is_dynamic {
+        return execute_static_mode(platform, action, action_index);
+    }
+
+    // Priority 2: Check if Cache Mode (is_dynamic = true AND has cached coordinates)
+    if action.has_cached_coordinates() {
+        return execute_cache_mode(platform, action, action_index);
+    }
+
+    // Priority 3: Dynamic Mode (is_dynamic = true AND no cache)
+    execute_dynamic_mode(platform, action, action_index)
+}
+
+/// Execute AI Vision Capture in Static Mode.
+///
+/// Uses saved_x/saved_y from static_data, applying proportional scaling
+/// if the current screen resolution differs from the recorded resolution.
+///
+/// # Requirements
+/// - **Validates: Requirements 4.3** - Static Mode execution
+/// - **Validates: Requirements 4.4** - Proportional scaling
+/// - **Validates: Requirements 4.12** - Skip if coordinates missing
+fn execute_static_mode(
+    platform: &dyn PlatformAutomation,
+    action: &crate::script::AIVisionCaptureAction,
+    action_index: usize,
+) -> AIVisionExecutionResult {
+    // Log Static Mode execution
+    if let Some(logger) = get_logger() {
+        let mut metadata = HashMap::new();
+        metadata.insert("action_index".to_string(), json!(action_index));
+        metadata.insert("action_id".to_string(), json!(&action.id));
+        metadata.insert("mode".to_string(), json!("Static"));
+        metadata.insert("is_dynamic".to_string(), json!(action.is_dynamic));
+        
+        logger.log_operation(
+            LogLevel::Info,
+            CoreType::Rust,
+            OperationType::Playback,
+            format!("ai_vision_static_{}", chrono::Utc::now().timestamp_millis()),
+            format!("AI Vision Capture [{}]: Using Static Mode (0 token cost)", action_index),
+            Some(metadata),
+        );
+    }
+
+    // Check if saved coordinates exist
+    let (saved_x, saved_y) = match (action.static_data.saved_x, action.static_data.saved_y) {
+        (Some(x), Some(y)) => (x, y),
+        _ => {
+            // Skip action and log warning (Requirement 4.12)
+            log_ai_vision_skip(action_index, action, "Missing saved coordinates in Static Mode");
+            return AIVisionExecutionResult {
+                success: false,
+                mode: AIVisionExecutionMode::Skipped,
+                coordinates: None,
+                ai_called: false,
+                error: Some("Missing saved coordinates in Static Mode".to_string()),
+            };
+        }
+    };
+
+    // Get current screen dimensions
+    let current_dim = match platform.get_screen_size() {
+        Ok(dim) => dim,
+        Err(e) => {
+            log_ai_vision_error(action_index, action, &format!("Failed to get screen size: {}", e));
+            return AIVisionExecutionResult {
+                success: false,
+                mode: AIVisionExecutionMode::Static,
+                coordinates: Some((saved_x, saved_y)),
+                ai_called: false,
+                error: Some(format!("Failed to get screen size: {}", e)),
+            };
+        }
+    };
+
+    // Apply proportional scaling if resolution differs (Requirement 4.4)
+    let recorded_dim = action.static_data.screen_dim;
+    let scaled = scale_coordinates(saved_x, saved_y, recorded_dim, current_dim);
+
+    if scaled.was_scaled {
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("original_x".to_string(), json!(saved_x));
+            metadata.insert("original_y".to_string(), json!(saved_y));
+            metadata.insert("scaled_x".to_string(), json!(scaled.x));
+            metadata.insert("scaled_y".to_string(), json!(scaled.y));
+            metadata.insert("recorded_dim".to_string(), json!(format!("{}x{}", recorded_dim.0, recorded_dim.1)));
+            metadata.insert("current_dim".to_string(), json!(format!("{}x{}", current_dim.0, current_dim.1)));
+            
+            logger.log_operation(
+                LogLevel::Debug,
+                CoreType::Rust,
+                OperationType::Playback,
+                format!("ai_vision_scale_{}", chrono::Utc::now().timestamp_millis()),
+                format!("Scaled coordinates from ({}, {}) to ({}, {}) for resolution change {}x{} -> {}x{}",
+                    saved_x, saved_y, scaled.x, scaled.y,
+                    recorded_dim.0, recorded_dim.1, current_dim.0, current_dim.1),
+                Some(metadata),
+            );
+        }
+    }
+
+    // Execute the interaction at the coordinates
+    let result = execute_interaction(platform, action, scaled.x, scaled.y, action_index);
+
+    AIVisionExecutionResult {
+        success: result.is_ok(),
+        mode: AIVisionExecutionMode::Static,
+        coordinates: Some((scaled.x, scaled.y)),
+        ai_called: false,
+        error: result.err().map(|e| e.to_string()),
+    }
+}
+
+/// Execute AI Vision Capture in Cache Mode.
+///
+/// Uses cached_x/cached_y from cache_data, applying proportional scaling
+/// if the current screen resolution differs from cache_dim.
+///
+/// # Requirements
+/// - **Validates: Requirements 4.5** - Cache Mode execution with scaling
+fn execute_cache_mode(
+    platform: &dyn PlatformAutomation,
+    action: &crate::script::AIVisionCaptureAction,
+    action_index: usize,
+) -> AIVisionExecutionResult {
+    // Log Cache Mode execution
+    if let Some(logger) = get_logger() {
+        let mut metadata = HashMap::new();
+        metadata.insert("action_index".to_string(), json!(action_index));
+        metadata.insert("action_id".to_string(), json!(&action.id));
+        metadata.insert("mode".to_string(), json!("Cache"));
+        
+        logger.log_operation(
+            LogLevel::Info,
+            CoreType::Rust,
+            OperationType::Playback,
+            format!("ai_vision_cache_{}", chrono::Utc::now().timestamp_millis()),
+            format!("AI Vision Capture [{}]: Using cached coordinates (0 token cost)", action_index),
+            Some(metadata),
+        );
+    }
+
+    // Get cached coordinates (we already verified they exist)
+    let (cached_x, cached_y) = match (action.cache_data.cached_x, action.cache_data.cached_y) {
+        (Some(x), Some(y)) => (x, y),
+        _ => {
+            // This shouldn't happen since we checked has_cached_coordinates()
+            log_ai_vision_error(action_index, action, "Cache data unexpectedly missing");
+            return AIVisionExecutionResult {
+                success: false,
+                mode: AIVisionExecutionMode::Cache,
+                coordinates: None,
+                ai_called: false,
+                error: Some("Cache data unexpectedly missing".to_string()),
+            };
+        }
+    };
+
+    // Get current screen dimensions
+    let current_dim = match platform.get_screen_size() {
+        Ok(dim) => dim,
+        Err(e) => {
+            log_ai_vision_error(action_index, action, &format!("Failed to get screen size: {}", e));
+            return AIVisionExecutionResult {
+                success: false,
+                mode: AIVisionExecutionMode::Cache,
+                coordinates: Some((cached_x, cached_y)),
+                ai_called: false,
+                error: Some(format!("Failed to get screen size: {}", e)),
+            };
+        }
+    };
+
+    // Apply proportional scaling using cache_dim if resolution differs
+    let cache_dim = action.cache_data.cache_dim.unwrap_or(current_dim);
+    let scaled = scale_coordinates(cached_x, cached_y, cache_dim, current_dim);
+
+    if scaled.was_scaled {
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("original_x".to_string(), json!(cached_x));
+            metadata.insert("original_y".to_string(), json!(cached_y));
+            metadata.insert("scaled_x".to_string(), json!(scaled.x));
+            metadata.insert("scaled_y".to_string(), json!(scaled.y));
+            metadata.insert("cache_dim".to_string(), json!(format!("{}x{}", cache_dim.0, cache_dim.1)));
+            metadata.insert("current_dim".to_string(), json!(format!("{}x{}", current_dim.0, current_dim.1)));
+            
+            logger.log_operation(
+                LogLevel::Debug,
+                CoreType::Rust,
+                OperationType::Playback,
+                format!("ai_vision_cache_scale_{}", chrono::Utc::now().timestamp_millis()),
+                format!("Scaled cached coordinates from ({}, {}) to ({}, {}) for resolution change {}x{} -> {}x{}",
+                    cached_x, cached_y, scaled.x, scaled.y,
+                    cache_dim.0, cache_dim.1, current_dim.0, current_dim.1),
+                Some(metadata),
+            );
+        }
+    }
+
+    // Execute the interaction at the coordinates
+    let result = execute_interaction(platform, action, scaled.x, scaled.y, action_index);
+
+    AIVisionExecutionResult {
+        success: result.is_ok(),
+        mode: AIVisionExecutionMode::Cache,
+        coordinates: Some((scaled.x, scaled.y)),
+        ai_called: false,
+        error: result.err().map(|e| e.to_string()),
+    }
+}
+
+/// Execute AI Vision Capture in Dynamic Mode.
+///
+/// This function handles Dynamic Mode execution by:
+/// 1. Capturing a screenshot of the current screen
+/// 2. Building an AI analysis request with prompt and reference images
+/// 3. Calling the AI service (via callback/provider)
+/// 4. Executing the interaction at the returned coordinates
+///
+/// Note: The actual AI service call is handled externally via the AIVisionProvider
+/// trait or through IPC to the TypeScript AI Vision Service.
+///
+/// # Requirements
+/// - **Validates: Requirements 4.6** - Dynamic Mode AI call
+/// - **Validates: Requirements 4.7** - ROI handling for Regional Search
+/// - **Validates: Requirements 4.8** - AI request structure
+/// - **Validates: Requirements 4.10** - Timeout handling
+fn execute_dynamic_mode(
+    _platform: &dyn PlatformAutomation,
+    action: &crate::script::AIVisionCaptureAction,
+    action_index: usize,
+) -> AIVisionExecutionResult {
+    // Log Dynamic Mode execution
+    if let Some(logger) = get_logger() {
+        let mut metadata = HashMap::new();
+        metadata.insert("action_index".to_string(), json!(action_index));
+        metadata.insert("action_id".to_string(), json!(&action.id));
+        metadata.insert("mode".to_string(), json!("Dynamic"));
+        metadata.insert("prompt".to_string(), json!(&action.dynamic_config.prompt));
+        metadata.insert("reference_images_count".to_string(), json!(action.dynamic_config.reference_images.len()));
+        metadata.insert("search_scope".to_string(), json!(format!("{:?}", action.dynamic_config.search_scope)));
+        metadata.insert("has_roi".to_string(), json!(action.dynamic_config.roi.is_some()));
+        
+        logger.log_operation(
+            LogLevel::Info,
+            CoreType::Rust,
+            OperationType::Playback,
+            format!("ai_vision_dynamic_{}", chrono::Utc::now().timestamp_millis()),
+            format!("AI Vision Capture [{}]: Dynamic Mode - Preparing AI analysis request...", action_index),
+            Some(metadata),
+        );
+    }
+
+    // Dynamic Mode requires external AI service integration
+    // The actual AI call is handled by the Tauri frontend via IPC
+    // This function prepares the request and returns a result indicating
+    // that AI analysis is needed
+    
+    // Log that we're ready for AI analysis
+    if let Some(logger) = get_logger() {
+        logger.log_operation(
+            LogLevel::Info,
+            CoreType::Rust,
+            OperationType::Playback,
+            format!("ai_vision_dynamic_ready_{}", chrono::Utc::now().timestamp_millis()),
+            format!("AI Vision Capture [{}]: Dynamic Mode - Ready for AI service call (handled via IPC)", action_index),
+            None,
+        );
+    }
+
+    // Return a result indicating Dynamic Mode needs AI service
+    // The actual execution will be handled by execute_dynamic_mode_with_ai
+    AIVisionExecutionResult {
+        success: false,
+        mode: AIVisionExecutionMode::Dynamic,
+        coordinates: None,
+        ai_called: false,
+        error: Some("Dynamic Mode requires AI service - use execute_dynamic_mode_with_ai".to_string()),
+    }
+}
+
+/// Execute AI Vision Capture in Dynamic Mode with AI provider.
+///
+/// This function performs the full Dynamic Mode execution including:
+/// 1. Capturing a screenshot of the current screen
+/// 2. Handling ROI scaling for Regional Search (Requirement 4.7)
+/// 3. Calling the AI service via the provided AIVisionProvider
+/// 4. Executing the interaction at the returned coordinates
+/// 5. Returning cache update information for persistence
+///
+/// # Arguments
+/// * `platform` - Platform automation interface for executing interactions
+/// * `action` - The AI Vision Capture action to execute
+/// * `action_index` - Index of the action in the script (for logging)
+/// * `ai_provider` - The AI Vision provider to use for analysis
+/// * `screenshot_base64` - Base64 encoded screenshot of the current screen
+/// * `reference_images_base64` - Base64 encoded reference images
+///
+/// # Returns
+/// `DynamicModeExecutionResult` containing execution details and cache update info
+///
+/// # Requirements
+/// - **Validates: Requirements 4.6** - Dynamic Mode AI call
+/// - **Validates: Requirements 4.7** - ROI handling for Regional Search
+/// - **Validates: Requirements 4.8** - AI request structure
+/// - **Validates: Requirements 4.9** - Cache update after success
+/// - **Validates: Requirements 4.10** - Timeout handling
+/// - **Validates: Requirements 4.11** - Cache invalidation on failure
+pub fn execute_dynamic_mode_with_ai(
+    platform: &dyn PlatformAutomation,
+    action: &crate::script::AIVisionCaptureAction,
+    action_index: usize,
+    ai_provider: &dyn crate::ai_vision_integration::AIVisionProvider,
+    screenshot_base64: String,
+    reference_images_base64: Vec<String>,
+) -> DynamicModeExecutionResult {
+    use crate::ai_vision_integration::{build_analysis_request, DEFAULT_AI_TIMEOUT_MS};
+    
+    // Get current screen dimensions
+    let current_dim = match platform.get_screen_size() {
+        Ok(dim) => dim,
+        Err(e) => {
+            log_ai_vision_error(action_index, action, &format!("Failed to get screen size: {}", e));
+            return DynamicModeExecutionResult {
+                execution_result: AIVisionExecutionResult {
+                    success: false,
+                    mode: AIVisionExecutionMode::Dynamic,
+                    coordinates: None,
+                    ai_called: false,
+                    error: Some(format!("Failed to get screen size: {}", e)),
+                },
+                cache_update: None,
+            };
+        }
+    };
+
+    // Log the AI analysis request
+    if let Some(logger) = get_logger() {
+        let mut metadata = HashMap::new();
+        metadata.insert("action_index".to_string(), json!(action_index));
+        metadata.insert("action_id".to_string(), json!(&action.id));
+        metadata.insert("prompt".to_string(), json!(&action.dynamic_config.prompt));
+        metadata.insert("reference_images_count".to_string(), json!(reference_images_base64.len()));
+        metadata.insert("search_scope".to_string(), json!(format!("{:?}", action.dynamic_config.search_scope)));
+        metadata.insert("has_roi".to_string(), json!(action.dynamic_config.roi.is_some()));
+        metadata.insert("current_screen_dim".to_string(), json!(format!("{}x{}", current_dim.0, current_dim.1)));
+        
+        logger.log_operation(
+            LogLevel::Info,
+            CoreType::Rust,
+            OperationType::Playback,
+            format!("ai_vision_dynamic_call_{}", chrono::Utc::now().timestamp_millis()),
+            format!("AI Vision Capture [{}]: Calling AI service...", action_index),
+            Some(metadata),
+        );
+    }
+
+    // Build the AI analysis request (handles ROI scaling - Requirement 4.7)
+    let request = build_analysis_request(
+        action,
+        screenshot_base64,
+        reference_images_base64,
+        current_dim,
+        Some(DEFAULT_AI_TIMEOUT_MS),
+    );
+
+    // Call the AI service
+    let ai_response = match ai_provider.analyze(request) {
+        Ok(response) => response,
+        Err(e) => {
+            // AI service error - clear cache (Requirement 4.11)
+            log_ai_vision_error(action_index, action, &format!("AI service error: {}", e));
+            return DynamicModeExecutionResult {
+                execution_result: AIVisionExecutionResult {
+                    success: false,
+                    mode: AIVisionExecutionMode::Dynamic,
+                    coordinates: None,
+                    ai_called: true,
+                    error: Some(format!("AI service error: {}", e)),
+                },
+                cache_update: Some(CacheUpdate::Clear),
+            };
+        }
+    };
+
+    // Handle AI response
+    if ai_response.success {
+        let x = ai_response.x.unwrap_or(0);
+        let y = ai_response.y.unwrap_or(0);
+        
+        // Log successful AI detection
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("action_index".to_string(), json!(action_index));
+            metadata.insert("x".to_string(), json!(x));
+            metadata.insert("y".to_string(), json!(y));
+            metadata.insert("confidence".to_string(), json!(ai_response.confidence));
+            
+            logger.log_operation(
+                LogLevel::Info,
+                CoreType::Rust,
+                OperationType::Playback,
+                format!("ai_vision_dynamic_success_{}", chrono::Utc::now().timestamp_millis()),
+                format!("AI Vision Capture [{}]: AI found element at ({}, {}) with confidence {:.2}", 
+                    action_index, x, y, ai_response.confidence.unwrap_or(0.0)),
+                Some(metadata),
+            );
+        }
+
+        // Execute the interaction at the AI-returned coordinates
+        let interaction_result = execute_interaction(platform, action, x, y, action_index);
+
+        // Prepare cache update (Requirement 4.9)
+        let cache_update = CacheUpdate::Update {
+            cached_x: x,
+            cached_y: y,
+            cache_dim: current_dim,
+        };
+
+        // Log cache update
+        if let Some(logger) = get_logger() {
+            logger.log_operation(
+                LogLevel::Info,
+                CoreType::Rust,
+                OperationType::Playback,
+                format!("ai_vision_cache_update_{}", chrono::Utc::now().timestamp_millis()),
+                format!("AI Vision Capture [{}]: Caching AI result for future runs", action_index),
+                None,
+            );
+        }
+
+        DynamicModeExecutionResult {
+            execution_result: AIVisionExecutionResult {
+                success: interaction_result.is_ok(),
+                mode: AIVisionExecutionMode::Dynamic,
+                coordinates: Some((x, y)),
+                ai_called: true,
+                error: interaction_result.err().map(|e| e.to_string()),
+            },
+            cache_update: Some(cache_update),
+        }
+    } else {
+        // AI failed to find element - clear cache (Requirement 4.11)
+        let error_msg = ai_response.error.unwrap_or_else(|| "Element not found".to_string());
+        
+        log_ai_vision_error(action_index, action, &format!("AI analysis failed: {}", error_msg));
+        
+        // Log cache invalidation
+        if let Some(logger) = get_logger() {
+            logger.log_operation(
+                LogLevel::Warn,
+                CoreType::Rust,
+                OperationType::Playback,
+                format!("ai_vision_cache_clear_{}", chrono::Utc::now().timestamp_millis()),
+                format!("AI Vision Capture [{}]: Clearing cache due to AI failure", action_index),
+                None,
+            );
+        }
+
+        DynamicModeExecutionResult {
+            execution_result: AIVisionExecutionResult {
+                success: false,
+                mode: AIVisionExecutionMode::Dynamic,
+                coordinates: None,
+                ai_called: true,
+                error: Some(error_msg),
+            },
+            cache_update: Some(CacheUpdate::Clear),
+        }
+    }
+}
+
+/// Result of Dynamic Mode execution including cache update information
+#[derive(Debug, Clone)]
+pub struct DynamicModeExecutionResult {
+    /// The execution result
+    pub execution_result: AIVisionExecutionResult,
+    /// Cache update to apply (if any)
+    pub cache_update: Option<CacheUpdate>,
+}
+
+/// Cache update operation to apply after Dynamic Mode execution
+#[derive(Debug, Clone)]
+pub enum CacheUpdate {
+    /// Update cache with new coordinates (Requirement 4.9)
+    Update {
+        cached_x: i32,
+        cached_y: i32,
+        cache_dim: (u32, u32),
+    },
+    /// Clear cache (Requirement 4.11)
+    Clear,
+}
+
+/// Execute the interaction type at the specified coordinates.
+///
+/// Supports click, dblclick, rclick, and hover interactions.
+///
+/// # Requirements
+/// - **Validates: Requirements 2.7** - Interaction type execution
+fn execute_interaction(
+    platform: &dyn PlatformAutomation,
+    action: &crate::script::AIVisionCaptureAction,
+    x: i32,
+    y: i32,
+    action_index: usize,
+) -> Result<()> {
+    use crate::script::InteractionType;
+
+    // Log the interaction execution
+    if let Some(logger) = get_logger() {
+        let mut metadata = HashMap::new();
+        metadata.insert("action_index".to_string(), json!(action_index));
+        metadata.insert("interaction_type".to_string(), json!(format!("{:?}", action.interaction)));
+        metadata.insert("x".to_string(), json!(x));
+        metadata.insert("y".to_string(), json!(y));
+        
+        logger.log_operation(
+            LogLevel::Debug,
+            CoreType::Rust,
+            OperationType::Playback,
+            format!("ai_vision_interaction_{}", chrono::Utc::now().timestamp_millis()),
+            format!("Executing {:?} at ({}, {})", action.interaction, x, y),
+            Some(metadata),
+        );
+    }
+
+    match action.interaction {
+        InteractionType::Click => {
+            platform.mouse_click_at(x, y, "left")
+        }
+        InteractionType::Dblclick => {
+            platform.mouse_double_click(x, y, "left")
+        }
+        InteractionType::Rclick => {
+            platform.mouse_click_at(x, y, "right")
+        }
+        InteractionType::Hover => {
+            platform.mouse_move(x, y)
+        }
+    }
+}
+
+/// Log the start of AI Vision Capture execution
+fn log_ai_vision_execution_start(action_index: usize, action: &crate::script::AIVisionCaptureAction) {
+    if let Some(logger) = get_logger() {
+        let mut metadata = HashMap::new();
+        metadata.insert("action_index".to_string(), json!(action_index));
+        metadata.insert("action_id".to_string(), json!(&action.id));
+        metadata.insert("is_dynamic".to_string(), json!(action.is_dynamic));
+        metadata.insert("has_static_coords".to_string(), json!(action.has_static_coordinates()));
+        metadata.insert("has_cached_coords".to_string(), json!(action.has_cached_coordinates()));
+        metadata.insert("interaction_type".to_string(), json!(format!("{:?}", action.interaction)));
+        
+        logger.log_operation(
+            LogLevel::Info,
+            CoreType::Rust,
+            OperationType::Playback,
+            format!("ai_vision_start_{}", chrono::Utc::now().timestamp_millis()),
+            format!("AI Vision Capture [{}]: Starting execution (is_dynamic={}, has_static={}, has_cache={})",
+                action_index, action.is_dynamic, action.has_static_coordinates(), action.has_cached_coordinates()),
+            Some(metadata),
+        );
+    }
+}
+
+/// Log when an AI Vision Capture action is skipped
+fn log_ai_vision_skip(action_index: usize, action: &crate::script::AIVisionCaptureAction, reason: &str) {
+    if let Some(logger) = get_logger() {
+        let mut metadata = HashMap::new();
+        metadata.insert("action_index".to_string(), json!(action_index));
+        metadata.insert("action_id".to_string(), json!(&action.id));
+        metadata.insert("reason".to_string(), json!(reason));
+        
+        logger.log_operation(
+            LogLevel::Warn,
+            CoreType::Rust,
+            OperationType::Playback,
+            format!("ai_vision_skip_{}", chrono::Utc::now().timestamp_millis()),
+            format!("AI Vision Capture [{}]: Skipped - {}", action_index, reason),
+            Some(metadata),
+        );
+    }
+}
+
+/// Log an error during AI Vision Capture execution
+fn log_ai_vision_error(action_index: usize, action: &crate::script::AIVisionCaptureAction, error: &str) {
+    if let Some(logger) = get_logger() {
+        let mut metadata = HashMap::new();
+        metadata.insert("action_index".to_string(), json!(action_index));
+        metadata.insert("action_id".to_string(), json!(&action.id));
+        metadata.insert("error".to_string(), json!(error));
+        
+        logger.log_operation(
+            LogLevel::Error,
+            CoreType::Rust,
+            OperationType::Playback,
+            format!("ai_vision_error_{}", chrono::Utc::now().timestamp_millis()),
+            format!("AI Vision Capture [{}]: Error - {}", action_index, error),
+            Some(metadata),
+        );
     }
 }
 

@@ -2,6 +2,7 @@
 
 use crate::{
     Result, AutomationError, AutomationConfig, ScriptData, Action, ActionType,
+    AIVisionCaptureAction,
     platform::{PlatformAutomation, create_platform_automation},
     logging::{CoreType, OperationType, LogLevel, get_logger}
 };
@@ -11,6 +12,18 @@ use tokio::sync::mpsc;
 use serde::{Serialize, Deserialize};
 use std::thread;
 use std::collections::HashMap;
+use uuid::Uuid;
+
+/// Modifier key state tracking for hotkey detection
+#[derive(Debug, Clone, Default)]
+pub struct ModifierState {
+    /// Cmd key held (macOS) or Ctrl key held (Windows/Linux)
+    pub cmd_or_ctrl_held: bool,
+    /// Shift key held
+    pub shift_held: bool,
+    /// Alt/Option key held
+    pub alt_held: bool,
+}
 
 /// Event recorder that captures user interactions
 pub struct Recorder {
@@ -21,6 +34,12 @@ pub struct Recorder {
     recorded_actions: Arc<Mutex<Vec<Action>>>,
     event_sender: Option<mpsc::UnboundedSender<RecordingEvent>>,
     screenshot_counter: Arc<Mutex<u32>>,
+    /// Modifier key state for hotkey detection
+    modifier_state: Arc<Mutex<ModifierState>>,
+    /// List of AI Vision Capture actions recorded
+    vision_actions: Arc<Mutex<Vec<AIVisionCaptureAction>>>,
+    /// Counter for vision capture screenshots
+    vision_screenshot_counter: Arc<Mutex<u32>>,
 }
 
 /// Events that can be recorded
@@ -86,6 +105,9 @@ impl Recorder {
             recorded_actions: Arc::new(Mutex::new(Vec::new())),
             event_sender: None,
             screenshot_counter: Arc::new(Mutex::new(0)),
+            modifier_state: Arc::new(Mutex::new(ModifierState::default())),
+            vision_actions: Arc::new(Mutex::new(Vec::new())),
+            vision_screenshot_counter: Arc::new(Mutex::new(0)),
         })
     }
 
@@ -166,6 +188,18 @@ impl Recorder {
         {
             let mut counter = self.screenshot_counter.lock().unwrap();
             *counter = 0;
+        }
+        {
+            let mut modifier_state = self.modifier_state.lock().unwrap();
+            *modifier_state = ModifierState::default();
+        }
+        {
+            let mut vision_actions = self.vision_actions.lock().unwrap();
+            vision_actions.clear();
+        }
+        {
+            let mut vision_counter = self.vision_screenshot_counter.lock().unwrap();
+            *vision_counter = 0;
         }
 
         // Send status event to UI
@@ -583,6 +617,7 @@ impl Recorder {
                 ActionType::Screenshot => "screenshot".to_string(),
                 ActionType::Wait => "wait".to_string(),
                 ActionType::Custom => "custom".to_string(),
+                ActionType::AiVisionCapture => "ai_vision_capture".to_string(),
             },
             timestamp: action.timestamp,
             x: action.x,
@@ -612,6 +647,460 @@ impl Recorder {
                 duration: self.get_timestamp(),
             },
         });
+    }
+
+    // =========================================================================
+    // AI Vision Capture Hotkey Detection and Recording
+    // =========================================================================
+
+    /// Check if the given key event is the vision capture hotkey
+    /// Hotkey: Cmd+F6 (macOS) or Ctrl+F6 (Windows/Linux)
+    /// Requirements: 1.1, 1.3
+    pub fn is_vision_capture_hotkey(&self, key: &rdev::Key, is_press: bool) -> bool {
+        // Update modifier state
+        self.update_modifier_state(key, is_press);
+
+        // Only trigger on key press, not release
+        if !is_press {
+            return false;
+        }
+
+        // Check if F6 is pressed
+        let is_f6 = matches!(key, rdev::Key::F6);
+        if !is_f6 {
+            return false;
+        }
+
+        // Check if Cmd (macOS) or Ctrl (Windows/Linux) is held
+        let modifier_state = self.modifier_state.lock().unwrap();
+        modifier_state.cmd_or_ctrl_held
+    }
+
+    /// Update the modifier key state based on key events
+    /// Tracks Cmd/Ctrl, Shift, and Alt/Option keys
+    fn update_modifier_state(&self, key: &rdev::Key, is_press: bool) {
+        let mut state = self.modifier_state.lock().unwrap();
+        
+        match key {
+            // macOS: Meta/Command key
+            rdev::Key::MetaLeft | rdev::Key::MetaRight => {
+                state.cmd_or_ctrl_held = is_press;
+            }
+            // Windows/Linux: Control key
+            rdev::Key::ControlLeft | rdev::Key::ControlRight => {
+                // On macOS, we use Meta (Cmd), on other platforms we use Ctrl
+                #[cfg(not(target_os = "macos"))]
+                {
+                    state.cmd_or_ctrl_held = is_press;
+                }
+                // On macOS, Ctrl is separate from Cmd, but we also track it
+                // for potential future use
+                #[cfg(target_os = "macos")]
+                {
+                    // On macOS, we primarily use Cmd, but also allow Ctrl+F6
+                    // for consistency with other platforms
+                    state.cmd_or_ctrl_held = is_press;
+                }
+            }
+            rdev::Key::ShiftLeft | rdev::Key::ShiftRight => {
+                state.shift_held = is_press;
+            }
+            rdev::Key::Alt | rdev::Key::AltGr => {
+                state.alt_held = is_press;
+            }
+            _ => {}
+        }
+    }
+
+    /// Get the current modifier state (for testing and debugging)
+    pub fn get_modifier_state(&self) -> ModifierState {
+        self.modifier_state.lock().unwrap().clone()
+    }
+
+    /// Reset the modifier state (useful when recording stops)
+    pub fn reset_modifier_state(&self) {
+        let mut state = self.modifier_state.lock().unwrap();
+        *state = ModifierState::default();
+    }
+
+    /// Get the list of recorded AI Vision Capture actions
+    pub fn get_vision_actions(&self) -> Vec<AIVisionCaptureAction> {
+        self.vision_actions.lock().unwrap().clone()
+    }
+
+    /// Capture a vision marker when the hotkey is pressed
+    /// This captures a screenshot and creates an AIVisionCaptureAction
+    /// Requirements: 1.2, 1.4
+    /// 
+    /// Returns the screenshot data and the created action, or an error if capture fails.
+    /// The screenshot should be saved to a file by the caller.
+    pub fn capture_vision_marker(&self) -> Result<(Vec<u8>, AIVisionCaptureAction)> {
+        if !self.is_recording() {
+            return Err(AutomationError::RecordingError {
+                message: "Cannot capture vision marker: not recording".to_string(),
+            });
+        }
+
+        let operation_id = format!("vision_capture_{}", chrono::Utc::now().timestamp_millis());
+        
+        // Log the operation start
+        if let Some(logger) = get_logger() {
+            logger.log_operation(
+                LogLevel::Info,
+                CoreType::Rust,
+                OperationType::Recording,
+                operation_id.clone(),
+                "Capturing AI Vision marker".to_string(),
+                None,
+            );
+        }
+
+        // Capture screenshot using platform automation
+        let screenshot_data = self.platform.take_screenshot().map_err(|e| {
+            if let Some(logger) = get_logger() {
+                logger.log_operation(
+                    LogLevel::Error,
+                    CoreType::Rust,
+                    OperationType::Recording,
+                    operation_id.clone(),
+                    format!("Failed to capture screenshot: {:?}", e),
+                    None,
+                );
+            }
+            e
+        })?;
+
+        // Get current screen dimensions
+        let screen_dim = self.platform.get_screen_size().map_err(|e| {
+            if let Some(logger) = get_logger() {
+                logger.log_operation(
+                    LogLevel::Error,
+                    CoreType::Rust,
+                    OperationType::Recording,
+                    operation_id.clone(),
+                    format!("Failed to get screen dimensions: {:?}", e),
+                    None,
+                );
+            }
+            e
+        })?;
+
+        // Generate unique ID for this action
+        let action_id = Uuid::new_v4().to_string();
+        
+        // Generate unique filename for the screenshot
+        let screenshot_filename = {
+            let mut counter = self.vision_screenshot_counter.lock().unwrap();
+            *counter += 1;
+            format!("vision_{}.png", action_id)
+        };
+
+        // Get current timestamp relative to recording start
+        let timestamp = self.get_timestamp();
+
+        // Create the AIVisionCaptureAction with default values
+        // Requirements: 3.1 - Default to Static Mode (is_dynamic = false)
+        let vision_action = AIVisionCaptureAction::new(
+            action_id.clone(),
+            timestamp,
+            screenshot_filename.clone(),
+            screen_dim,
+        );
+
+        // Add to vision actions list
+        {
+            let mut vision_actions = self.vision_actions.lock().unwrap();
+            vision_actions.push(vision_action.clone());
+        }
+
+        // Also add a regular Action to the recorded_actions list for script continuity
+        // This ensures the vision action appears in the correct position in the script
+        let action = Action {
+            action_type: ActionType::AiVisionCapture,
+            timestamp,
+            x: None,
+            y: None,
+            button: None,
+            key: None,
+            text: None,
+            modifiers: None,
+            additional_data: Some({
+                let mut data = HashMap::new();
+                data.insert("vision_action_id".to_string(), serde_json::json!(action_id));
+                data.insert("screenshot".to_string(), serde_json::json!(screenshot_filename));
+                data.insert("screen_width".to_string(), serde_json::json!(screen_dim.0));
+                data.insert("screen_height".to_string(), serde_json::json!(screen_dim.1));
+                data
+            }),
+        };
+
+        {
+            let mut actions = self.recorded_actions.lock().unwrap();
+            actions.push(action.clone());
+        }
+
+        // Send real-time event to UI
+        self.send_action_event(&action);
+
+        // Send a specific vision capture event
+        self.send_event(RecordingEvent {
+            event_type: "vision_capture".to_string(),
+            data: RecordingEventData::Status {
+                status: "captured".to_string(),
+                message: Some(format!("Vision marker captured: {}", screenshot_filename)),
+            },
+        });
+
+        // Log success
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("action_id".to_string(), serde_json::json!(action_id));
+            metadata.insert("screenshot".to_string(), serde_json::json!(screenshot_filename));
+            metadata.insert("screen_dim".to_string(), serde_json::json!(screen_dim));
+            metadata.insert("timestamp".to_string(), serde_json::json!(timestamp));
+            
+            logger.log_operation(
+                LogLevel::Info,
+                CoreType::Rust,
+                OperationType::Recording,
+                operation_id,
+                "AI Vision marker captured successfully".to_string(),
+                Some(metadata),
+            );
+        }
+
+        Ok((screenshot_data, vision_action))
+    }
+
+    /// Get the next vision screenshot filename without incrementing the counter
+    /// Useful for previewing what the filename will be
+    pub fn peek_next_vision_filename(&self) -> String {
+        let counter = self.vision_screenshot_counter.lock().unwrap();
+        format!("vision_{:04}.png", *counter + 1)
+    }
+
+    /// Get the count of vision captures in the current recording session
+    pub fn get_vision_capture_count(&self) -> u32 {
+        *self.vision_screenshot_counter.lock().unwrap()
+    }
+
+    /// Capture a vision marker asynchronously without blocking the event loop
+    /// This ensures recording continuity (Requirement 1.3)
+    /// 
+    /// The capture is performed in a separate thread to avoid blocking
+    /// the main event loop that handles mouse and keyboard hooks.
+    /// 
+    /// Returns a channel receiver that will receive the result when capture completes.
+    pub fn capture_vision_marker_async(&self) -> std::sync::mpsc::Receiver<Result<(Vec<u8>, AIVisionCaptureAction)>> {
+        let (tx, rx) = std::sync::mpsc::channel();
+        
+        // Clone all the Arc references we need for the capture
+        let is_recording = Arc::clone(&self.is_recording);
+        let vision_screenshot_counter = Arc::clone(&self.vision_screenshot_counter);
+        let vision_actions = Arc::clone(&self.vision_actions);
+        let recorded_actions = Arc::clone(&self.recorded_actions);
+        let start_time = self.start_time;
+        let event_sender = self.event_sender.clone();
+        
+        // We need to capture platform info before spawning the thread
+        // since platform is not Send
+        let screen_size_result = self.platform.get_screen_size();
+        let screenshot_result = self.platform.take_screenshot();
+        
+        // Spawn a thread to process the capture without blocking
+        thread::spawn(move || {
+            let result = Self::process_vision_capture_in_thread(
+                is_recording,
+                vision_screenshot_counter,
+                vision_actions,
+                recorded_actions,
+                start_time,
+                event_sender,
+                screen_size_result,
+                screenshot_result,
+            );
+            
+            // Send the result back through the channel
+            let _ = tx.send(result);
+        });
+        
+        rx
+    }
+
+    /// Internal helper to process vision capture in a separate thread
+    /// This is called from capture_vision_marker_async to ensure non-blocking behavior
+    fn process_vision_capture_in_thread(
+        is_recording: Arc<AtomicBool>,
+        vision_screenshot_counter: Arc<Mutex<u32>>,
+        vision_actions: Arc<Mutex<Vec<AIVisionCaptureAction>>>,
+        recorded_actions: Arc<Mutex<Vec<Action>>>,
+        start_time: Option<Instant>,
+        event_sender: Option<mpsc::UnboundedSender<RecordingEvent>>,
+        screen_size_result: Result<(u32, u32)>,
+        screenshot_result: Result<Vec<u8>>,
+    ) -> Result<(Vec<u8>, AIVisionCaptureAction)> {
+        // Check if still recording
+        if !is_recording.load(Ordering::SeqCst) {
+            return Err(AutomationError::RecordingError {
+                message: "Cannot capture vision marker: not recording".to_string(),
+            });
+        }
+
+        let operation_id = format!("vision_capture_async_{}", chrono::Utc::now().timestamp_millis());
+        
+        // Log the operation start
+        if let Some(logger) = get_logger() {
+            logger.log_operation(
+                LogLevel::Info,
+                CoreType::Rust,
+                OperationType::Recording,
+                operation_id.clone(),
+                "Processing AI Vision marker capture (async)".to_string(),
+                None,
+            );
+        }
+
+        // Get screenshot data
+        let screenshot_data = screenshot_result.map_err(|e| {
+            if let Some(logger) = get_logger() {
+                logger.log_operation(
+                    LogLevel::Error,
+                    CoreType::Rust,
+                    OperationType::Recording,
+                    operation_id.clone(),
+                    format!("Failed to capture screenshot: {:?}", e),
+                    None,
+                );
+            }
+            e
+        })?;
+
+        // Get screen dimensions
+        let screen_dim = screen_size_result.map_err(|e| {
+            if let Some(logger) = get_logger() {
+                logger.log_operation(
+                    LogLevel::Error,
+                    CoreType::Rust,
+                    OperationType::Recording,
+                    operation_id.clone(),
+                    format!("Failed to get screen dimensions: {:?}", e),
+                    None,
+                );
+            }
+            e
+        })?;
+
+        // Generate unique ID for this action
+        let action_id = Uuid::new_v4().to_string();
+        
+        // Generate unique filename for the screenshot
+        let screenshot_filename = {
+            let mut counter = vision_screenshot_counter.lock().unwrap();
+            *counter += 1;
+            format!("vision_{}.png", action_id)
+        };
+
+        // Get current timestamp relative to recording start
+        let timestamp = start_time
+            .map(|start| start.elapsed().as_secs_f64())
+            .unwrap_or(0.0);
+
+        // Create the AIVisionCaptureAction with default values
+        let vision_action = AIVisionCaptureAction::new(
+            action_id.clone(),
+            timestamp,
+            screenshot_filename.clone(),
+            screen_dim,
+        );
+
+        // Add to vision actions list
+        {
+            let mut va = vision_actions.lock().unwrap();
+            va.push(vision_action.clone());
+        }
+
+        // Also add a regular Action to the recorded_actions list
+        let action = Action {
+            action_type: ActionType::AiVisionCapture,
+            timestamp,
+            x: None,
+            y: None,
+            button: None,
+            key: None,
+            text: None,
+            modifiers: None,
+            additional_data: Some({
+                let mut data = HashMap::new();
+                data.insert("vision_action_id".to_string(), serde_json::json!(action_id));
+                data.insert("screenshot".to_string(), serde_json::json!(screenshot_filename));
+                data.insert("screen_width".to_string(), serde_json::json!(screen_dim.0));
+                data.insert("screen_height".to_string(), serde_json::json!(screen_dim.1));
+                data
+            }),
+        };
+
+        {
+            let mut actions = recorded_actions.lock().unwrap();
+            actions.push(action.clone());
+        }
+
+        // Send events to UI if sender is available
+        if let Some(ref sender) = event_sender {
+            // Send action recorded event
+            let action_data = ActionEventData {
+                action_type: "ai_vision_capture".to_string(),
+                timestamp,
+                x: None,
+                y: None,
+                button: None,
+                key: None,
+                text: None,
+            };
+
+            let _ = sender.send(RecordingEvent {
+                event_type: "action_recorded".to_string(),
+                data: RecordingEventData::ActionRecorded {
+                    action: action_data,
+                },
+            });
+
+            // Send vision capture specific event
+            let _ = sender.send(RecordingEvent {
+                event_type: "vision_capture".to_string(),
+                data: RecordingEventData::Status {
+                    status: "captured".to_string(),
+                    message: Some(format!("Vision marker captured: {}", screenshot_filename)),
+                },
+            });
+        }
+
+        // Log success
+        if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("action_id".to_string(), serde_json::json!(action_id));
+            metadata.insert("screenshot".to_string(), serde_json::json!(screenshot_filename));
+            metadata.insert("screen_dim".to_string(), serde_json::json!(screen_dim));
+            metadata.insert("timestamp".to_string(), serde_json::json!(timestamp));
+            
+            logger.log_operation(
+                LogLevel::Info,
+                CoreType::Rust,
+                OperationType::Recording,
+                operation_id,
+                "AI Vision marker captured successfully (async)".to_string(),
+                Some(metadata),
+            );
+        }
+
+        Ok((screenshot_data, vision_action))
+    }
+
+    /// Check if a vision capture is currently in progress
+    /// This can be used to prevent multiple simultaneous captures
+    pub fn is_vision_capture_in_progress(&self) -> bool {
+        // For now, we don't track this state since captures are quick
+        // and the async version handles concurrency through channels
+        false
     }
 }
 
