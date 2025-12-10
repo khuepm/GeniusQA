@@ -10,6 +10,7 @@ import { AuthButton } from '../components/AuthButton';
 import { CoreSelector, CoreType, CoreStatus, PerformanceMetrics, PerformanceComparison } from '../components/CoreSelector';
 import { ScriptListItem } from '../components/ScriptListItem';
 import { ScriptFilter } from '../components/ScriptFilter';
+import { ClickCursorOverlay } from '../components/ClickCursorOverlay';
 import { getIPCBridge } from '../services/ipcBridgeService';
 import { scriptStorageService, StoredScriptInfo, ScriptFilter as ScriptFilterType, ScriptSource, TargetOS } from '../services/scriptStorageService';
 import {
@@ -221,6 +222,7 @@ const RecorderScreen: React.FC = () => {
 
   /**
    * Update recording time while recording
+   * NOTE: Reduced update frequency to 1s to minimize re-renders during debugging
    */
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -229,7 +231,7 @@ const RecorderScreen: React.FC = () => {
       interval = setInterval(() => {
         const elapsed = (Date.now() - recordingStartTime) / 1000;
         setRecordingTime(elapsed);
-      }, 100); // Update every 100ms for smooth display
+      }, 1000); // Update every 1s (was 100ms) to reduce console noise
     }
 
     return () => {
@@ -734,20 +736,23 @@ const RecorderScreen: React.FC = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms}`;
   };
 
-  // Debug logging for render
-  console.log('[DEBUG] RecorderScreen render:', {
-    status,
-    currentCore,
-    hasRecordings,
-    coreLoading,
-    error,
-    coreError,
-    availableCores,
-    selectedScriptPath
-  });
+  // Debug logging for render - commented out to reduce console noise
+  // console.log('[DEBUG] RecorderScreen render:', {
+  //   status,
+  //   currentCore,
+  //   hasRecordings,
+  //   coreLoading,
+  //   error,
+  //   coreError,
+  //   availableCores,
+  //   selectedScriptPath
+  // });
 
   return (
     <div className="recorder-container">
+      {/* Click Cursor Overlay - shows cursor at click positions during recording */}
+      <ClickCursorOverlay isRecording={status === 'recording'} />
+
       <div className="recorder-content">
         {/* Back Button */}
         <button
