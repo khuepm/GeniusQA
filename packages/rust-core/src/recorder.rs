@@ -13,6 +13,13 @@ use serde::{Serialize, Deserialize};
 use std::thread;
 use std::collections::HashMap;
 use uuid::Uuid;
+#[cfg(target_os = "macos")]
+use core_graphics::event::{
+    CGEvent, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventType, CGEventMask,
+    EventField, CGEventTapProxy,
+};
+#[cfg(target_os = "macos")]
+use core_foundation::runloop::{kCFRunLoopDefaultMode, CFRunLoop, CFRunLoopRunInMode};
 
 /// Modifier key state tracking for hotkey detection
 #[derive(Debug, Clone, Default)]
@@ -233,6 +240,91 @@ impl Recorder {
         Ok(())
     }
 
+    #[cfg(target_os = "macos")]
+    fn macos_keycode_map() -> HashMap<u16, &'static str> {
+        let mut map = HashMap::new();
+        // Common letters
+        map.insert(0x00, "a");
+        map.insert(0x01, "s");
+        map.insert(0x02, "d");
+        map.insert(0x03, "f");
+        map.insert(0x04, "h");
+        map.insert(0x05, "g");
+        map.insert(0x06, "z");
+        map.insert(0x07, "x");
+        map.insert(0x08, "c");
+        map.insert(0x09, "v");
+        map.insert(0x0B, "b");
+        map.insert(0x0C, "q");
+        map.insert(0x0D, "w");
+        map.insert(0x0E, "e");
+        map.insert(0x0F, "r");
+        map.insert(0x10, "y");
+        map.insert(0x11, "t");
+        map.insert(0x12, "1");
+        map.insert(0x13, "2");
+        map.insert(0x14, "3");
+        map.insert(0x15, "4");
+        map.insert(0x16, "6");
+        map.insert(0x17, "5");
+        map.insert(0x19, "9");
+        map.insert(0x1A, "7");
+        map.insert(0x1B, "minus");
+        map.insert(0x1C, "8");
+        map.insert(0x1D, "0");
+        map.insert(0x1E, "equal");
+        map.insert(0x1F, "o");
+        map.insert(0x20, "u");
+        map.insert(0x21, "bracket_left");
+        map.insert(0x22, "i");
+        map.insert(0x23, "p");
+        map.insert(0x24, "enter");
+        map.insert(0x25, "l");
+        map.insert(0x26, "j");
+        map.insert(0x27, "quote");
+        map.insert(0x28, "k");
+        map.insert(0x29, "semicolon");
+        map.insert(0x2A, "backslash");
+        map.insert(0x2B, "comma");
+        map.insert(0x2C, "slash");
+        map.insert(0x2D, "n");
+        map.insert(0x2E, "m");
+        map.insert(0x2F, "period");
+        // Special keys
+        map.insert(0x30, "tab");
+        map.insert(0x31, "space");
+        map.insert(0x32, "grave");
+        map.insert(0x33, "backspace");
+        map.insert(0x35, "escape");
+        map.insert(0x37, "cmd");
+        map.insert(0x38, "shift");
+        map.insert(0x39, "capslock");
+        map.insert(0x3A, "option");
+        map.insert(0x3B, "ctrl");
+        map.insert(0x3C, "rightshift");
+        map.insert(0x3D, "rightoption");
+        map.insert(0x3E, "rightctrl");
+        // Arrow keys
+        map.insert(0x7B, "left");
+        map.insert(0x7C, "right");
+        map.insert(0x7D, "down");
+        map.insert(0x7E, "up");
+        // Function keys
+        map.insert(0x7A, "f1");
+        map.insert(0x78, "f2");
+        map.insert(0x63, "f3");
+        map.insert(0x76, "f4");
+        map.insert(0x60, "f5");
+        map.insert(0x61, "f6");
+        map.insert(0x62, "f7");
+        map.insert(0x64, "f8");
+        map.insert(0x65, "f9");
+        map.insert(0x6D, "f10");
+        map.insert(0x67, "f11");
+        map.insert(0x6F, "f12");
+        map
+    }
+
     /// Stop recording and return the recorded script
     pub fn stop_recording(&mut self) -> Result<ScriptData> {
         let operation_id = format!("stop_recording_{}", chrono::Utc::now().timestamp());
@@ -448,9 +540,13 @@ impl Recorder {
         let recorded_actions = Arc::clone(&self.recorded_actions);
         let start_time = self.start_time;
 
-        // On macOS, disable the rdev-based global listener to avoid native crashes
-        // when pressing system shortcuts like Cmd+Tab. Recording with the Rust core
-        // on macOS will not capture input events for now, but the app will remain stable.
+        // macOS: use Core Graphics event tap (safe) to capture keyboard & mouse without rdev crashes
+        #[cfg(target_os = "macos")]
+        {
+            self.start_macos_event_tap_capture(is_recording, recorded_actions, start_time)?;
+        }
+
+        // Other platforms: use rdev listener
         #[cfg(not(target_os = "macos"))]
         {
             // Use a channel to communicate events from rdev callback to processing thread
@@ -591,6 +687,162 @@ impl Recorder {
                 }
             });
         }
+
+        Ok(())
+    }
+
+    // ---------------------------------------------------------------------
+    // macOS event tap capture (keyboard + mouse) to avoid rdev crashes
+    // ---------------------------------------------------------------------
+    #[cfg(target_os = "macos")]
+    fn start_macos_event_tap_capture(
+        &self,
+        is_recording: Arc<AtomicBool>,
+        recorded_actions: Arc<Mutex<Vec<Action>>>,
+        start_time: Option<Instant>,
+    ) -> Result<()> {
+        // Avoid expensive map allocation on every event: build once
+        let keycode_to_name = Self::macos_keycode_map();
+
+        thread::spawn(move || {
+            let max_actions = 50000usize;
+            let mouse_move_threshold = 10;
+            let min_move_interval = 0.05f64;
+            // Use RefCell for interior mutability since CGEventTap expects Fn, not FnMut
+            use std::cell::RefCell;
+            let last_mouse_pos: RefCell<Option<(i32, i32)>> = RefCell::new(None);
+            let last_move_time: RefCell<f64> = RefCell::new(0.0f64);
+
+            // Event tap callback (Fn with interior mutability)
+            let is_rec_flag = Arc::clone(&is_recording);
+            let is_rec_flag_loop = Arc::clone(&is_recording);  // Clone for the while loop
+            let actions_ref = Arc::clone(&recorded_actions);
+            let start_ref = start_time;
+            let callback_state = move |_: CGEventTapProxy, event_type: CGEventType, event: CGEvent| -> Option<CGEvent> {
+                if !is_rec_flag.load(Ordering::SeqCst) {
+                    return None;
+                }
+
+                let timestamp = start_ref.map(|s| s.elapsed().as_secs_f64()).unwrap_or(0.0);
+
+                // Action limit guard
+                let action_count = {
+                    if let Ok(actions) = actions_ref.try_lock() {
+                        actions.len()
+                    } else {
+                        return Some(event);
+                    }
+                };
+                if action_count >= max_actions {
+                    return Some(event);
+                }
+
+                match event_type {
+                    CGEventType::KeyDown => {
+                        let keycode = event.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE) as u16;
+                        if let Some(key_name) = keycode_to_name.get(&keycode) {
+                            // Stop on ESC
+                            if *key_name == "escape" {
+                                is_rec_flag.store(false, Ordering::SeqCst);
+                                return None;
+                            }
+                            if let Ok(mut actions) = actions_ref.try_lock() {
+                                let action = Action::key_press(key_name, timestamp, None);
+                                actions.push(action);
+                            }
+                        }
+                    }
+                    CGEventType::MouseMoved
+                    | CGEventType::LeftMouseDragged
+                    | CGEventType::RightMouseDragged
+                    | CGEventType::OtherMouseDragged => {
+                        let location = event.location();
+                        let current_pos = (location.x as i32, location.y as i32);
+
+                        let last_time = *last_move_time.borrow();
+                        if timestamp - last_time < min_move_interval {
+                            *last_mouse_pos.borrow_mut() = Some(current_pos);
+                            return Some(event);
+                        }
+
+                        let should_record = if let Some(last_pos) = *last_mouse_pos.borrow() {
+                            let dx = (current_pos.0 - last_pos.0).abs();
+                            let dy = (current_pos.1 - last_pos.1).abs();
+                            dx >= mouse_move_threshold || dy >= mouse_move_threshold
+                        } else {
+                            true
+                        };
+
+                        if should_record {
+                            if let Ok(mut actions) = actions_ref.try_lock() {
+                                let action = Action::mouse_move(current_pos.0, current_pos.1, timestamp);
+                                actions.push(action);
+                                *last_mouse_pos.borrow_mut() = Some(current_pos);
+                                *last_move_time.borrow_mut() = timestamp;
+                            }
+                        } else {
+                            *last_mouse_pos.borrow_mut() = Some(current_pos);
+                        }
+                    }
+                    CGEventType::LeftMouseDown | CGEventType::RightMouseDown | CGEventType::OtherMouseDown => {
+                        let location = event.location();
+                        let button_str = match event_type {
+                            CGEventType::LeftMouseDown => "left",
+                            CGEventType::RightMouseDown => "right",
+                            _ => "middle",
+                        };
+                        if let Ok(mut actions) = actions_ref.try_lock() {
+                            let action = Action::mouse_click(location.x as i32, location.y as i32, button_str, timestamp);
+                            actions.push(action);
+                        }
+                    }
+                    _ => {}
+                }
+
+                Some(event)
+            };
+
+            // Event types to listen for: key down + mouse move/drag + mouse down
+            let event_types = vec![
+                CGEventType::KeyDown,
+                CGEventType::MouseMoved,
+                CGEventType::LeftMouseDragged,
+                CGEventType::RightMouseDragged,
+                CGEventType::OtherMouseDragged,
+                CGEventType::LeftMouseDown,
+                CGEventType::RightMouseDown,
+                CGEventType::OtherMouseDown,
+            ];
+
+            let tap = match core_graphics::event::CGEventTap::new(
+                CGEventTapLocation::HID,
+                CGEventTapPlacement::HeadInsertEventTap,
+                CGEventTapOptions::ListenOnly,
+                event_types,
+                move |proxy, etype, event: &CGEvent| callback_state(proxy, etype, event.clone()),
+            ) {
+                Ok(t) => t,
+                Err(_) => {
+                    eprintln!("Failed to create CGEventTap for macOS recording");
+                    is_rec_flag_loop.store(false, Ordering::SeqCst);
+                    return;
+                }
+            };
+
+            let run_loop_source = tap.mach_port.create_runloop_source(0).unwrap();
+            let run_loop = CFRunLoop::get_current();
+            unsafe {
+                run_loop.add_source(&run_loop_source, kCFRunLoopDefaultMode);
+            }
+            tap.enable();
+
+            // Run loop with periodic check to stop
+            while is_rec_flag_loop.load(Ordering::SeqCst) {
+                unsafe {
+                    CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.1, 1);
+                }
+            }
+        });
 
         Ok(())
     }

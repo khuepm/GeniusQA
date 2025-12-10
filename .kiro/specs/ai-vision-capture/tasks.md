@@ -5,11 +5,11 @@
 Mục tiêu: Định nghĩa ngôn ngữ chung giữa Frontend (TS) và Backend (Rust).
 
 - [x] 1. Define TypeScript types for AI Vision Capture
-  - [x] 1.1 Creat3ả0k4cưe aiVisionCapture.types.ts with AIVisionCaptureAction, VisionROI , InteractionType, SearchScope interfaces
+  - [x] 1.1 Create aiVisionCapture.types.ts with AIVisionCaptureAction, VisionROI , InteractionType, SearchScope interfaces
     - Define all interfaces as specified in design document
     - Include JSDoc comments for each field
     - _Requirements: 5.1, 5.2, 5.3, 5.4_
-  - [x]* 1.2 Write property test for schema validation (TS/Fast-check)  
+  - [x] 1.2 Write property test for schema validation (TS/Fast-check)  
     - **Property 1: AI Vision Capture Action Schema Validation**
     - **Validates: Requirements 5.1, 5.2, 5.3**
     - Use fast-check to generate random action objects and verify required fields
@@ -332,118 +332,118 @@ Mục tiêu: Giao diện cho người dùng tương tác với dữ liệu đã 
 
 Mục tiêu: Đảm bảo tính tương thích nếu vẫn dùng Python.
 
-- [ ]* 25. Extend Python storage models (Optional)
-  - [ ]* 25.1 Add Pydantic models for AIVisionCaptureAction in models.py
+- [x] 25. Extend Python storage models (Optional)
+  - [x] 25.1 Add Pydantic models for AIVisionCaptureAction in models.py
     - Add VisionROI, StaticData, DynamicConfig, CacheData models
     - Ensure compatibility with existing Action model
     - _Requirements: 5.1, 5.2, 5.3, 5.4_
-  - [ ]* 25.2 Write property test for round-trip serialization (Python)
+  - [x] 25.2 Write property test for round-trip serialization (Python)
     - **Property 2: Round-trip Serialization Consistency**
     - **Validates: Requirements 5.6**
     - Use hypothesis to generate random actions, serialize to JSON, deserialize, compare
 
-- [ ]* 26. Extend Python Recorder for vision capture hotkey (Optional)
-  - [ ]* 26.1 Add hotkey detection in recorder.py
+- [x] 26. Extend Python Recorder for vision capture hotkey (Optional)
+  - [x] 26.1 Add hotkey detection in recorder.py
     - Detect Cmd+F6 (macOS) or Ctrl+F6 (Windows/Linux)
     - Implement _is_vision_capture_hotkey() method
     - Track modifier key states (Cmd/Ctrl held)
     - Ensure hotkey does not interrupt recording flow
     - _Requirements: 1.1, 1.3_
-  - [ ]* 26.2 Implement _capture_vision_marker() method
+  - [x] 26.2 Implement _capture_vision_marker() method
     - Capture full screenshot using existing screenshot module
     - Get current screen dimensions
     - Create ai_vision_capture action with default values
     - Generate unique action ID (uuid4)
     - Add action to recorded_actions list
     - _Requirements: 1.2, 1.4_
-  - [ ]* 26.3 Implement screenshot storage for vision markers
+  - [x] 26.3 Implement screenshot storage for vision markers
     - Save screenshot to screenshots/ subdirectory
     - Use naming pattern vision_{action_id}.png
     - Store relative path in static_data.original_screenshot
     - _Requirements: 5.5_
-  - [ ]* 26.4 Write property test for recording continuity (Python)
+  - [x] 26.4 Write property test for recording continuity (Python)
     - **Property 13: Recording Continuity**
     - **Validates: Requirements 1.3**
     - Simulate hotkey during recording, verify events continue
 
-- [ ]* 27. Implement Python Asset Manager (Optional)
-  - [ ]* 27.1 Create asset_manager.py with file operations
+- [x] 27. Implement Python Asset Manager (Optional)
+  - [x] 27.1 Create asset_manager.py with file operations
     - Implement AssetManager class with script_path
     - Implement save_reference_image() with unique filename
     - Implement load_reference_image() and delete_reference_image()
     - _Requirements: 5.5, 2.6_
-  - [ ]* 27.2 Implement path normalization utilities (Python)
+  - [x] 27.2 Implement path normalization utilities (Python)
     - Implement to_posix_path() - convert to forward slashes
     - Implement to_native_path() - convert to OS-native
     - Implement generate_unique_filename() with pattern vision_{action_id}_{timestamp}.{ext}
     - _Requirements: 5.9, 5.10, 5.11_
-  - [ ]* 27.3 Write property test for Python path normalization
+  - [x] 27.3 Write property test for Python path normalization
     - **Property 16: Asset Path Normalization (Cross-Platform)**
     - **Validates: Requirements 5.9, 5.10**
     - Generate paths with mixed separators, verify POSIX output
 
-- [ ]* 28. Implement Python AI Vision Service (Optional)
-  - [ ]* 28.1 Create ai_vision_service.py with Gemini Vision integration
+- [x] 28. Implement Python AI Vision Service (Optional)
+  - [x] 28.1 Create ai_vision_service.py with Gemini Vision integration
     - Implement AIVisionService class with analyze() method
     - Accept screenshot (base64), prompt, reference_images
     - Implement configurable timeout (default 15s)
     - Return AIVisionResponse with x, y, confidence, error
     - _Requirements: 4.6, 4.8, 4.10_
-  - [ ]* 28.2 Implement image preprocessing utilities
+  - [x] 28.2 Implement image preprocessing utilities
     - Add crop_to_roi() function for Regional Search
     - Add scale_roi() function for resolution differences
     - Add encode_image_base64() helper
     - _Requirements: 4.7_
-  - [ ]* 28.3 Write property test for AI timeout enforcement (Python)
+  - [x] 28.3 Write property test for AI timeout enforcement (Python)
     - **Property 11: AI Timeout Enforcement**
     - **Validates: Requirements 4.10, 4.11**
     - Mock slow responses, verify timeout behavior
 
-- [ ]* 29. Extend Python Player for ai_vision_capture playback (Optional)
-  - [ ]* 29.1 Implement _execute_ai_vision_capture() dispatcher
+- [x] 29. Extend Python Player for ai_vision_capture playback (Optional)
+  - [x] 29.1 Implement _execute_ai_vision_capture() dispatcher
     - Check is_dynamic flag first
     - Route to static, cached, or dynamic execution
     - Log which mode is being used
     - _Requirements: 4.1_
-  - [ ]* 29.2 Implement coordinate scaling utility (Python)
+  - [x] 29.2 Implement coordinate scaling utility (Python)
     - Add _scale_coordinates() method
     - Calculate proportional scaling: new_x = old_x * (new_width / old_width)
     - Clamp coordinates to screen bounds
     - _Requirements: 4.4, 4.7_
-  - [ ]* 29.3 Implement Static Mode playback (Python)
+  - [x] 29.3 Implement Static Mode playback (Python)
     - Read saved_x, saved_y from static_data
     - Apply proportional scaling if resolution differs
     - Execute interaction_type at coordinates using PyAutoGUI
     - Skip and log warning if coordinates missing
     - _Requirements: 4.3, 4.4, 4.12_
-  - [ ]* 29.4 Implement Cache Mode playback (Python)
+  - [x] 29.4 Implement Cache Mode playback (Python)
     - Check cached_x, cached_y validity
     - Apply scaling using cache_dim
     - Execute interaction at cached coordinates
     - _Requirements: 4.5_
-  - [ ]* 29.5 Implement Dynamic Mode AI playback (Python)
+  - [x] 29.5 Implement Dynamic Mode AI playback (Python)
     - Capture current screenshot
     - Handle ROI cropping for Regional Search
     - Call AIVisionService.analyze()
     - Execute interaction at returned coordinates
     - _Requirements: 4.6, 4.7, 4.8_
-  - [ ]* 29.6 Implement cache persistence and invalidation (Python)
+  - [x] 29.6 Implement cache persistence and invalidation (Python)
     - Save AI results to cache_data after success
     - Clear cache on AI failure
     - Persist updated script
     - _Requirements: 4.9, 4.11, 5.8_
-  - [ ]* 29.7 Write property tests for Python Player
+  - [x] 29.7 Write property tests for Python Player
     - **Property 4: Static Mode Zero AI Calls**
     - **Property 5: Dynamic Cache Zero AI Calls**
     - **Property 14: Playback Priority Order**
     - **Validates: Requirements 4.1, 4.3, 4.5**
 
-- [ ]* 30. Update Python storage module (Optional)
-  - [ ]* 30.1 Extend storage.py for ai_vision_capture
+- [x] 30. Update Python storage module (Optional)
+  - [x] 30.1 Extend storage.py for ai_vision_capture
     - Add validation for ai_vision_capture actions
     - Handle cache_data persistence on script save
     - Ensure assets folder exists when loading scripts
     - _Requirements: 5.5, 5.6, 5.8_
 
-- [ ] 31. Final Checkpoint - Ensure all tests pass
+- [x] 31. Final Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.

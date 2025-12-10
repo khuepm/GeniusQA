@@ -8,12 +8,137 @@ the recording and playback pipeline.
 The models implement the JSON schema defined in the design document and provide
 automatic validation, serialization, and deserialization.
 
-Requirements: 3.1, 3.2, 3.3, 3.5
+Requirements: 3.1, 3.2, 3.3, 3.5, 5.1, 5.2, 5.3, 5.4
 """
 
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Literal, Optional, Union, Tuple, List
 from pydantic import BaseModel, Field, field_validator
+
+
+# =============================================================================
+# AI Vision Capture Models (Requirements: 5.1, 5.2, 5.3, 5.4)
+# =============================================================================
+
+class VisionROI(BaseModel):
+    """
+    Region of Interest for AI Vision Capture.
+    
+    Defines a rectangular region on the screenshot where the AI should focus
+    its search. Used for Regional Search mode to optimize accuracy and performance.
+    
+    Attributes:
+        x: X coordinate of the top-left corner (non-negative)
+        y: Y coordinate of the top-left corner (non-negative)
+        width: Width of the region (positive)
+        height: Height of the region (positive)
+    
+    Requirements: 5.3
+    """
+    x: int = Field(ge=0, description="X coordinate of top-left corner")
+    y: int = Field(ge=0, description="Y coordinate of top-left corner")
+    width: int = Field(gt=0, description="Width of the region")
+    height: int = Field(gt=0, description="Height of the region")
+
+
+class StaticData(BaseModel):
+    """
+    Static data for AI Vision Capture action.
+    
+    Contains the original screenshot captured during recording and the
+    saved coordinates determined during editing (Static Mode).
+    
+    Attributes:
+        original_screenshot: Path to the screenshot file
+        saved_x: X coordinate saved during editing (nullable)
+        saved_y: Y coordinate saved during editing (nullable)
+        screen_dim: Screen dimensions [width, height] at capture time
+    
+    Requirements: 5.2
+    """
+    original_screenshot: str = Field(description="Path to the original screenshot")
+    saved_x: Optional[int] = Field(None, description="Saved X coordinate from Static Mode")
+    saved_y: Optional[int] = Field(None, description="Saved Y coordinate from Static Mode")
+    screen_dim: Tuple[int, int] = Field(description="Screen dimensions [width, height]")
+
+
+class DynamicConfig(BaseModel):
+    """
+    Dynamic configuration for AI Vision Capture action.
+    
+    Contains the prompt, reference images, ROI, and search scope settings
+    used when calling the AI service in Dynamic Mode.
+    
+    Attributes:
+        prompt: User-provided description of the target element
+        reference_images: List of paths to reference images
+        roi: Region of Interest for Regional Search (nullable)
+        search_scope: Search scope - 'global' or 'regional'
+    
+    Requirements: 5.3
+    """
+    prompt: str = Field(default="", description="User prompt describing the target")
+    reference_images: List[str] = Field(default_factory=list, description="Paths to reference images")
+    roi: Optional[VisionROI] = Field(None, description="Region of Interest for Regional Search")
+    search_scope: Literal['global', 'regional'] = Field(default='global', description="Search scope")
+
+
+class CacheData(BaseModel):
+    """
+    Cache data for AI Vision Capture action.
+    
+    Stores the coordinates returned by a successful Dynamic Mode AI call,
+    along with the screen dimensions at cache time. This allows subsequent
+    playback runs to use cached coordinates without calling AI (0 token cost).
+    
+    Attributes:
+        cached_x: Cached X coordinate from successful AI call (nullable)
+        cached_y: Cached Y coordinate from successful AI call (nullable)
+        cache_dim: Screen dimensions when cache was created (nullable)
+    
+    Requirements: 5.4
+    """
+    cached_x: Optional[int] = Field(None, description="Cached X coordinate from AI")
+    cached_y: Optional[int] = Field(None, description="Cached Y coordinate from AI")
+    cache_dim: Optional[Tuple[int, int]] = Field(None, description="Screen dimensions at cache time")
+
+
+class AIVisionCaptureAction(BaseModel):
+    """
+    AI Vision Capture action for intelligent element detection.
+    
+    This action type allows users to capture visual markers during recording
+    and use AI to locate elements during playback. Supports two modes:
+    
+    - Static Mode (default): AI analyzes during editing, saves coordinates,
+      playback uses saved coordinates (0 token cost)
+    - Dynamic Mode: AI analyzes during playback to find elements on current
+      screen, with intelligent caching to minimize token costs
+    
+    Attributes:
+        type: Action type identifier ('ai_vision_capture')
+        id: Unique identifier (UUID)
+        timestamp: Time in seconds since recording started
+        is_dynamic: Whether to use Dynamic Mode (default: False)
+        interaction: Type of interaction to perform at found coordinates
+        static_data: Static mode data (screenshot, saved coordinates)
+        dynamic_config: Dynamic mode configuration (prompt, references, ROI)
+        cache_data: Cached coordinates from successful Dynamic AI calls
+    
+    Requirements: 5.1, 5.2, 5.3, 5.4
+    Validates: Property 2 (Round-trip Serialization Consistency)
+    """
+    type: Literal['ai_vision_capture'] = Field(default='ai_vision_capture', description="Action type")
+    id: str = Field(description="Unique action identifier (UUID)")
+    timestamp: float = Field(ge=0, description="Seconds since recording start")
+    is_dynamic: bool = Field(default=False, description="Enable Dynamic Mode")
+    interaction: Literal['click', 'dblclick', 'rclick', 'hover'] = Field(
+        default='click', 
+        description="Interaction type to perform"
+    )
+    static_data: StaticData = Field(description="Static mode data")
+    dynamic_config: DynamicConfig = Field(default_factory=DynamicConfig, description="Dynamic mode config")
+    cache_data: CacheData = Field(default_factory=CacheData, description="Cached AI results")
 
 
 class Action(BaseModel):
@@ -166,6 +291,14 @@ class ScriptMetadata(BaseModel):
     platform: str = Field(description="Platform where recording was made (windows, darwin, linux)")
 
 
+# =============================================================================
+# Union type for all action types
+# =============================================================================
+
+# Type alias for any action type (existing + AI Vision Capture)
+AnyAction = Union[Action, AIVisionCaptureAction]
+
+
 class ScriptFile(BaseModel):
     """
     Complete script file with metadata and actions.
@@ -178,9 +311,12 @@ class ScriptFile(BaseModel):
     The JSON representation of this model matches the script file format defined
     in the design document, making it compatible with AI systems and manual editing.
     
+    Supports both traditional actions (mouse_move, mouse_click, key_press, key_release)
+    and AI Vision Capture actions for intelligent element detection.
+    
     Attributes:
         metadata: Recording session metadata
-        actions: List of captured user actions in chronological order
+        actions: List of captured user actions in chronological order (supports both Action and AIVisionCaptureAction)
         variables: Optional dictionary of variable names to default values for substitution
     
     Examples:
@@ -191,10 +327,10 @@ class ScriptFile(BaseModel):
         >>> json_str = script.model_dump_json()  # Serialize to JSON
         >>> loaded = ScriptFile.model_validate_json(json_str)  # Deserialize
     
-    Requirements: 3.1, 3.2, 3.3
+    Requirements: 3.1, 3.2, 3.3, 5.1, 5.2, 5.3, 5.4
     Validates: Property 2 (Script file format round-trip consistency)
     """
     
     metadata: ScriptMetadata
-    actions: list[Action]
+    actions: List[AnyAction]
     variables: Optional[dict[str, str]] = Field(default_factory=dict, description="Variable definitions for substitution")
