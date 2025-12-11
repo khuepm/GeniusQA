@@ -45,7 +45,7 @@ lerna-debug.log*
 # Misc
 .env
 .env.local
-.env.*. local
+.env.*.local
 
 # React Native
 . watchmanconfig

@@ -1,10 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Layout } from '../components/Layout';
-import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Project } from '../types/database';
 import { Plus, FolderKanban, Trash2, Edit } from 'lucide-react';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  deleteDoc,
+  doc,
+  orderBy,
+} from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 export const Projects: React.FC = () => {
   const { user } = useAuth();
@@ -16,17 +25,31 @@ export const Projects: React.FC = () => {
   }, [user]);
 
   const fetchProjects = async () => {
-    if (!user) return;
+    if (!user) {
+      setProjects([]);
+      setLoading(false);
+      return;
+    }
 
     try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setProjects(data || []);
+      const projectsQuery = query(
+        collection(db, 'projects'),
+        where('user_id', '==', user.uid),
+        orderBy('created_at', 'desc'),
+      );
+      const snapshot = await getDocs(projectsQuery);
+      const items: Project[] = snapshot.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          name: (data.name as string) || '',
+          description: (data.description as string) || '',
+          created_at: (data.created_at as string) || '',
+          updated_at: (data.updated_at as string) || '',
+          user_id: (data.user_id as string) || '',
+        };
+      });
+      setProjects(items);
     } catch (error) {
       console.error('Error fetching projects:', error);
     } finally {
@@ -38,8 +61,7 @@ export const Projects: React.FC = () => {
     if (!confirm('Are you sure you want to delete this project?')) return;
 
     try {
-      const { error } = await supabase.from('projects').delete().eq('id', id);
-      if (error) throw error;
+      await deleteDoc(doc(db, 'projects', id));
       setProjects(projects.filter((p) => p.id !== id));
     } catch (error) {
       console.error('Error deleting project:', error);

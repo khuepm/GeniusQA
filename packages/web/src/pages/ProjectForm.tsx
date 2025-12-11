@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
-import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { ArrowLeft } from 'lucide-react';
+import {
+  collection,
+  doc,
+  getDoc,
+  addDoc,
+  updateDoc,
+} from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 export const ProjectForm: React.FC = () => {
   const { id } = useParams();
@@ -24,15 +31,14 @@ export const ProjectForm: React.FC = () => {
 
   const fetchProject = async () => {
     try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) throw error;
-      setName(data.name);
-      setDescription(data.description);
+      if (!id) return;
+      const docRef = doc(db, 'projects', id);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        setName((data.name as string) || '');
+        setDescription((data.description as string) || '');
+      }
     } catch (error) {
       console.error('Error fetching project:', error);
       setError('Failed to load project');
@@ -46,20 +52,22 @@ export const ProjectForm: React.FC = () => {
 
     try {
       if (isEdit) {
-        const { error } = await supabase
-          .from('projects')
-          .update({ name, description, updated_at: new Date().toISOString() })
-          .eq('id', id);
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('projects').insert({
+        if (!id) return;
+        const docRef = doc(db, 'projects', id);
+        await updateDoc(docRef, {
           name,
           description,
-          user_id: user?.id,
+          updated_at: new Date().toISOString(),
         });
-
-        if (error) throw error;
+      } else {
+        const projectsRef = collection(db, 'projects');
+        await addDoc(projectsRef, {
+          name,
+          description,
+          user_id: user?.uid,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
       }
 
       navigate('/projects');

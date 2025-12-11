@@ -1,9 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Layout } from '../components/Layout';
-import { supabase } from '../lib/supabase';
 import { TestCase } from '../types/database';
 import { Plus, FileText, Trash2, Edit, Play } from 'lucide-react';
+import {
+  collection,
+  getDocs,
+  deleteDoc,
+  doc,
+  orderBy,
+  query,
+} from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 export const TestCases: React.FC = () => {
   const [testcases, setTestcases] = useState<TestCase[]>([]);
@@ -15,13 +23,22 @@ export const TestCases: React.FC = () => {
 
   const fetchTestCases = async () => {
     try {
-      const { data, error } = await supabase
-        .from('testcases')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setTestcases(data || []);
+      const testcasesQuery = query(collection(db, 'testcases'), orderBy('created_at', 'desc'));
+      const snapshot = await getDocs(testcasesQuery);
+      const items: TestCase[] = snapshot.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          project_id: (data.project_id as string) || '',
+          name: (data.name as string) || '',
+          description: (data.description as string) || '',
+          steps: (data.steps as any[]) || [],
+          status: (data.status as TestCase['status']) || 'draft',
+          created_at: (data.created_at as string) || '',
+          updated_at: (data.updated_at as string) || '',
+        };
+      });
+      setTestcases(items);
     } catch (error) {
       console.error('Error fetching test cases:', error);
     } finally {
@@ -33,8 +50,7 @@ export const TestCases: React.FC = () => {
     if (!confirm('Are you sure you want to delete this test case?')) return;
 
     try {
-      const { error } = await supabase.from('testcases').delete().eq('id', id);
-      if (error) throw error;
+      await deleteDoc(doc(db, 'testcases', id));
       setTestcases(testcases.filter((tc) => tc.id !== id));
     } catch (error) {
       console.error('Error deleting test case:', error);
