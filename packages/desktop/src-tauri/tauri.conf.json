@@ -31,7 +31,7 @@
         ]
       },
       "window": {
-        "all": false,
+        "all": true,
         "close": true,
         "hide": true,
         "show": true,
@@ -39,7 +39,8 @@
         "minimize": true,
         "unmaximize": true,
         "unminimize": true,
-        "startDragging": true
+        "startDragging": true,
+        "create": true
       },
       "protocol": {
         "all": false,

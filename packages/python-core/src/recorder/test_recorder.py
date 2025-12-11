@@ -185,3 +185,260 @@ def test_recorder_dependency_check():
     if not is_available:
         assert len(error_msg) > 0
         assert "pip install" in error_msg
+
+
+# =============================================================================
+# AI Vision Capture Property Tests
+# =============================================================================
+
+# Feature: ai-vision-capture, Property 13: Recording Continuity
+# Validates: Requirements 1.3
+@settings(max_examples=100, deadline=None)
+@given(
+    num_events_before=st.integers(min_value=1, max_value=5),
+    num_events_after=st.integers(min_value=1, max_value=5)
+)
+def test_recording_continuity_property(num_events_before, num_events_after):
+    """
+    **Feature: ai-vision-capture, Property 13: Recording Continuity**
+    **Validates: Requirements 1.3**
+    
+    For any recording session, pressing the vision capture hotkey SHALL NOT
+    interrupt the capture of subsequent mouse and keyboard events.
+    
+    This test verifies that:
+    1. Events before the hotkey are captured
+    2. The vision capture action is created
+    3. Events after the hotkey continue to be captured
+    4. The total action count matches expected (before + vision + after)
+    """
+    # Disable screenshot capture to avoid Pillow dependency in this test
+    recorder = Recorder(capture_screenshots=False)
+    
+    # Mock pyautogui module for vision capture
+    mock_pyautogui = MagicMock()
+    mock_screenshot = MagicMock()
+    mock_pyautogui.screenshot.return_value = mock_screenshot
+    mock_pyautogui.size.return_value = MagicMock(width=1920, height=1080)
+    
+    # Mock the listeners and dependencies
+    with patch('recorder.recorder.mouse.Listener') as mock_mouse_listener, \
+         patch('recorder.recorder.keyboard.Listener') as mock_keyboard_listener, \
+         patch.object(Recorder, 'check_dependencies', return_value=(True, "")), \
+         patch.dict('sys.modules', {'pyautogui': mock_pyautogui}):
+        
+        # Create mock listener instances
+        mock_mouse_instance = MagicMock()
+        mock_keyboard_instance = MagicMock()
+        mock_mouse_listener.return_value = mock_mouse_instance
+        mock_keyboard_listener.return_value = mock_keyboard_instance
+        
+        recorder.start_recording()
+        
+        # Simulate events BEFORE the hotkey
+        from pynput.mouse import Button
+        for i in range(num_events_before):
+            recorder._on_mouse_click(100 + i, 200 + i, Button.left, True)
+        
+        events_before_count = len(recorder.actions)
+        
+        # Simulate the vision capture hotkey (Ctrl+F6 on non-macOS)
+        # First, simulate Ctrl key press to set modifier state
+        recorder._cmd_ctrl_held = True
+        
+        # Then simulate F6 key press while Ctrl is held
+        from pynput.keyboard import Key
+        recorder._on_key_event(Key.f6, True)
+        
+        # Check that vision capture action was created
+        vision_actions = [a for a in recorder.actions if a.type == 'ai_vision_capture']
+        assert len(vision_actions) == 1, "Vision capture action should be created"
+        
+        # Simulate events AFTER the hotkey
+        for i in range(num_events_after):
+            recorder._on_mouse_click(300 + i, 400 + i, Button.left, True)
+        
+        actions = recorder.stop_recording()
+    
+    # Property: All events should be captured (before + vision + F6 key + after)
+    # Note: The F6 key press is also recorded as a key_press action
+    expected_count = num_events_before + 1 + 1 + num_events_after  # before + vision + f6_key + after
+    assert len(actions) == expected_count, f"Expected {expected_count} actions, got {len(actions)}"
+    
+    # Property: Vision capture action should be present
+    vision_actions = [a for a in actions if a.type == 'ai_vision_capture']
+    assert len(vision_actions) == 1, "Exactly one vision capture action should exist"
+    
+    # Property: Vision capture action should have valid structure
+    vision_action = vision_actions[0]
+    assert vision_action.id is not None, "Vision action should have an ID"
+    assert vision_action.timestamp >= 0, "Vision action should have valid timestamp"
+    assert vision_action.is_dynamic is False, "Vision action should default to Static Mode"
+    assert vision_action.interaction == 'click', "Vision action should default to click interaction"
+    
+    # Property: Events after hotkey should be captured
+    # Find the index of the vision action
+    vision_index = next(i for i, a in enumerate(actions) if a.type == 'ai_vision_capture')
+    
+    # Count mouse clicks after the vision action (excluding the F6 key press)
+    clicks_after = [a for a in actions[vision_index+1:] if a.type == 'mouse_click']
+    assert len(clicks_after) == num_events_after, f"Expected {num_events_after} clicks after hotkey, got {len(clicks_after)}"
+
+
+def test_vision_capture_hotkey_detection_macos():
+    """Test that Cmd+F6 is detected on macOS."""
+    recorder = Recorder(capture_screenshots=False)
+    
+    # Simulate macOS
+    recorder._is_macos = True
+    recorder._cmd_ctrl_held = False
+    
+    from pynput.keyboard import Key
+    
+    # Cmd key press should set modifier state
+    result = recorder._is_vision_capture_hotkey(Key.cmd, True)
+    assert result is False, "Cmd key alone should not trigger hotkey"
+    assert recorder._cmd_ctrl_held is True, "Cmd key should set modifier state"
+    
+    # F6 while Cmd is held should trigger hotkey
+    result = recorder._is_vision_capture_hotkey(Key.f6, True)
+    assert result is True, "Cmd+F6 should trigger hotkey on macOS"
+    
+    # Cmd key release should clear modifier state
+    result = recorder._is_vision_capture_hotkey(Key.cmd, False)
+    assert result is False
+    assert recorder._cmd_ctrl_held is False, "Cmd release should clear modifier state"
+
+
+def test_vision_capture_hotkey_detection_windows_linux():
+    """Test that Ctrl+F6 is detected on Windows/Linux."""
+    recorder = Recorder(capture_screenshots=False)
+    
+    # Simulate Windows/Linux
+    recorder._is_macos = False
+    recorder._cmd_ctrl_held = False
+    
+    from pynput.keyboard import Key
+    
+    # Ctrl key press should set modifier state
+    result = recorder._is_vision_capture_hotkey(Key.ctrl, True)
+    assert result is False, "Ctrl key alone should not trigger hotkey"
+    assert recorder._cmd_ctrl_held is True, "Ctrl key should set modifier state"
+    
+    # F6 while Ctrl is held should trigger hotkey
+    result = recorder._is_vision_capture_hotkey(Key.f6, True)
+    assert result is True, "Ctrl+F6 should trigger hotkey on Windows/Linux"
+    
+    # Ctrl key release should clear modifier state
+    result = recorder._is_vision_capture_hotkey(Key.ctrl, False)
+    assert result is False
+    assert recorder._cmd_ctrl_held is False, "Ctrl release should clear modifier state"
+
+
+def test_vision_capture_creates_valid_action(tmp_path):
+    """Test that vision capture creates a valid AIVisionCaptureAction."""
+    screenshots_dir = tmp_path / "screenshots"
+    recorder = Recorder(screenshots_dir=screenshots_dir, capture_screenshots=True)
+    
+    # Mock pyautogui module
+    mock_pyautogui = MagicMock()
+    mock_screenshot = MagicMock()
+    mock_pyautogui.screenshot.return_value = mock_screenshot
+    mock_pyautogui.size.return_value = MagicMock(width=1920, height=1080)
+    
+    with patch('recorder.recorder.mouse.Listener') as mock_mouse_listener, \
+         patch('recorder.recorder.keyboard.Listener') as mock_keyboard_listener, \
+         patch.object(Recorder, 'check_dependencies', return_value=(True, "")), \
+         patch.dict('sys.modules', {'pyautogui': mock_pyautogui}):
+        
+        mock_mouse_instance = MagicMock()
+        mock_keyboard_instance = MagicMock()
+        mock_mouse_listener.return_value = mock_mouse_instance
+        mock_keyboard_listener.return_value = mock_keyboard_instance
+        
+        recorder.start_recording()
+        
+        # Trigger vision capture
+        recorder._capture_vision_marker()
+        
+        actions = recorder.stop_recording()
+    
+    # Should have exactly one action
+    assert len(actions) == 1
+    
+    # Should be an AIVisionCaptureAction
+    action = actions[0]
+    assert action.type == 'ai_vision_capture'
+    
+    # Validate structure
+    assert action.id is not None
+    assert len(action.id) == 36  # UUID format
+    assert action.timestamp >= 0
+    assert action.is_dynamic is False
+    assert action.interaction == 'click'
+    
+    # Validate static_data
+    assert action.static_data is not None
+    assert action.static_data.original_screenshot.startswith('screenshots/vision_')
+    assert action.static_data.saved_x is None
+    assert action.static_data.saved_y is None
+    assert action.static_data.screen_dim == (1920, 1080)
+    
+    # Validate dynamic_config
+    assert action.dynamic_config is not None
+    assert action.dynamic_config.prompt == ""
+    assert action.dynamic_config.reference_images == []
+    assert action.dynamic_config.roi is None
+    assert action.dynamic_config.search_scope == 'global'
+    
+    # Validate cache_data
+    assert action.cache_data is not None
+    assert action.cache_data.cached_x is None
+    assert action.cache_data.cached_y is None
+    assert action.cache_data.cache_dim is None
+
+
+def test_vision_capture_does_not_block_recording(tmp_path):
+    """Test that vision capture does not block subsequent event capture."""
+    screenshots_dir = tmp_path / "screenshots"
+    recorder = Recorder(screenshots_dir=screenshots_dir, capture_screenshots=True)
+    
+    # Mock pyautogui module
+    mock_pyautogui = MagicMock()
+    mock_screenshot = MagicMock()
+    mock_pyautogui.screenshot.return_value = mock_screenshot
+    mock_pyautogui.size.return_value = MagicMock(width=1920, height=1080)
+    
+    with patch('recorder.recorder.mouse.Listener') as mock_mouse_listener, \
+         patch('recorder.recorder.keyboard.Listener') as mock_keyboard_listener, \
+         patch.object(Recorder, 'check_dependencies', return_value=(True, "")), \
+         patch.dict('sys.modules', {'pyautogui': mock_pyautogui}):
+        
+        mock_mouse_instance = MagicMock()
+        mock_keyboard_instance = MagicMock()
+        mock_mouse_listener.return_value = mock_mouse_instance
+        mock_keyboard_listener.return_value = mock_keyboard_instance
+        
+        recorder.start_recording()
+        
+        # Capture some events before
+        from pynput.mouse import Button
+        recorder._on_mouse_click(100, 100, Button.left, True)
+        
+        # Trigger vision capture
+        recorder._capture_vision_marker()
+        
+        # Capture some events after - this should work without issues
+        recorder._on_mouse_click(200, 200, Button.left, True)
+        recorder._on_mouse_move(300, 300)
+        
+        actions = recorder.stop_recording()
+    
+    # Should have 4 actions: click, vision, click, move
+    assert len(actions) == 4
+    
+    # Verify order
+    assert actions[0].type == 'mouse_click'
+    assert actions[1].type == 'ai_vision_capture'
+    assert actions[2].type == 'mouse_click'
+    assert actions[3].type == 'mouse_move'

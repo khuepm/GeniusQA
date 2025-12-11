@@ -163,17 +163,19 @@ impl CoreRouter {
         let mut pref_manager = self.preference_manager.lock().unwrap();
         match PreferenceManager::with_default_path() {
             Ok(manager) => {
-                // Set active core based on saved preferences
-                let preferred_core = manager.get_preferred_core();
+                // Force Rust core as active (ignore saved preferences)
                 let mut active_core = self.active_core.lock().unwrap();
-                *active_core = preferred_core.into();
+                *active_core = CoreType::Rust;
                 
                 *pref_manager = Some(manager);
                 Ok(())
             }
             Err(e) => {
                 eprintln!("Failed to initialize preference manager: {:?}", e);
-                Err(format!("Failed to initialize preferences: {:?}", e))
+                // Still force Rust core even if preferences fail
+                let mut active_core = self.active_core.lock().unwrap();
+                *active_core = CoreType::Rust;
+                Ok(()) // Don't fail initialization
             }
         }
     }
@@ -938,20 +940,10 @@ impl CoreRouter {
     }
 
     /// Get list of available automation cores
+    /// NOTE: Python core temporarily disabled, only Rust core available
     pub fn get_available_cores(&self) -> Vec<CoreType> {
-        let mut available = Vec::new();
-
-        // Check Python core availability
-        if self.is_python_core_available() {
-            available.push(CoreType::Python);
-        }
-
-        // Check Rust core availability
-        if self.is_rust_core_available() {
-            available.push(CoreType::Rust);
-        }
-
-        available
+        // Only return Rust core for now
+        vec![CoreType::Rust]
     }
 
     /// Get current core status including health information
@@ -1201,10 +1193,52 @@ impl CoreRouter {
                     }
                 }
 
+                // Set up event streaming to Tauri for recording events
+                let app_handle_clone = app_handle.clone();
+                let (event_tx, mut event_rx) = mpsc::unbounded_channel::<rust_automation_core::recorder::RecordingEvent>();
+                
+                eprintln!("[Rust Recorder] Event streaming channel created");
+                
+                // Spawn a task to forward recording events to Tauri
+                tauri::async_runtime::spawn(async move {
+                    while let Some(event) = event_rx.recv().await {
+                        let event_name = event.event_type.clone();
+                        
+                        // Emit the original event
+                        if let Err(e) = app_handle_clone.emit_all(&event_name, &event) {
+                            eprintln!("[Rust Recorder] Failed to emit event '{}': {:?}", event_name, e);
+                        }
+                        
+                        // Also emit recording_click event for cursor overlay when it's a mouse click
+                        if event_name == "action_recorded" {
+                            if let rust_automation_core::recorder::RecordingEventData::ActionRecorded { ref action } = event.data {
+                                if action.action_type == "mouse_click" {
+                                    if let (Some(x), Some(y)) = (action.x, action.y) {
+                                        let click_event = serde_json::json!({
+                                            "x": x,
+                                            "y": y,
+                                            "button": action.button.clone().unwrap_or_else(|| "left".to_string())
+                                        });
+                                        if let Err(e) = app_handle_clone.emit_all("recording_click", &click_event) {
+                                            eprintln!("[Rust Recorder] Failed to emit recording_click event: {:?}", e);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    eprintln!("[Rust Recorder] Event forwarding task terminated");
+                });
+
                 // Start recording
                 if let Some(recorder) = recorder_lock.as_mut() {
+                    // Set event sender for real-time UI updates
+                    recorder.set_event_sender(event_tx);
+                    eprintln!("[Rust Recorder] Event sender configured");
+                    
                     match recorder.start_recording() {
                         Ok(_) => {
+                            eprintln!("[Rust Recorder] Recording started successfully");
                             Ok(serde_json::json!({
                                 "success": true,
                                 "data": {

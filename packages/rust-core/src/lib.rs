@@ -20,6 +20,8 @@ pub mod cross_core_testing;
 pub mod logging;
 pub mod monitoring;
 pub mod debug;
+pub mod asset_manager;
+pub mod ai_vision_integration;
 
 #[cfg(test)]
 mod preferences_property_tests;
@@ -45,10 +47,13 @@ mod permission_property_tests;
 #[cfg(test)]
 mod playback_property_tests;
 
+#[cfg(test)]
+mod ai_vision_capture_property_tests;
+
 pub use automation::{AutomationCore, AutomationCommand, CommandResult};
 pub use error::{AutomationError, Result, ErrorInfo, ErrorSeverity};
 pub use config::AutomationConfig;
-pub use script::{ScriptData, Action, ActionType};
+pub use script::{ScriptData, Action, ActionType, AIVisionCaptureAction, StaticData, DynamicConfig, CacheData, VisionROI, InteractionType, SearchScope};
 pub use preferences::{PreferenceManager, UserPreferences};
 pub use health::{CoreHealthChecker, CoreHealth, PerformanceMetrics};
 pub use fallback::{FallbackManager, FallbackConfig, FallbackResult};
@@ -58,6 +63,9 @@ pub use validation::{ScriptValidator, ScriptMigrator, CompatibilityTester, Compa
 pub use cross_core_testing::{CrossCoreTestSuite, TestScript, CrossCoreTestResult, RecordingComparator, create_default_test_scripts};
 pub use logging::{AutomationLogger, LoggingConfig, LogEntry, LogLevel, OperationType as LogOperationType, CoreType as LogCoreType, PerformanceReport, init_logger, get_logger};
 pub use monitoring::{CoreMonitor, MonitoringConfig, HealthStatus, CoreHealthInfo, Alert, AlertType, MonitoringMetrics, HealthCheckResult};
+pub use asset_manager::{AssetManager, to_posix_path, to_native_path, generate_unique_filename, is_safe_path};
+pub use player::{scale_coordinates, scale_roi, ScreenDimensions, ScaledCoordinates, execute_ai_vision_capture, execute_dynamic_mode_with_ai, AIVisionExecutionResult, AIVisionExecutionMode, DynamicModeExecutionResult, CacheUpdate};
+pub use ai_vision_integration::{AIVisionAnalysisRequest, AIVisionAnalysisResponse, AIVisionProvider, DynamicModeResult, build_analysis_request, apply_cache_update, persist_cache_update, DEFAULT_AI_TIMEOUT_MS};
 
 /// Re-export commonly used types
 pub mod prelude {
@@ -119,6 +127,11 @@ pub mod prelude {
         AlertType,
         MonitoringMetrics,
         HealthCheckResult,
+        AssetManager,
+        to_posix_path,
+        to_native_path,
+        generate_unique_filename,
+        is_safe_path,
     };
     pub use crate::health::CoreType;
 }

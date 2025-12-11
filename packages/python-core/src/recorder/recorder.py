@@ -1,10 +1,15 @@
 """Recorder module for capturing mouse and keyboard events."""
 
 import time
-from typing import Optional
+import uuid
+import platform
+from typing import Optional, Union, List
 from pathlib import Path
 from pynput import mouse, keyboard
-from storage.models import Action
+from storage.models import Action, AIVisionCaptureAction, StaticData, DynamicConfig, CacheData
+
+# Type alias for any action type
+AnyAction = Union[Action, AIVisionCaptureAction]
 
 
 class Recorder:
@@ -17,7 +22,7 @@ class Recorder:
             screenshots_dir: Directory to save screenshots (default: None, will be set by storage)
             capture_screenshots: Whether to capture screenshots on mouse clicks (default: True)
         """
-        self.actions: list[Action] = []
+        self.actions: List[AnyAction] = []
         self.start_time: Optional[float] = None
         self.is_recording: bool = False
         self.mouse_listener: Optional[mouse.Listener] = None
@@ -26,6 +31,11 @@ class Recorder:
         self.capture_screenshots: bool = capture_screenshots
         self.screenshot_counter: int = 0
         self._stop_requested: bool = False
+        
+        # Vision capture hotkey state tracking
+        # Cmd+F6 (macOS) or Ctrl+F6 (Windows/Linux)
+        self._cmd_ctrl_held: bool = False
+        self._is_macos: bool = platform.system() == 'Darwin'
     
     @staticmethod
     def check_dependencies(check_pillow: bool = True) -> tuple[bool, str]:
@@ -105,7 +115,7 @@ class Recorder:
         sys.stderr.write("[Recorder] Press ESC to stop recording\n")
         sys.stderr.flush()
     
-    def stop_recording(self) -> list[Action]:
+    def stop_recording(self) -> List[AnyAction]:
         """Stop capturing and return recorded actions."""
         if not self.is_recording:
             raise RuntimeError("No recording in progress")
@@ -127,14 +137,29 @@ class Recorder:
         
         # Log first few actions for debugging
         if self.actions:
-            sys.stderr.write(f"[Recorder] First action: {self.actions[0].type} at ({self.actions[0].x}, {self.actions[0].y})\n")
+            first_action = self.actions[0]
+            if first_action.type == 'ai_vision_capture':
+                sys.stderr.write(f"[Recorder] First action: {first_action.type} (id: {first_action.id})\n")
+            else:
+                sys.stderr.write(f"[Recorder] First action: {first_action.type} at ({first_action.x}, {first_action.y})\n")
+            
             if len(self.actions) > 1:
-                sys.stderr.write(f"[Recorder] Last action: {self.actions[-1].type} at ({self.actions[-1].x}, {self.actions[-1].y})\n")
+                last_action = self.actions[-1]
+                if last_action.type == 'ai_vision_capture':
+                    sys.stderr.write(f"[Recorder] Last action: {last_action.type} (id: {last_action.id})\n")
+                else:
+                    sys.stderr.write(f"[Recorder] Last action: {last_action.type} at ({last_action.x}, {last_action.y})\n")
             sys.stderr.flush()
         else:
             sys.stderr.write("[Recorder] WARNING: No actions were captured!\n")
             sys.stderr.write("[Recorder] This usually means Accessibility permissions are not granted.\n")
             sys.stderr.write("[Recorder] On macOS: System Preferences → Security & Privacy → Privacy → Accessibility\n")
+            sys.stderr.flush()
+        
+        # Count vision capture actions
+        vision_actions = [a for a in self.actions if a.type == 'ai_vision_capture']
+        if vision_actions:
+            sys.stderr.write(f"[Recorder] AI Vision Capture actions: {len(vision_actions)}\n")
             sys.stderr.flush()
         
         return self.actions
@@ -228,6 +253,149 @@ class Recorder:
             sys.stderr.flush()
             return None
     
+    def _get_screen_dimensions(self) -> tuple[int, int]:
+        """
+        Get the current screen dimensions.
+        
+        Returns:
+            Tuple of (width, height) in pixels
+        """
+        try:
+            import pyautogui
+            size = pyautogui.size()
+            return (size.width, size.height)
+        except Exception as e:
+            import sys
+            sys.stderr.write(f"Warning: Failed to get screen dimensions: {str(e)}\n")
+            sys.stderr.flush()
+            # Return a reasonable default
+            return (1920, 1080)
+    
+    def _capture_vision_marker(self) -> None:
+        """
+        Capture a vision marker (screenshot + action) for AI Vision Capture.
+        
+        This method is called when the user presses the vision capture hotkey
+        (Cmd+F6 on macOS, Ctrl+F6 on Windows/Linux). It captures a full screenshot,
+        saves it to the screenshots directory, and creates an ai_vision_capture
+        action with default values.
+        
+        The screenshot is saved asynchronously to avoid blocking the event loop,
+        ensuring that mouse and keyboard hooks remain active during capture.
+        
+        Requirements: 1.2, 1.4, 5.5
+        """
+        if not self.is_recording or self.start_time is None:
+            return
+        
+        import sys
+        
+        try:
+            import pyautogui
+            
+            # Generate unique action ID
+            action_id = str(uuid.uuid4())
+            
+            # Get current timestamp
+            timestamp = time.time() - self.start_time
+            
+            # Get screen dimensions
+            screen_dim = self._get_screen_dimensions()
+            
+            # Capture screenshot
+            screenshot = pyautogui.screenshot()
+            
+            # Generate unique filename for vision marker screenshot
+            # Pattern: vision_{action_id}.png (Requirements: 5.5)
+            filename = f"vision_{action_id}.png"
+            
+            # Save screenshot to screenshots directory
+            screenshot_path: Optional[str] = None
+            if self.screenshots_dir:
+                # Ensure screenshots directory exists
+                self.screenshots_dir.mkdir(parents=True, exist_ok=True)
+                filepath = self.screenshots_dir / filename
+                screenshot.save(filepath)
+                # Store relative path (Requirements: 5.5)
+                screenshot_path = f"screenshots/{filename}"
+                sys.stderr.write(f"[Recorder] Vision marker screenshot saved: {screenshot_path}\n")
+                sys.stderr.flush()
+            else:
+                sys.stderr.write("[Recorder] Warning: No screenshots directory configured, vision marker saved without screenshot\n")
+                sys.stderr.flush()
+                screenshot_path = ""
+            
+            # Create ai_vision_capture action with default values (Requirements: 1.2, 1.4)
+            vision_action = AIVisionCaptureAction(
+                type='ai_vision_capture',
+                id=action_id,
+                timestamp=timestamp,
+                is_dynamic=False,  # Default to Static Mode (Requirement 3.1)
+                interaction='click',  # Default interaction type
+                static_data=StaticData(
+                    original_screenshot=screenshot_path,
+                    saved_x=None,
+                    saved_y=None,
+                    screen_dim=screen_dim
+                ),
+                dynamic_config=DynamicConfig(
+                    prompt="",
+                    reference_images=[],
+                    roi=None,
+                    search_scope='global'
+                ),
+                cache_data=CacheData(
+                    cached_x=None,
+                    cached_y=None,
+                    cache_dim=None
+                )
+            )
+            
+            # Add action to recorded actions list
+            self.actions.append(vision_action)
+            
+            sys.stderr.write(f"[Recorder] AI Vision Capture action created: {action_id}\n")
+            sys.stderr.flush()
+            
+        except Exception as e:
+            # Log error but don't fail the recording (Requirement 1.3)
+            sys.stderr.write(f"Warning: Failed to capture vision marker: {str(e)}\n")
+            sys.stderr.flush()
+    
+    def _is_vision_capture_hotkey(self, key, pressed: bool) -> bool:
+        """
+        Check if the vision capture hotkey (Cmd+F6 or Ctrl+F6) was pressed.
+        
+        On macOS: Cmd+F6
+        On Windows/Linux: Ctrl+F6
+        
+        Args:
+            key: The key that was pressed/released
+            pressed: True if key was pressed, False if released
+        
+        Returns:
+            True if the vision capture hotkey combination was detected
+        
+        Requirements: 1.1, 1.3
+        """
+        # Track modifier key state (Cmd on macOS, Ctrl on Windows/Linux)
+        if self._is_macos:
+            # Track Cmd key (left or right)
+            if key in (keyboard.Key.cmd, keyboard.Key.cmd_l, keyboard.Key.cmd_r):
+                self._cmd_ctrl_held = pressed
+                return False
+        else:
+            # Track Ctrl key (left or right)
+            if key in (keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r):
+                self._cmd_ctrl_held = pressed
+                return False
+        
+        # Check for F6 key press while modifier is held
+        if pressed and self._cmd_ctrl_held and key == keyboard.Key.f6:
+            return True
+        
+        return False
+    
     def _on_key_event(self, key, pressed: bool) -> None:
         """Callback for keyboard events."""
         if not self.is_recording or self.start_time is None:
@@ -240,6 +408,19 @@ class Recorder:
             sys.stderr.flush()
             self._stop_requested = True
             return
+        
+        # Check for vision capture hotkey (Cmd+F6 or Ctrl+F6)
+        # This must be checked BEFORE recording the key event to avoid
+        # recording the F6 key press as a regular action
+        # Requirements: 1.1, 1.3
+        if self._is_vision_capture_hotkey(key, pressed):
+            import sys
+            modifier = "Cmd" if self._is_macos else "Ctrl"
+            sys.stderr.write(f"[Recorder] {modifier}+F6 pressed - capturing vision marker\n")
+            sys.stderr.flush()
+            self._capture_vision_marker()
+            # Continue recording - do not return early
+            # The hotkey should not interrupt the recording flow (Requirement 1.3)
         
         timestamp = time.time() - self.start_time
         

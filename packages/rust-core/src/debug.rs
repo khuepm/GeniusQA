@@ -327,6 +327,7 @@ impl ScriptVerifier {
             ActionType::Wait => true,
             ActionType::Screenshot => false,
             ActionType::Custom => false,
+            ActionType::AiVisionCapture => false, // Handled separately via AIVisionCaptureAction
         }
     }
 

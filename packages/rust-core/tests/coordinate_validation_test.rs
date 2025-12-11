@@ -234,6 +234,7 @@ fn has_required_fields(action: &Action) -> bool {
         ActionType::Wait => true,
         ActionType::Screenshot => false,
         ActionType::Custom => false,
+        ActionType::AiVisionCapture => false, // Handled separately via AIVisionCaptureAction
     }
 }
 

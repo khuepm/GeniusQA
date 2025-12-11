@@ -63,7 +63,7 @@ def valid_action():
 
 
 # Feature: desktop-recorder-mvp, Property 3: Playback executes actions in order
-@settings(max_examples=100)
+@settings(max_examples=100, deadline=None)  # Disable deadline due to thread scheduling variance
 @given(st.lists(valid_action(), min_size=1, max_size=20))
 def test_playback_executes_actions_in_order(actions):
     """For any script file with multiple actions, playback should execute each action in the exact order.

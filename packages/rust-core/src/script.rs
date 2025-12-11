@@ -48,6 +48,7 @@ pub enum ActionType {
     MouseDoubleClick,
     MouseDrag,
     MouseScroll,
+    AiVisionCapture,
     KeyPress,
     KeyRelease,
     KeyType,
@@ -190,4 +191,216 @@ impl Action {
             additional_data: None,
         }
     }
+}
+
+// ============================================================================
+// AI Vision Capture Types
+// ============================================================================
+
+/// Interaction type for AI Vision Capture actions
+/// Specifies what action to perform at the detected coordinates
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum InteractionType {
+    /// Left mouse click (default)
+    Click,
+    /// Double left mouse click
+    Dblclick,
+    /// Right mouse click
+    Rclick,
+    /// Mouse hover without click
+    Hover,
+}
+
+impl Default for InteractionType {
+    fn default() -> Self {
+        InteractionType::Click
+    }
+}
+
+/// Search scope for AI Vision Capture
+/// Determines whether to search the full screen or within a defined ROI
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SearchScope {
+    /// Search the entire screen
+    Global,
+    /// Search only within the defined ROI
+    Regional,
+}
+
+impl Default for SearchScope {
+    fn default() -> Self {
+        SearchScope::Global
+    }
+}
+
+/// Region of Interest for AI Vision Capture
+/// Defines a rectangular area on the screen for targeted searching
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct VisionROI {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// Static data captured during recording
+/// Contains the original screenshot and coordinates saved during editing
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StaticData {
+    /// Path to the original screenshot captured during recording
+    pub original_screenshot: String,
+    /// X coordinate saved during editing (null if not yet analyzed)
+    pub saved_x: Option<i32>,
+    /// Y coordinate saved during editing (null if not yet analyzed)
+    pub saved_y: Option<i32>,
+    /// Screen dimensions at the time of recording [width, height]
+    pub screen_dim: (u32, u32),
+}
+
+/// Dynamic configuration for AI-based element finding
+/// Contains prompt, reference images, and search settings
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DynamicConfig {
+    /// User prompt describing the target element
+    pub prompt: String,
+    /// Paths to reference images for visual matching
+    pub reference_images: Vec<String>,
+    /// Region of Interest for targeted searching (optional)
+    pub roi: Option<VisionROI>,
+    /// Search scope: global (full screen) or regional (within ROI)
+    pub search_scope: SearchScope,
+}
+
+impl Default for DynamicConfig {
+    fn default() -> Self {
+        DynamicConfig {
+            prompt: String::new(),
+            reference_images: Vec::new(),
+            roi: None,
+            search_scope: SearchScope::Global,
+        }
+    }
+}
+
+/// Cache data for storing successful AI detection results
+/// Allows subsequent playbacks to skip AI calls when coordinates are cached
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CacheData {
+    /// Cached X coordinate from successful AI detection
+    pub cached_x: Option<i32>,
+    /// Cached Y coordinate from successful AI detection
+    pub cached_y: Option<i32>,
+    /// Screen dimensions when cache was created [width, height]
+    pub cache_dim: Option<(u32, u32)>,
+}
+
+impl Default for CacheData {
+    fn default() -> Self {
+        CacheData {
+            cached_x: None,
+            cached_y: None,
+            cache_dim: None,
+        }
+    }
+}
+
+/// AI Vision Capture Action
+/// A special action type that uses AI to find UI elements on screen
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AIVisionCaptureAction {
+    /// Action type identifier (always "ai_vision_capture")
+    #[serde(rename = "type")]
+    pub action_type: String,
+    /// Unique identifier for this action
+    pub id: String,
+    /// Timestamp when this action was recorded
+    pub timestamp: f64,
+    /// Whether to use dynamic (AI) mode during playback
+    pub is_dynamic: bool,
+    /// Type of interaction to perform at the detected coordinates
+    pub interaction: InteractionType,
+    /// Static data from recording and editing
+    pub static_data: StaticData,
+    /// Dynamic configuration for AI-based detection
+    pub dynamic_config: DynamicConfig,
+    /// Cached coordinates from previous successful AI detection
+    pub cache_data: CacheData,
+}
+
+impl AIVisionCaptureAction {
+    /// Create a new AI Vision Capture action with default values
+    pub fn new(
+        id: String,
+        timestamp: f64,
+        original_screenshot: String,
+        screen_dim: (u32, u32),
+    ) -> Self {
+        AIVisionCaptureAction {
+            action_type: "ai_vision_capture".to_string(),
+            id,
+            timestamp,
+            is_dynamic: false, // Default to Static Mode (Requirement 3.1)
+            interaction: InteractionType::default(),
+            static_data: StaticData {
+                original_screenshot,
+                saved_x: None,
+                saved_y: None,
+                screen_dim,
+            },
+            dynamic_config: DynamicConfig::default(),
+            cache_data: CacheData::default(),
+        }
+    }
+
+    /// Check if this action has valid static coordinates
+    pub fn has_static_coordinates(&self) -> bool {
+        self.static_data.saved_x.is_some() && self.static_data.saved_y.is_some()
+    }
+
+    /// Check if this action has valid cached coordinates
+    pub fn has_cached_coordinates(&self) -> bool {
+        self.cache_data.cached_x.is_some() && self.cache_data.cached_y.is_some()
+    }
+
+    /// Get the execution mode for this action
+    pub fn get_execution_mode(&self) -> AIVisionExecutionMode {
+        if !self.is_dynamic && self.has_static_coordinates() {
+            AIVisionExecutionMode::Static
+        } else if self.is_dynamic && self.has_cached_coordinates() {
+            AIVisionExecutionMode::Cached
+        } else if self.is_dynamic {
+            AIVisionExecutionMode::Dynamic
+        } else {
+            AIVisionExecutionMode::Skip
+        }
+    }
+
+    /// Update cache with new coordinates from successful AI detection
+    pub fn update_cache(&mut self, x: i32, y: i32, screen_dim: (u32, u32)) {
+        self.cache_data.cached_x = Some(x);
+        self.cache_data.cached_y = Some(y);
+        self.cache_data.cache_dim = Some(screen_dim);
+    }
+
+    /// Clear cache data (used when AI detection fails)
+    pub fn clear_cache(&mut self) {
+        self.cache_data.cached_x = None;
+        self.cache_data.cached_y = None;
+        self.cache_data.cache_dim = None;
+    }
+}
+
+/// Execution mode for AI Vision Capture actions
+#[derive(Debug, Clone, PartialEq)]
+pub enum AIVisionExecutionMode {
+    /// Use saved static coordinates (0 token cost)
+    Static,
+    /// Use cached coordinates from previous AI detection (0 token cost)
+    Cached,
+    /// Call AI service to find element (token cost)
+    Dynamic,
+    /// Skip execution (missing coordinates in static mode)
+    Skip,
 }

@@ -231,6 +231,7 @@ impl ScriptValidator {
                 ActionType::Screenshot => "screenshot",
                 ActionType::Wait => "wait",
                 ActionType::Custom => "custom",
+                ActionType::AiVisionCapture => "ai_vision_capture",
             };
 
             if !self.schema.action_types.contains(&action_type_str.to_string()) {

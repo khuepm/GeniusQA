@@ -26,6 +26,13 @@ import {
   RecordingResult,
 } from '../types/recorder.types';
 import { CoreStatus, PerformanceMetrics, PerformanceComparison, UserSettings } from '../components/CoreSelector';
+import {
+  AIVisionCaptureAction,
+  AIVisionRequest,
+  AIVisionResponse,
+  CacheData,
+  ScreenDimensions,
+} from '../types/aiVisionCapture.types';
 
 /**
  * Configuration for IPC Bridge
@@ -878,6 +885,336 @@ export class IPCBridgeService {
     } catch (error) {
       console.error('[IPC Bridge] set_preview_opacity failed:', error);
       throw new Error(`Failed to set preview opacity: ${error}`);
+    }
+  }
+
+  /**
+   * Save an asset file (e.g., reference image)
+   * 
+   * Saves binary data (base64 encoded) to the specified path.
+   * Creates parent directories if they don't exist.
+   * 
+   * @param {string} assetPath - Absolute path to save the asset
+   * @param {string} base64Data - Base64 encoded file data
+   * 
+   * @throws {Error} If file write fails
+   * @throws {Error} If directory creation fails
+   * 
+   * @example
+   * await ipcBridge.saveAsset('/path/to/assets/image.png', base64ImageData);
+   * 
+   * Requirements: 5.5, 2.6
+   */
+  public async saveAsset(assetPath: string, base64Data: string): Promise<void> {
+    try {
+      console.log('[IPC Bridge] Invoking save_asset command...', { assetPath });
+      await invoke('save_asset', { assetPath, base64Data });
+      console.log('[IPC Bridge] save_asset command successful');
+    } catch (error) {
+      console.error('[IPC Bridge] save_asset command failed:', error);
+      throw new Error(this.formatErrorMessage(error as Error));
+    }
+  }
+
+  /**
+   * Load an asset file (e.g., reference image)
+   * 
+   * Loads binary data from the specified path and returns it as base64.
+   * 
+   * @param {string} assetPath - Absolute path to the asset
+   * @returns {Promise<string>} Base64 encoded file data
+   * 
+   * @throws {Error} If file not found
+   * @throws {Error} If file read fails
+   * 
+   * @example
+   * const base64Data = await ipcBridge.loadAsset('/path/to/assets/image.png');
+   * 
+   * Requirements: 5.10
+   */
+  public async loadAsset(assetPath: string): Promise<string> {
+    try {
+      console.log('[IPC Bridge] Invoking load_asset command...', { assetPath });
+      const result = await invoke<string>('load_asset', { assetPath });
+      console.log('[IPC Bridge] load_asset command successful');
+      return result;
+    } catch (error) {
+      console.error('[IPC Bridge] load_asset command failed:', error);
+      throw new Error(this.formatErrorMessage(error as Error));
+    }
+  }
+
+  /**
+   * Delete an asset file (e.g., reference image)
+   * 
+   * Permanently deletes the asset file at the specified path.
+   * 
+   * @param {string} assetPath - Absolute path to the asset
+   * 
+   * @throws {Error} If file not found
+   * @throws {Error} If file deletion fails
+   * 
+   * @example
+   * await ipcBridge.deleteAsset('/path/to/assets/image.png');
+   * 
+   * Requirements: 2.6
+   */
+  public async deleteAsset(assetPath: string): Promise<void> {
+    try {
+      console.log('[IPC Bridge] Invoking delete_asset command...', { assetPath });
+      await invoke('delete_asset', { assetPath });
+      console.log('[IPC Bridge] delete_asset command successful');
+    } catch (error) {
+      console.error('[IPC Bridge] delete_asset command failed:', error);
+      throw new Error(this.formatErrorMessage(error as Error));
+    }
+  }
+
+  // ============================================================================
+  // AI Vision Capture IPC Commands
+  // Requirements: 1.1, 3.3, 4.9
+  // ============================================================================
+
+  /**
+   * Capture a vision marker during recording
+   * 
+   * Triggers the capture of a screenshot and creates an ai_vision_capture action.
+   * This is called when the user presses the vision capture hotkey (Cmd+F6 / Ctrl+F6)
+   * from the UI, or when manually triggering a vision marker capture.
+   * 
+   * @returns {Promise<AIVisionCaptureAction>} The created vision capture action
+   * 
+   * @throws {Error} If screenshot capture fails
+   * @throws {Error} If no recording is in progress
+   * 
+   * @example
+   * const action = await ipcBridge.captureVisionMarker();
+   * console.log('Vision marker captured:', action.id);
+   * 
+   * Requirements: 1.1, 1.2, 1.4
+   */
+  public async captureVisionMarker(): Promise<AIVisionCaptureAction> {
+    try {
+      console.log('[IPC Bridge] Invoking capture_vision_marker command...');
+      const result = await invoke<AIVisionCaptureAction>('capture_vision_marker');
+      console.log('[IPC Bridge] capture_vision_marker command successful:', result.id);
+      return result;
+    } catch (error) {
+      console.error('[IPC Bridge] capture_vision_marker command failed:', error);
+      throw new Error(this.formatErrorMessage(error as Error));
+    }
+  }
+
+  /**
+   * Analyze a screenshot using AI Vision service
+   * 
+   * Sends a screenshot, prompt, and optional reference images to the AI service
+   * for analysis. Returns the detected coordinates of the target element.
+   * 
+   * This command is used both during editing (Static Mode) and playback (Dynamic Mode).
+   * 
+   * @param {AIVisionRequest} request - The vision analysis request containing:
+   *   - screenshot: Base64 encoded screenshot or file path
+   *   - prompt: User prompt describing the target element
+   *   - reference_images: Array of reference image paths/base64
+   *   - roi: Optional region of interest for regional search
+   * 
+   * @returns {Promise<AIVisionResponse>} The analysis result with coordinates or error
+   * 
+   * @throws {Error} If AI service is not initialized
+   * @throws {Error} If analysis times out (default 15s)
+   * 
+   * @example
+   * const response = await ipcBridge.analyzeVision({
+   *   screenshot: base64Screenshot,
+   *   prompt: 'Click the Submit button',
+   *   reference_images: ['assets/submit_icon.png'],
+   *   roi: { x: 100, y: 100, width: 200, height: 100 }
+   * });
+   * if (response.success) {
+   *   console.log(`Found at (${response.x}, ${response.y})`);
+   * }
+   * 
+   * Requirements: 3.3, 4.6, 4.8, 4.10
+   */
+  public async analyzeVision(request: AIVisionRequest): Promise<AIVisionResponse> {
+    try {
+      console.log('[IPC Bridge] Invoking analyze_vision command...', {
+        hasScreenshot: !!request.screenshot,
+        prompt: request.prompt?.substring(0, 50) + '...',
+        referenceImageCount: request.reference_images?.length || 0,
+        hasRoi: !!request.roi,
+      });
+      
+      // Note: This command delegates to the AI Vision Service
+      // The actual AI call is made from the frontend service
+      // This IPC command is for triggering analysis from the Rust backend during playback
+      const result = await invoke<AIVisionResponse>('analyze_vision', { request });
+      
+      console.log('[IPC Bridge] analyze_vision command result:', {
+        success: result.success,
+        hasCoordinates: result.x !== undefined && result.y !== undefined,
+        confidence: result.confidence,
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('[IPC Bridge] analyze_vision command failed:', error);
+      // Return error response instead of throwing to match AIVisionResponse interface
+      return {
+        success: false,
+        error: this.formatErrorMessage(error as Error),
+      };
+    }
+  }
+
+  /**
+   * Update vision cache data in a script
+   * 
+   * Persists the cache_data (cached_x, cached_y, cache_dim) for an ai_vision_capture
+   * action to the script file. This is called after a successful Dynamic Mode AI call
+   * to cache the result for future playback runs.
+   * 
+   * @param {string} scriptPath - Path to the script file
+   * @param {string} actionId - UUID of the ai_vision_capture action to update
+   * @param {CacheData} cacheData - The cache data to persist
+   * 
+   * @throws {Error} If script file not found
+   * @throws {Error} If action ID not found in script
+   * @throws {Error} If file write fails
+   * 
+   * @example
+   * await ipcBridge.updateVisionCache(
+   *   '/path/to/script.json',
+   *   'action-uuid-123',
+   *   { cached_x: 520, cached_y: 280, cache_dim: [1920, 1080] }
+   * );
+   * 
+   * Requirements: 4.9, 5.8
+   */
+  public async updateVisionCache(
+    scriptPath: string,
+    actionId: string,
+    cacheData: CacheData
+  ): Promise<void> {
+    try {
+      console.log('[IPC Bridge] Invoking update_vision_cache command...', {
+        scriptPath,
+        actionId,
+        hasCachedCoordinates: cacheData.cached_x !== null && cacheData.cached_y !== null,
+      });
+      
+      await invoke('update_vision_cache', {
+        scriptPath,
+        actionId,
+        cacheData,
+      });
+      
+      console.log('[IPC Bridge] update_vision_cache command successful');
+    } catch (error) {
+      console.error('[IPC Bridge] update_vision_cache command failed:', error);
+      throw new Error(this.formatErrorMessage(error as Error));
+    }
+  }
+
+  /**
+   * Invalidate vision cache for an action
+   * 
+   * Clears the cache_data for an ai_vision_capture action. This is called when
+   * the dynamic_config changes (prompt, roi, reference_images) or when AI fails.
+   * 
+   * @param {string} scriptPath - Path to the script file
+   * @param {string} actionId - UUID of the ai_vision_capture action to update
+   * 
+   * @throws {Error} If script file not found
+   * @throws {Error} If action ID not found in script
+   * @throws {Error} If file write fails
+   * 
+   * @example
+   * await ipcBridge.invalidateVisionCache('/path/to/script.json', 'action-uuid-123');
+   * 
+   * Requirements: 4.11, 7.1, 7.2, 7.3
+   */
+  public async invalidateVisionCache(
+    scriptPath: string,
+    actionId: string
+  ): Promise<void> {
+    try {
+      console.log('[IPC Bridge] Invoking invalidate_vision_cache command...', {
+        scriptPath,
+        actionId,
+      });
+      
+      await invoke('update_vision_cache', {
+        scriptPath,
+        actionId,
+        cacheData: {
+          cached_x: null,
+          cached_y: null,
+          cache_dim: null,
+        },
+      });
+      
+      console.log('[IPC Bridge] invalidate_vision_cache command successful');
+    } catch (error) {
+      console.error('[IPC Bridge] invalidate_vision_cache command failed:', error);
+      throw new Error(this.formatErrorMessage(error as Error));
+    }
+  }
+
+  /**
+   * Get current screen dimensions
+   * 
+   * Returns the current screen width and height. Used for coordinate scaling
+   * when screen resolution differs from recording time.
+   * 
+   * @returns {Promise<ScreenDimensions>} Screen dimensions as [width, height]
+   * 
+   * @throws {Error} If screen dimensions cannot be determined
+   * 
+   * @example
+   * const [width, height] = await ipcBridge.getScreenDimensions();
+   * console.log(`Screen: ${width}x${height}`);
+   * 
+   * Requirements: 4.4, 4.5
+   */
+  public async getScreenDimensions(): Promise<ScreenDimensions> {
+    try {
+      console.log('[IPC Bridge] Invoking get_screen_dimensions command...');
+      const result = await invoke<ScreenDimensions>('get_screen_dimensions');
+      console.log('[IPC Bridge] get_screen_dimensions result:', result);
+      return result;
+    } catch (error) {
+      console.error('[IPC Bridge] get_screen_dimensions command failed:', error);
+      throw new Error(this.formatErrorMessage(error as Error));
+    }
+  }
+
+  /**
+   * Capture current screen screenshot
+   * 
+   * Captures a screenshot of the current screen and returns it as base64.
+   * Used for Dynamic Mode AI analysis during playback.
+   * 
+   * @returns {Promise<string>} Base64 encoded screenshot
+   * 
+   * @throws {Error} If screenshot capture fails
+   * 
+   * @example
+   * const screenshot = await ipcBridge.captureScreenshot();
+   * // Use screenshot for AI analysis
+   * 
+   * Requirements: 4.6
+   */
+  public async captureScreenshot(): Promise<string> {
+    try {
+      console.log('[IPC Bridge] Invoking capture_screenshot command...');
+      const result = await invoke<string>('capture_screenshot');
+      console.log('[IPC Bridge] capture_screenshot command successful');
+      return result;
+    } catch (error) {
+      console.error('[IPC Bridge] capture_screenshot command failed:', error);
+      throw new Error(this.formatErrorMessage(error as Error));
     }
   }
 

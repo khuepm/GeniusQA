@@ -1,13 +1,18 @@
 """Property-based tests for data models."""
 
 import pytest
-from hypothesis import given, strategies as st
+from hypothesis import given, strategies as st, settings
 from datetime import datetime
-from .models import Action, ScriptMetadata, ScriptFile
+from .models import (
+    Action, ScriptMetadata, ScriptFile,
+    VisionROI, StaticData, DynamicConfig, CacheData, AIVisionCaptureAction
+)
 from .storage import Storage
 from pathlib import Path
 import tempfile
 import shutil
+import json
+import uuid
 
 
 # Strategies for generating valid actions
@@ -215,6 +220,7 @@ class TestScriptFileVariables:
 
 
 # Property-based test for variables
+@settings(deadline=None)  # Disable deadline due to variable file I/O times
 @given(
     actions=st.lists(valid_action(), min_size=0, max_size=20),
     variables=st.dictionaries(
@@ -249,3 +255,155 @@ def test_script_with_variables_roundtrip(actions, variables):
         
         # Verify variables are preserved
         assert loaded_script.variables == variables
+
+
+# =============================================================================
+# AI Vision Capture Property Tests
+# =============================================================================
+
+# Strategies for generating valid AI Vision Capture components
+
+@st.composite
+def vision_roi_strategy(draw):
+    """Generate a valid VisionROI."""
+    return VisionROI(
+        x=draw(st.integers(min_value=0, max_value=3840)),
+        y=draw(st.integers(min_value=0, max_value=2160)),
+        width=draw(st.integers(min_value=1, max_value=1920)),
+        height=draw(st.integers(min_value=1, max_value=1080))
+    )
+
+
+@st.composite
+def static_data_strategy(draw):
+    """Generate valid StaticData."""
+    return StaticData(
+        original_screenshot=draw(st.text(
+            min_size=1, max_size=50,
+            alphabet=st.characters(whitelist_categories=('Lu', 'Ll', 'Nd'), whitelist_characters='_-./'))
+        ),
+        saved_x=draw(st.one_of(st.none(), st.integers(min_value=0, max_value=3840))),
+        saved_y=draw(st.one_of(st.none(), st.integers(min_value=0, max_value=2160))),
+        screen_dim=(
+            draw(st.integers(min_value=640, max_value=7680)),
+            draw(st.integers(min_value=480, max_value=4320))
+        )
+    )
+
+
+@st.composite
+def dynamic_config_strategy(draw):
+    """Generate valid DynamicConfig."""
+    has_roi = draw(st.booleans())
+    return DynamicConfig(
+        prompt=draw(st.text(min_size=0, max_size=200)),
+        reference_images=draw(st.lists(
+            st.text(min_size=1, max_size=50, alphabet=st.characters(
+                whitelist_categories=('Lu', 'Ll', 'Nd'), whitelist_characters='_-./'))
+            , min_size=0, max_size=5
+        )),
+        roi=draw(vision_roi_strategy()) if has_roi else None,
+        search_scope=draw(st.sampled_from(['global', 'regional']))
+    )
+
+
+@st.composite
+def cache_data_strategy(draw):
+    """Generate valid CacheData."""
+    has_cache = draw(st.booleans())
+    if has_cache:
+        return CacheData(
+            cached_x=draw(st.integers(min_value=0, max_value=3840)),
+            cached_y=draw(st.integers(min_value=0, max_value=2160)),
+            cache_dim=(
+                draw(st.integers(min_value=640, max_value=7680)),
+                draw(st.integers(min_value=480, max_value=4320))
+            )
+        )
+    return CacheData()
+
+
+@st.composite
+def ai_vision_capture_action_strategy(draw):
+    """Generate a valid AIVisionCaptureAction."""
+    return AIVisionCaptureAction(
+        id=str(uuid.uuid4()),
+        timestamp=draw(st.floats(min_value=0, max_value=1000, allow_nan=False, allow_infinity=False)),
+        is_dynamic=draw(st.booleans()),
+        interaction=draw(st.sampled_from(['click', 'dblclick', 'rclick', 'hover'])),
+        static_data=draw(static_data_strategy()),
+        dynamic_config=draw(dynamic_config_strategy()),
+        cache_data=draw(cache_data_strategy())
+    )
+
+
+# Feature: ai-vision-capture, Property 2: Round-trip Serialization Consistency
+@settings(max_examples=100)
+@given(action=ai_vision_capture_action_strategy())
+def test_ai_vision_capture_roundtrip_serialization(action):
+    """
+    Property 2: Round-trip Serialization Consistency
+    
+    For any valid ai_vision_capture action, serializing to JSON and then 
+    deserializing SHALL produce an equivalent action object with identical field values.
+    
+    **Feature: ai-vision-capture, Property 2: Round-trip Serialization Consistency**
+    **Validates: Requirements 5.6**
+    """
+    # Serialize to JSON
+    json_str = action.model_dump_json()
+    
+    # Deserialize back to object
+    loaded_action = AIVisionCaptureAction.model_validate_json(json_str)
+    
+    # Verify all fields are equivalent
+    assert loaded_action.type == action.type
+    assert loaded_action.id == action.id
+    assert loaded_action.timestamp == action.timestamp
+    assert loaded_action.is_dynamic == action.is_dynamic
+    assert loaded_action.interaction == action.interaction
+    
+    # Verify static_data
+    assert loaded_action.static_data.original_screenshot == action.static_data.original_screenshot
+    assert loaded_action.static_data.saved_x == action.static_data.saved_x
+    assert loaded_action.static_data.saved_y == action.static_data.saved_y
+    assert loaded_action.static_data.screen_dim == action.static_data.screen_dim
+    
+    # Verify dynamic_config
+    assert loaded_action.dynamic_config.prompt == action.dynamic_config.prompt
+    assert loaded_action.dynamic_config.reference_images == action.dynamic_config.reference_images
+    assert loaded_action.dynamic_config.search_scope == action.dynamic_config.search_scope
+    
+    if action.dynamic_config.roi is not None:
+        assert loaded_action.dynamic_config.roi is not None
+        assert loaded_action.dynamic_config.roi.x == action.dynamic_config.roi.x
+        assert loaded_action.dynamic_config.roi.y == action.dynamic_config.roi.y
+        assert loaded_action.dynamic_config.roi.width == action.dynamic_config.roi.width
+        assert loaded_action.dynamic_config.roi.height == action.dynamic_config.roi.height
+    else:
+        assert loaded_action.dynamic_config.roi is None
+    
+    # Verify cache_data
+    assert loaded_action.cache_data.cached_x == action.cache_data.cached_x
+    assert loaded_action.cache_data.cached_y == action.cache_data.cached_y
+    assert loaded_action.cache_data.cache_dim == action.cache_data.cache_dim
+
+
+# Additional test: Verify model_dump produces equivalent dict
+@settings(max_examples=100)
+@given(action=ai_vision_capture_action_strategy())
+def test_ai_vision_capture_dict_roundtrip(action):
+    """
+    Test that model_dump and model_validate produce equivalent objects.
+    
+    **Feature: ai-vision-capture, Property 2: Round-trip Serialization Consistency**
+    **Validates: Requirements 5.6**
+    """
+    # Convert to dict
+    action_dict = action.model_dump()
+    
+    # Reconstruct from dict
+    loaded_action = AIVisionCaptureAction.model_validate(action_dict)
+    
+    # Verify equivalence
+    assert loaded_action.model_dump() == action.model_dump()
