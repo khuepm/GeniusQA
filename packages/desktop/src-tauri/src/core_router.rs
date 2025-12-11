@@ -163,17 +163,19 @@ impl CoreRouter {
         let mut pref_manager = self.preference_manager.lock().unwrap();
         match PreferenceManager::with_default_path() {
             Ok(manager) => {
-                // Set active core based on saved preferences
-                let preferred_core = manager.get_preferred_core();
+                // Force Rust core as active (ignore saved preferences)
                 let mut active_core = self.active_core.lock().unwrap();
-                *active_core = preferred_core.into();
+                *active_core = CoreType::Rust;
                 
                 *pref_manager = Some(manager);
                 Ok(())
             }
             Err(e) => {
                 eprintln!("Failed to initialize preference manager: {:?}", e);
-                Err(format!("Failed to initialize preferences: {:?}", e))
+                // Still force Rust core even if preferences fail
+                let mut active_core = self.active_core.lock().unwrap();
+                *active_core = CoreType::Rust;
+                Ok(()) // Don't fail initialization
             }
         }
     }
@@ -938,20 +940,10 @@ impl CoreRouter {
     }
 
     /// Get list of available automation cores
+    /// NOTE: Python core temporarily disabled, only Rust core available
     pub fn get_available_cores(&self) -> Vec<CoreType> {
-        let mut available = Vec::new();
-
-        // Check Python core availability
-        if self.is_python_core_available() {
-            available.push(CoreType::Python);
-        }
-
-        // Check Rust core availability
-        if self.is_rust_core_available() {
-            available.push(CoreType::Rust);
-        }
-
-        available
+        // Only return Rust core for now
+        vec![CoreType::Rust]
     }
 
     /// Get current core status including health information

@@ -15,8 +15,8 @@ use std::collections::HashMap;
 use uuid::Uuid;
 #[cfg(target_os = "macos")]
 use core_graphics::event::{
-    CGEvent, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventType, CGEventMask,
-    EventField, CGEventTapProxy,
+    CGEvent, CGEventFlags, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
+    CGEventType, CGEventMask, EventField, CGEventTapProxy,
 };
 #[cfg(target_os = "macos")]
 use core_foundation::runloop::{kCFRunLoopDefaultMode, CFRunLoop, CFRunLoopRunInMode};
@@ -539,11 +539,12 @@ impl Recorder {
         let is_recording = Arc::clone(&self.is_recording);
         let recorded_actions = Arc::clone(&self.recorded_actions);
         let start_time = self.start_time;
+        let event_sender = self.event_sender.clone();
 
         // macOS: use Core Graphics event tap (safe) to capture keyboard & mouse without rdev crashes
         #[cfg(target_os = "macos")]
         {
-            self.start_macos_event_tap_capture(is_recording, recorded_actions, start_time)?;
+            self.start_macos_event_tap_capture(is_recording, recorded_actions, start_time, event_sender)?;
         }
 
         // Other platforms: use rdev listener
@@ -700,9 +701,27 @@ impl Recorder {
         is_recording: Arc<AtomicBool>,
         recorded_actions: Arc<Mutex<Vec<Action>>>,
         start_time: Option<Instant>,
+        event_sender: Option<mpsc::UnboundedSender<RecordingEvent>>,
     ) -> Result<()> {
         // Avoid expensive map allocation on every event: build once
         let keycode_to_name = Self::macos_keycode_map();
+        // Helper to extract pressed modifiers from event flags
+        let modifiers_from_flags = |flags: CGEventFlags| -> Vec<String> {
+            let mut modifiers = Vec::new();
+            if flags.contains(CGEventFlags::CGEventFlagCommand) {
+                modifiers.push("cmd".to_string());
+            }
+            if flags.contains(CGEventFlags::CGEventFlagShift) {
+                modifiers.push("shift".to_string());
+            }
+            if flags.contains(CGEventFlags::CGEventFlagControl) {
+                modifiers.push("ctrl".to_string());
+            }
+            if flags.contains(CGEventFlags::CGEventFlagAlternate) {
+                modifiers.push("option".to_string());
+            }
+            modifiers
+        };
 
         thread::spawn(move || {
             let max_actions = 50000usize;
@@ -712,12 +731,14 @@ impl Recorder {
             use std::cell::RefCell;
             let last_mouse_pos: RefCell<Option<(i32, i32)>> = RefCell::new(None);
             let last_move_time: RefCell<f64> = RefCell::new(0.0f64);
+            let last_flags: RefCell<CGEventFlags> = RefCell::new(CGEventFlags::empty());
 
             // Event tap callback (Fn with interior mutability)
             let is_rec_flag = Arc::clone(&is_recording);
             let is_rec_flag_loop = Arc::clone(&is_recording);  // Clone for the while loop
             let actions_ref = Arc::clone(&recorded_actions);
             let start_ref = start_time;
+            let event_sender_ref = event_sender;
             let callback_state = move |_: CGEventTapProxy, event_type: CGEventType, event: CGEvent| -> Option<CGEvent> {
                 if !is_rec_flag.load(Ordering::SeqCst) {
                     return None;
@@ -746,8 +767,9 @@ impl Recorder {
                                 is_rec_flag.store(false, Ordering::SeqCst);
                                 return None;
                             }
+                            let modifiers = modifiers_from_flags(event.get_flags());
                             if let Ok(mut actions) = actions_ref.try_lock() {
-                                let action = Action::key_press(key_name, timestamp, None);
+                                let action = Action::key_press(key_name, timestamp, Some(modifiers));
                                 actions.push(action);
                             }
                         }
@@ -784,16 +806,75 @@ impl Recorder {
                             *last_mouse_pos.borrow_mut() = Some(current_pos);
                         }
                     }
+                    CGEventType::ScrollWheel => {
+                        let location = event.location();
+                        let x = location.x as i32;
+                        let y = location.y as i32;
+                        let delta_y = event.get_integer_value_field(EventField::SCROLL_WHEEL_EVENT_DELTA_AXIS_1) as i32;
+                        let delta_x = event.get_integer_value_field(EventField::SCROLL_WHEEL_EVENT_DELTA_AXIS_2) as i32;
+                        if let Ok(mut actions) = actions_ref.try_lock() {
+                            let mut additional_data = HashMap::new();
+                            additional_data.insert("delta_x".to_string(), serde_json::json!(delta_x));
+                            additional_data.insert("delta_y".to_string(), serde_json::json!(delta_y));
+                            let action = Action {
+                                action_type: ActionType::MouseScroll,
+                                timestamp,
+                                x: Some(x),
+                                y: Some(y),
+                                button: None,
+                                key: None,
+                                text: None,
+                                modifiers: None,
+                                additional_data: Some(additional_data),
+                            };
+                            actions.push(action);
+                        }
+                    }
+                    CGEventType::FlagsChanged => {
+                        let flags = event.get_flags();
+                        let prev_flags = *last_flags.borrow();
+                        // Detect Command key press transition to record modifier explicitly
+                        let cmd_now = flags.contains(CGEventFlags::CGEventFlagCommand);
+                        let cmd_prev = prev_flags.contains(CGEventFlags::CGEventFlagCommand);
+                        if cmd_now && !cmd_prev {
+                            if let Ok(mut actions) = actions_ref.try_lock() {
+                                let action = Action::key_press("cmd", timestamp, None);
+                                actions.push(action);
+                            }
+                        }
+                        *last_flags.borrow_mut() = flags;
+                    }
                     CGEventType::LeftMouseDown | CGEventType::RightMouseDown | CGEventType::OtherMouseDown => {
                         let location = event.location();
+                        let x = location.x as i32;
+                        let y = location.y as i32;
                         let button_str = match event_type {
                             CGEventType::LeftMouseDown => "left",
                             CGEventType::RightMouseDown => "right",
                             _ => "middle",
                         };
                         if let Ok(mut actions) = actions_ref.try_lock() {
-                            let action = Action::mouse_click(location.x as i32, location.y as i32, button_str, timestamp);
-                            actions.push(action);
+                            let action = Action::mouse_click(x, y, button_str, timestamp);
+                            actions.push(action.clone());
+                            
+                            // Send event to UI for real-time feedback
+                            if let Some(ref sender) = event_sender_ref {
+                                let action_data = ActionEventData {
+                                    action_type: "mouse_click".to_string(),
+                                    timestamp,
+                                    x: Some(x),
+                                    y: Some(y),
+                                    button: Some(button_str.to_string()),
+                                    key: None,
+                                    text: None,
+                                };
+                                let _ = sender.send(RecordingEvent {
+                                    event_type: "action_recorded".to_string(),
+                                    data: RecordingEventData::ActionRecorded {
+                                        action: action_data,
+                                    },
+                                });
+                            }
                         }
                     }
                     _ => {}
@@ -812,6 +893,8 @@ impl Recorder {
                 CGEventType::LeftMouseDown,
                 CGEventType::RightMouseDown,
                 CGEventType::OtherMouseDown,
+                CGEventType::ScrollWheel,
+                CGEventType::FlagsChanged,
             ];
 
             let tap = match core_graphics::event::CGEventTap::new(

@@ -10,7 +10,7 @@ use rust_automation_core::preferences::UserSettings;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::path::Path;
-use tauri::State;
+use tauri::{State, Manager, WindowBuilder, WindowUrl};
 
 // Core router state wrapper
 struct CoreRouterState {
@@ -904,6 +904,121 @@ async fn delete_asset(asset_path: String) -> Result<(), String> {
     Ok(())
 }
 
+// ============================================================================
+// Click Cursor Overlay Window Commands
+// ============================================================================
+
+/// HTML content for the overlay window
+const OVERLAY_HTML: &str = r#"
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; }
+    html, body { width: 100vw; height: 100vh; background: transparent; overflow: hidden; }
+    .cursor { position: absolute; transform: translate(-50%, -50%); pointer-events: none; }
+    .cursor img { width: 48px; height: 48px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); }
+    .ripple { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 20px; height: 20px; border-radius: 50%; border: 2px solid rgba(66,133,244,0.8);
+      background: rgba(66,133,244,0.2); animation: ripple 0.6s ease-out forwards; }
+    @keyframes ripple { to { width: 80px; height: 80px; opacity: 0; } }
+    @keyframes fadeout { to { opacity: 0; } }
+  </style>
+</head>
+<body>
+  <div id="c"></div>
+  <script>
+    const { listen } = window.__TAURI__.event;
+    listen('show_cursor', e => {
+      const d = document.createElement('div');
+      d.className = 'cursor';
+      d.style.left = e.payload.x + 'px';
+      d.style.top = e.payload.y + 'px';
+      d.innerHTML = '<img src="https://raw.githubusercontent.com/nickvdyck/cursor-icons/master/icons/cursor-48.png"><div class="ripple"></div>';
+      document.getElementById('c').appendChild(d);
+      setTimeout(() => d.style.animation = 'fadeout 0.3s forwards', 500);
+      setTimeout(() => d.remove(), 800);
+    });
+  </script>
+</body>
+</html>
+"#;
+
+/// Create a fullscreen transparent overlay window for showing click cursors
+#[tauri::command]
+async fn create_click_overlay(app_handle: tauri::AppHandle) -> Result<(), String> {
+    // Check if overlay already exists
+    if app_handle.get_window("click_overlay").is_some() {
+        log::info!("[Click Overlay] Overlay window already exists");
+        return Ok(());
+    }
+
+    log::info!("[Click Overlay] Creating fullscreen overlay window...");
+
+    // Use data URL for the overlay content
+    let data_url = format!("data:text/html,{}", urlencoding::encode(OVERLAY_HTML));
+
+    // Create a new fullscreen, click-through window
+    // Note: transparent windows need special handling per platform
+    let overlay_window = WindowBuilder::new(
+        &app_handle,
+        "click_overlay",
+        WindowUrl::External(data_url.parse().unwrap())
+    )
+    .title("Click Overlay")
+    .fullscreen(true)
+    .decorations(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .resizable(false)
+    .focused(false)
+    .build()
+    .map_err(|e| format!("Failed to create overlay window: {}", e))?;
+
+    // On macOS, set the window to ignore mouse events
+    #[cfg(target_os = "macos")]
+    {
+        use cocoa::appkit::NSWindow;
+        use cocoa::base::id;
+        
+        if let Ok(ns_window) = overlay_window.ns_window() {
+            unsafe {
+                let ns_win: id = ns_window as id;
+                ns_win.setIgnoresMouseEvents_(true);
+            }
+        }
+    }
+
+    log::info!("[Click Overlay] Overlay window created successfully");
+    Ok(())
+}
+
+/// Close the click overlay window
+#[tauri::command]
+async fn close_click_overlay(app_handle: tauri::AppHandle) -> Result<(), String> {
+    if let Some(window) = app_handle.get_window("click_overlay") {
+        log::info!("[Click Overlay] Closing overlay window...");
+        window.close().map_err(|e| format!("Failed to close overlay window: {}", e))?;
+        log::info!("[Click Overlay] Overlay window closed");
+    }
+    Ok(())
+}
+
+/// Show a click cursor at the specified position
+#[tauri::command]
+async fn show_click_cursor(app_handle: tauri::AppHandle, x: i32, y: i32, button: String) -> Result<(), String> {
+    if let Some(window) = app_handle.get_window("click_overlay") {
+        // Emit event to the overlay window
+        window.emit("show_cursor", serde_json::json!({
+            "x": x,
+            "y": y,
+            "button": button
+        })).map_err(|e| format!("Failed to emit show_cursor event: {}", e))?;
+    }
+    Ok(())
+}
+
 fn main() {
     // Initialize logging system
     if let Err(e) = init_logging() {
@@ -980,6 +1095,10 @@ fn main() {
             save_asset,
             load_asset,
             delete_asset,
+            // Click overlay commands
+            create_click_overlay,
+            close_click_overlay,
+            show_click_cursor,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
