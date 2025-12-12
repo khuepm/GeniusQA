@@ -51,6 +51,11 @@ export const ProjectForm: React.FC = () => {
     setLoading(true);
 
     try {
+      if (!user) {
+        setError('Bạn cần đăng nhập trước khi tạo project.');
+        return;
+      }
+
       if (isEdit) {
         if (!id) return;
         const docRef = doc(db, 'projects', id);
@@ -64,7 +69,7 @@ export const ProjectForm: React.FC = () => {
         await addDoc(projectsRef, {
           name,
           description,
-          user_id: user?.uid,
+          user_id: user.uid,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
@@ -72,7 +77,7 @@ export const ProjectForm: React.FC = () => {
 
       navigate('/projects');
     } catch (error: any) {
-      setError(error.message);
+      setError(error?.message || 'Tạo project thất bại');
     } finally {
       setLoading(false);
     }

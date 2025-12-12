@@ -19,6 +19,7 @@ export const Projects: React.FC = () => {
   const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchProjects();
@@ -40,18 +41,26 @@ export const Projects: React.FC = () => {
       const snapshot = await getDocs(projectsQuery);
       const items: Project[] = snapshot.docs.map((d) => {
         const data = d.data();
+        const created = (data.created_at as any)?.toDate
+          ? (data.created_at as any).toDate().toISOString()
+          : (data.created_at as string) || '';
+        const updated = (data.updated_at as any)?.toDate
+          ? (data.updated_at as any).toDate().toISOString()
+          : (data.updated_at as string) || '';
         return {
           id: d.id,
           name: (data.name as string) || '',
           description: (data.description as string) || '',
-          created_at: (data.created_at as string) || '',
-          updated_at: (data.updated_at as string) || '',
+          created_at: created,
+          updated_at: updated,
           user_id: (data.user_id as string) || '',
         };
       });
       setProjects(items);
+      setError('');
     } catch (error) {
       console.error('Error fetching projects:', error);
+      setError('Không tải được danh sách project. Kiểm tra quyền Firestore hoặc cấu hình.');
     } finally {
       setLoading(false);
     }
@@ -95,6 +104,12 @@ export const Projects: React.FC = () => {
               </div>
             ))}
           </div>
+        ) : error ? (
+          <div className="text-center py-12 bg-white rounded-lg shadow">
+            <FolderKanban className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">Không thể tải projects</h3>
+            <p className="mt-1 text-sm text-gray-500">{error}</p>
+          </div>
         ) : projects.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-lg shadow">
             <FolderKanban className="mx-auto h-12 w-12 text-gray-400" />
@@ -125,7 +140,7 @@ export const Projects: React.FC = () => {
                 </div>
                 <div className="mt-4 flex items-center space-x-2">
                   <Link
-                    to={`/projects/${project.id}`}
+                    to={`/projects/${project.id}/edit`}
                     className="flex-1 text-center px-3 py-2 bg-primary-50 hover:bg-primary-100 text-primary-700 rounded-lg text-sm font-medium transition-colors"
                   >
                     View
