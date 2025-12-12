@@ -15,6 +15,14 @@ import {
   SearchScope,
 } from '../types/aiVisionCapture.types';
 import { toPosixPath } from './assetManager';
+import { 
+  TestScript, 
+  TestStep, 
+  ActionWithId, 
+  EnhancedScriptMetadata,
+  MigrationResult 
+} from '../types/testCaseDriven.types';
+import { TestScriptMigrationService } from './testScriptMigrationService';
 
 /**
  * Extended action type that includes AI Vision Capture actions
@@ -29,6 +37,13 @@ export type ExtendedAction = Action | AIVisionCaptureAction;
 export interface ExtendedScriptData extends Omit<ScriptData, 'actions'> {
   actions: ExtendedAction[];
 }
+
+/**
+ * Union type for all supported script formats
+ * Supports both legacy flat scripts and new step-based scripts
+ * Requirements: 6.5, 8.1
+ */
+export type AnyScriptFormat = ExtendedScriptData | TestScript;
 
 /**
  * Result of a script save operation
@@ -140,13 +155,84 @@ function getPlatform(): string {
 /**
  * Script Storage Service class
  * 
- * Extended to support AI Vision Capture actions with proper serialization,
- * validation, and asset folder management.
+ * Extended to support both legacy flat scripts and new step-based TestScript format.
+ * Handles automatic migration, format detection, and maintains backward compatibility.
  * 
- * Requirements: 5.5, 5.6
+ * Requirements: 5.5, 5.6, 6.5, 8.1, 8.5
  */
 class ScriptStorageService {
   private ipcBridge = getIPCBridge();
+
+  /**
+   * Saves a step-based test script to the user's library
+   * Handles validation, serialization, and asset management for TestScript format
+   * 
+   * @param testScript - The test script to save
+   * @param scriptName - The name for the script (optional, uses title from metadata)
+   * @returns Result of the save operation
+   * 
+   * Requirements: 8.1, 8.5
+   */
+  async saveTestScript(testScript: TestScript, scriptName?: string): Promise<ScriptSaveResult> {
+    try {
+      // Use script title if no name provided
+      const finalScriptName = scriptName || testScript.meta.title || 'Untitled Test Script';
+      
+      // Validate the test script structure
+      const validationResult = this.validateTestScript(testScript);
+      if (!validationResult.valid) {
+        return {
+          success: false,
+          error: `Invalid test script: ${validationResult.errors.join(', ')}`,
+        };
+      }
+
+      // Generate the filename
+      const filename = generateScriptPath(finalScriptName);
+      
+      // Get the recordings directory path
+      const homeDir = await this.getHomeDirectory();
+      const scriptPath = `${homeDir}/GeniusQA/recordings/${filename}`;
+      
+      // Process actions for save (handle AI Vision Capture actions)
+      const processedScript = this.processTestScriptForSave(testScript);
+      
+      // Check if script contains AI Vision Capture actions
+      const hasVisionActions = Object.values(processedScript.action_pool).some(
+        action => isAIVisionCaptureAction(action)
+      );
+      
+      console.log('[ScriptStorageService] Saving test script:', {
+        scriptName: finalScriptName,
+        scriptPath,
+        stepCount: processedScript.steps.length,
+        actionCount: Object.keys(processedScript.action_pool).length,
+        hasVisionActions,
+      });
+
+      // Ensure assets folder exists if there are vision actions
+      if (hasVisionActions) {
+        const assetsDir = getAssetsDirectoryPath(scriptPath);
+        await this.ensureAssetsFolderExists(assetsDir);
+      }
+
+      // Save via IPC bridge
+      await this.ipcBridge.saveScript(scriptPath, processedScript);
+
+      console.log('[ScriptStorageService] Test script saved successfully:', scriptPath);
+
+      return {
+        success: true,
+        scriptPath,
+      };
+    } catch (error) {
+      console.error('[ScriptStorageService] Failed to save test script:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to save test script',
+      };
+    }
+  }
 
   /**
    * Saves an AI-generated script to the user's library
@@ -208,6 +294,129 @@ class ScriptStorageService {
         error: error instanceof Error ? error.message : 'Failed to save script',
       };
     }
+  }
+
+  /**
+   * Validates a TestScript structure
+   * Requirements: 8.1, 8.5
+   * 
+   * @param testScript - The test script to validate
+   * @returns Validation result with errors
+   */
+  private validateTestScript(testScript: TestScript): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    // Validate metadata
+    if (!testScript.meta) {
+      errors.push('Missing metadata');
+    } else {
+      if (!testScript.meta.title || testScript.meta.title.trim() === '') {
+        errors.push('Script title is required');
+      }
+      if (!testScript.meta.version) {
+        errors.push('Script version is required');
+      }
+      if (!testScript.meta.created_at) {
+        errors.push('Creation timestamp is required');
+      }
+    }
+
+    // Validate steps array
+    if (!Array.isArray(testScript.steps)) {
+      errors.push('Steps must be an array');
+    } else {
+      const stepIds = new Set<string>();
+      const stepOrders = new Set<number>();
+
+      for (let i = 0; i < testScript.steps.length; i++) {
+        const step = testScript.steps[i];
+        
+        if (!step.id || step.id.trim() === '') {
+          errors.push(`Step ${i} missing ID`);
+        } else if (stepIds.has(step.id)) {
+          errors.push(`Duplicate step ID: ${step.id}`);
+        } else {
+          stepIds.add(step.id);
+        }
+
+        if (typeof step.order !== 'number' || step.order < 1) {
+          errors.push(`Step ${i} order must be a positive number`);
+        } else if (stepOrders.has(step.order)) {
+          errors.push(`Duplicate step order: ${step.order}`);
+        } else {
+          stepOrders.add(step.order);
+        }
+
+        if (!step.description || step.description.trim() === '') {
+          errors.push(`Step ${i} missing description`);
+        }
+
+        if (!Array.isArray(step.action_ids)) {
+          errors.push(`Step ${i} action_ids must be an array`);
+        }
+      }
+    }
+
+    // Validate action pool
+    if (!testScript.action_pool || typeof testScript.action_pool !== 'object') {
+      errors.push('Action pool must be an object');
+    } else {
+      // Check that all referenced actions exist in the pool
+      const poolActionIds = new Set(Object.keys(testScript.action_pool));
+      const referencedActionIds = new Set(
+        testScript.steps.flatMap(step => step.action_ids)
+      );
+
+      for (const actionId of referencedActionIds) {
+        if (!poolActionIds.has(actionId)) {
+          errors.push(`Referenced action not found in pool: ${actionId}`);
+        }
+      }
+
+      // Validate individual actions
+      for (const [actionId, action] of Object.entries(testScript.action_pool)) {
+        if (!action.id || action.id !== actionId) {
+          errors.push(`Action ID mismatch: pool key ${actionId} vs action.id ${action.id}`);
+        }
+        if (typeof action.timestamp !== 'number') {
+          errors.push(`Action ${actionId} missing valid timestamp`);
+        }
+      }
+    }
+
+    // Validate variables (optional)
+    if (testScript.variables && typeof testScript.variables !== 'object') {
+      errors.push('Variables must be an object');
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+    };
+  }
+
+  /**
+   * Processes a TestScript for saving - serializes AI Vision Capture actions
+   * Requirements: 8.1, 5.5, 5.9
+   * 
+   * @param testScript - The test script to process
+   * @returns Test script with processed actions
+   */
+  private processTestScriptForSave(testScript: TestScript): TestScript {
+    const processedActionPool: Record<string, ActionWithId> = {};
+
+    for (const [actionId, action] of Object.entries(testScript.action_pool)) {
+      if (isAIVisionCaptureAction(action)) {
+        processedActionPool[actionId] = serializeAIVisionCaptureAction(action) as ActionWithId;
+      } else {
+        processedActionPool[actionId] = action;
+      }
+    }
+
+    return {
+      ...testScript,
+      action_pool: processedActionPool,
+    };
   }
 
   /**
@@ -402,7 +611,110 @@ class ScriptStorageService {
   }
 
   /**
-   * Loads a script by path
+   * Loads any script format and returns it in the appropriate format
+   * Automatically detects format and handles migration if needed
+   * 
+   * @param scriptPath - The path to the script file
+   * @returns The script data in its native format or null if not found
+   * 
+   * Requirements: 6.5, 8.1
+   */
+  async loadAnyScript(scriptPath: string): Promise<AnyScriptFormat | null> {
+    try {
+      const rawScriptData = await this.ipcBridge.loadScript(scriptPath);
+      
+      if (!rawScriptData) {
+        return null;
+      }
+
+      // Detect format and process accordingly
+      if (TestScriptMigrationService.isStepBasedFormat(rawScriptData)) {
+        // It's already a TestScript format
+        return this.processTestScriptOnLoad(rawScriptData as TestScript, scriptPath);
+      } else if (TestScriptMigrationService.isLegacyFormat(rawScriptData)) {
+        // It's a legacy format - return as ExtendedScriptData
+        return this.processActionsOnLoad(rawScriptData as ExtendedScriptData, scriptPath);
+      } else {
+        console.warn('[ScriptStorageService] Unknown script format:', scriptPath);
+        return null;
+      }
+    } catch (error) {
+      console.error('[ScriptStorageService] Failed to load script:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Loads a script and migrates it to TestScript format if needed
+   * 
+   * @param scriptPath - The path to the script file
+   * @returns Migration result with TestScript or error
+   * 
+   * Requirements: 6.5, 8.1
+   */
+  async loadScriptAsTestScript(scriptPath: string): Promise<MigrationResult> {
+    try {
+      const rawScriptData = await this.ipcBridge.loadScript(scriptPath);
+      
+      if (!rawScriptData) {
+        return {
+          success: false,
+          error: 'Script file not found',
+          was_legacy: false,
+        };
+      }
+
+      // Check if it's already in TestScript format
+      if (TestScriptMigrationService.isStepBasedFormat(rawScriptData)) {
+        const processedScript = this.processTestScriptOnLoad(rawScriptData as TestScript, scriptPath);
+        return {
+          success: true,
+          migrated_script: processedScript,
+          was_legacy: false,
+        };
+      }
+
+      // Check if it's a legacy format that can be migrated
+      if (TestScriptMigrationService.isLegacyFormat(rawScriptData)) {
+        console.log('[ScriptStorageService] Migrating legacy script:', scriptPath);
+        
+        const migratedScript = TestScriptMigrationService.migrateLegacyScript(rawScriptData);
+        const processedScript = this.processTestScriptOnLoad(migratedScript, scriptPath);
+        
+        // Validate the migration
+        const validationResult = TestScriptMigrationService.validateMigration(rawScriptData, migratedScript);
+        if (!validationResult.isValid) {
+          return {
+            success: false,
+            error: `Migration validation failed: ${validationResult.errors.join(', ')}`,
+            was_legacy: true,
+          };
+        }
+
+        return {
+          success: true,
+          migrated_script: processedScript,
+          was_legacy: true,
+        };
+      }
+
+      return {
+        success: false,
+        error: 'Unknown script format',
+        was_legacy: false,
+      };
+    } catch (error) {
+      console.error('[ScriptStorageService] Failed to load and migrate script:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to load script',
+        was_legacy: false,
+      };
+    }
+  }
+
+  /**
+   * Loads a script by path (legacy method for backward compatibility)
    * Validates AI Vision Capture actions on load
    * 
    * @param scriptPath - The path to the script file
@@ -418,14 +730,66 @@ class ScriptStorageService {
         return null;
       }
       
-      // Validate and process AI Vision Capture actions
-      const processedScript = this.processActionsOnLoad(scriptData as ExtendedScriptData, scriptPath);
+      // Only handle legacy format scripts in this method
+      if (TestScriptMigrationService.isLegacyFormat(scriptData)) {
+        return this.processActionsOnLoad(scriptData as ExtendedScriptData, scriptPath);
+      }
       
-      return processedScript;
+      // For TestScript format, convert back to legacy format for compatibility
+      if (TestScriptMigrationService.isStepBasedFormat(scriptData)) {
+        const testScript = scriptData as TestScript;
+        const legacyScript = TestScriptMigrationService.convertToLegacyFormat(testScript);
+        return this.processActionsOnLoad(legacyScript as ExtendedScriptData, scriptPath);
+      }
+      
+      console.warn('[ScriptStorageService] Unknown script format in loadScript:', scriptPath);
+      return null;
     } catch (error) {
       console.error('[ScriptStorageService] Failed to load script:', error);
       return null;
     }
+  }
+
+  /**
+   * Processes a TestScript on load - validates AI Vision Capture actions
+   * Requirements: 8.1, 5.6
+   * 
+   * @param testScript - The loaded test script data
+   * @param scriptPath - Path to the script file (for logging)
+   * @returns Test script with validated actions
+   */
+  private processTestScriptOnLoad(testScript: TestScript, scriptPath: string): TestScript {
+    const processedActionPool: Record<string, ActionWithId> = {};
+    const validationWarnings: string[] = [];
+    
+    for (const [actionId, action] of Object.entries(testScript.action_pool)) {
+      if (isAIVisionCaptureAction(action)) {
+        try {
+          // Validate the AI Vision Capture action
+          const validatedAction = deserializeAIVisionCaptureAction(action) as ActionWithId;
+          processedActionPool[actionId] = validatedAction;
+        } catch (error) {
+          // Log validation error but don't fail the entire load
+          const errorMessage = error instanceof Error ? error.message : 'Unknown validation error';
+          validationWarnings.push(`Action ${actionId}: ${errorMessage}`);
+          
+          // Still include the action but log the warning
+          processedActionPool[actionId] = action;
+        }
+      } else {
+        processedActionPool[actionId] = action;
+      }
+    }
+    
+    // Log any validation warnings
+    if (validationWarnings.length > 0) {
+      console.warn('[ScriptStorageService] AI Vision Capture validation warnings for', scriptPath, ':', validationWarnings);
+    }
+    
+    return {
+      ...testScript,
+      action_pool: processedActionPool,
+    };
   }
 
   /**
@@ -497,6 +861,318 @@ class ScriptStorageService {
     } catch (error) {
       console.error('[ScriptStorageService] Failed to check for scripts:', error);
       return false;
+    }
+  }
+
+  /**
+   * Attempts to recover a corrupted script file
+   * Requirements: 8.4
+   * 
+   * @param scriptPath - Path to the corrupted script
+   * @returns Recovery result with repaired script or error
+   */
+  async recoverCorruptedScript(scriptPath: string): Promise<MigrationResult> {
+    try {
+      console.log('[ScriptStorageService] Attempting to recover corrupted script:', scriptPath);
+      
+      // Try to load the raw file content
+      const rawContent = await this.ipcBridge.loadScript(scriptPath);
+      
+      if (!rawContent) {
+        return {
+          success: false,
+          error: 'Could not read script file',
+          was_legacy: false,
+        };
+      }
+
+      // Try to repair common JSON issues
+      const repairedContent = this.repairJsonStructure(rawContent);
+      
+      // Attempt to parse and validate the repaired content
+      if (TestScriptMigrationService.isStepBasedFormat(repairedContent)) {
+        const testScript = repairedContent as TestScript;
+        
+        // Validate and repair the test script structure
+        const repairedScript = this.repairTestScriptStructure(testScript);
+        
+        return {
+          success: true,
+          migrated_script: repairedScript,
+          was_legacy: false,
+        };
+      } else if (TestScriptMigrationService.isLegacyFormat(repairedContent)) {
+        // Try to migrate the legacy script
+        const migratedScript = TestScriptMigrationService.migrateLegacyScript(repairedContent);
+        
+        return {
+          success: true,
+          migrated_script: migratedScript,
+          was_legacy: true,
+        };
+      }
+
+      return {
+        success: false,
+        error: 'Could not determine script format after repair attempts',
+        was_legacy: false,
+      };
+    } catch (error) {
+      console.error('[ScriptStorageService] Failed to recover corrupted script:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Recovery failed',
+        was_legacy: false,
+      };
+    }
+  }
+
+  /**
+   * Repairs common JSON structure issues
+   * Requirements: 8.4
+   * 
+   * @param rawContent - Raw script content
+   * @returns Repaired content
+   */
+  private repairJsonStructure(rawContent: any): any {
+    // If it's already a valid object, return as-is
+    if (typeof rawContent === 'object' && rawContent !== null) {
+      return rawContent;
+    }
+
+    // If it's a string, try to parse it
+    if (typeof rawContent === 'string') {
+      try {
+        return JSON.parse(rawContent);
+      } catch {
+        // Try to repair common JSON issues
+        let repairedJson = rawContent
+          .replace(/,\s*}/g, '}') // Remove trailing commas in objects
+          .replace(/,\s*]/g, ']') // Remove trailing commas in arrays
+          .replace(/'/g, '"') // Replace single quotes with double quotes
+          .replace(/(\w+):/g, '"$1":'); // Quote unquoted keys
+
+        try {
+          return JSON.parse(repairedJson);
+        } catch {
+          throw new Error('Could not repair JSON structure');
+        }
+      }
+    }
+
+    throw new Error('Invalid script content type');
+  }
+
+  /**
+   * Repairs TestScript structure issues
+   * Requirements: 8.4
+   * 
+   * @param testScript - Potentially corrupted test script
+   * @returns Repaired test script
+   */
+  private repairTestScriptStructure(testScript: TestScript): TestScript {
+    const repaired: TestScript = {
+      meta: {
+        version: testScript.meta?.version || '2.0',
+        created_at: testScript.meta?.created_at || new Date().toISOString(),
+        duration: testScript.meta?.duration || 0,
+        action_count: testScript.meta?.action_count || 0,
+        platform: testScript.meta?.platform || 'unknown',
+        title: testScript.meta?.title || 'Recovered Script',
+        description: testScript.meta?.description || 'Automatically recovered script',
+        pre_conditions: testScript.meta?.pre_conditions || '',
+        tags: testScript.meta?.tags || ['recovered'],
+      },
+      steps: [],
+      action_pool: {},
+      variables: testScript.variables || {},
+    };
+
+    // Repair steps array
+    if (Array.isArray(testScript.steps)) {
+      const validSteps: TestStep[] = [];
+      const usedOrders = new Set<number>();
+      let nextOrder = 1;
+
+      for (const step of testScript.steps) {
+        if (step && typeof step === 'object') {
+          // Ensure step has required fields
+          const repairedStep: TestStep = {
+            id: step.id || `recovered_step_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            order: step.order && !usedOrders.has(step.order) ? step.order : nextOrder,
+            description: step.description || 'Recovered step',
+            expected_result: step.expected_result || '',
+            action_ids: Array.isArray(step.action_ids) ? step.action_ids : [],
+            continue_on_failure: Boolean(step.continue_on_failure),
+          };
+
+          usedOrders.add(repairedStep.order);
+          nextOrder = Math.max(nextOrder, repairedStep.order) + 1;
+          validSteps.push(repairedStep);
+        }
+      }
+
+      repaired.steps = validSteps;
+    }
+
+    // Repair action pool
+    if (testScript.action_pool && typeof testScript.action_pool === 'object') {
+      const validActions: Record<string, ActionWithId> = {};
+
+      for (const [actionId, action] of Object.entries(testScript.action_pool)) {
+        if (action && typeof action === 'object') {
+          // Ensure action has required fields
+          const repairedAction: ActionWithId = {
+            id: action.id || actionId,
+            type: action.type || 'mouse_click',
+            timestamp: typeof action.timestamp === 'number' ? action.timestamp : Date.now(),
+            x: typeof action.x === 'number' ? action.x : null,
+            y: typeof action.y === 'number' ? action.y : null,
+            button: action.button || null,
+            key: action.key || null,
+            screenshot: action.screenshot || null,
+            // Preserve AI Vision fields if present
+            ...(action.is_dynamic !== undefined && { is_dynamic: action.is_dynamic }),
+            ...(action.interaction && { interaction: action.interaction }),
+            ...(action.static_data && { static_data: action.static_data }),
+            ...(action.dynamic_config && { dynamic_config: action.dynamic_config }),
+            ...(action.cache_data && { cache_data: action.cache_data }),
+            ...(action.is_assertion !== undefined && { is_assertion: action.is_assertion }),
+          };
+
+          validActions[actionId] = repairedAction;
+        }
+      }
+
+      repaired.action_pool = validActions;
+    }
+
+    // Update action count in metadata
+    repaired.meta.action_count = Object.keys(repaired.action_pool).length;
+
+    return repaired;
+  }
+
+  /**
+   * Creates a backup of a script before performing risky operations
+   * Requirements: 8.4
+   * 
+   * @param scriptPath - Path to the script to backup
+   * @returns Path to the backup file or null if failed
+   */
+  async createScriptBackup(scriptPath: string): Promise<string | null> {
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const backupPath = scriptPath.replace(/\.json$/, `_backup_${timestamp}.json`);
+      
+      const scriptData = await this.ipcBridge.loadScript(scriptPath);
+      if (scriptData) {
+        await this.ipcBridge.saveScript(backupPath, scriptData);
+        console.log('[ScriptStorageService] Created backup:', backupPath);
+        return backupPath;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('[ScriptStorageService] Failed to create backup:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Validates script configuration and reports issues
+   * Requirements: 8.4
+   * 
+   * @param scriptPath - Path to the script to validate
+   * @returns Validation report with errors and warnings
+   */
+  async validateScriptConfiguration(scriptPath: string): Promise<{
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+    canRecover: boolean;
+  }> {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    let canRecover = false;
+
+    try {
+      const migrationResult = await this.loadScriptAsTestScript(scriptPath);
+      
+      if (!migrationResult.success) {
+        errors.push(migrationResult.error || 'Failed to load script');
+        canRecover = true; // We can try recovery
+        return { valid: false, errors, warnings, canRecover };
+      }
+
+      const testScript = migrationResult.migrated_script!;
+      
+      // Validate script structure
+      const structureValidation = this.validateTestScript(testScript);
+      if (!structureValidation.valid) {
+        errors.push(...structureValidation.errors);
+      }
+
+      // Check for orphaned actions (actions not referenced by any step)
+      const referencedActionIds = new Set(
+        testScript.steps.flatMap(step => step.action_ids)
+      );
+      const poolActionIds = new Set(Object.keys(testScript.action_pool));
+      const orphanedActions = Array.from(poolActionIds).filter(
+        id => !referencedActionIds.has(id)
+      );
+
+      if (orphanedActions.length > 0) {
+        warnings.push(`Found ${orphanedActions.length} orphaned actions not referenced by any step`);
+      }
+
+      // Check for missing actions (referenced but not in pool)
+      const missingActions = Array.from(referencedActionIds).filter(
+        id => !poolActionIds.has(id)
+      );
+
+      if (missingActions.length > 0) {
+        errors.push(`Found ${missingActions.length} missing actions referenced by steps`);
+      }
+
+      // Check for duplicate step orders
+      const stepOrders = testScript.steps.map(step => step.order);
+      const uniqueOrders = new Set(stepOrders);
+      if (stepOrders.length !== uniqueOrders.size) {
+        warnings.push('Found duplicate step orders');
+      }
+
+      // Validate AI Vision Capture actions
+      for (const [actionId, action] of Object.entries(testScript.action_pool)) {
+        if (isAIVisionCaptureAction(action)) {
+          const visionValidation = validateAIVisionCaptureAction(action);
+          if (!visionValidation.valid) {
+            errors.push(`AI Vision action ${actionId}: ${visionValidation.errors.join(', ')}`);
+          }
+          if (visionValidation.warnings.length > 0) {
+            warnings.push(`AI Vision action ${actionId}: ${visionValidation.warnings.join(', ')}`);
+          }
+        }
+      }
+
+      canRecover = errors.length > 0; // Can attempt recovery if there are errors
+
+      return {
+        valid: errors.length === 0,
+        errors,
+        warnings,
+        canRecover,
+      };
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : 'Validation failed');
+      canRecover = true;
+      
+      return {
+        valid: false,
+        errors,
+        warnings,
+        canRecover,
+      };
     }
   }
 }
@@ -816,3 +1492,8 @@ export function collectAssetPaths(actions: ExtendedAction[]): string[] {
 export const scriptStorageService = new ScriptStorageService();
 
 export default scriptStorageService;
+
+// Export additional utility functions for external use
+export {
+  TestScriptMigrationService,
+};

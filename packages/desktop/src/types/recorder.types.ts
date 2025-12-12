@@ -161,7 +161,7 @@ export interface PlaybackProgress {
  * Used for visual preview during playback.
  * 
  * @interface ActionData
- * @property {string} type - Type of action (mouse_move, mouse_click, key_press, key_release)
+ * @property {string} type - Type of action (mouse_move, mouse_click, key_press, key_release, ai_vision_capture)
  * @property {number} timestamp - Time in seconds since recording start
  * @property {number | null} x - X coordinate for mouse actions
  * @property {number | null} y - Y coordinate for mouse actions
@@ -170,7 +170,7 @@ export interface PlaybackProgress {
  * @property {string | null} screenshot - Screenshot filename if available
  */
 export interface ActionData {
-  type: 'mouse_move' | 'mouse_click' | 'key_press' | 'key_release';
+  type: 'mouse_move' | 'mouse_click' | 'key_press' | 'key_release' | 'ai_vision_capture';
   timestamp: number;
   x: number | null;
   y: number | null;
@@ -192,4 +192,46 @@ export interface ActionData {
 export interface ActionPreviewData {
   index: number;
   action: ActionData;
+}
+/**
+ * Step-based recording state
+ * 
+ * Extends the recorder to support step-based action mapping.
+ * Used when recording actions for specific test steps.
+ * 
+ * @interface StepRecordingContext
+ * @property {string | null} active_step_id - ID of step currently receiving actions
+ * @property {boolean} auto_create_setup - Whether to auto-create setup step if no step is active
+ */
+export interface StepRecordingContext {
+  active_step_id: string | null;
+  auto_create_setup: boolean;
+}
+
+/**
+ * Enhanced recorder state for step-based recording
+ * 
+ * Extends RecorderScreenState with step-based recording capabilities.
+ * 
+ * @interface StepRecorderState
+ * @extends RecorderScreenState
+ * @property {StepRecordingContext} step_context - Step-based recording context
+ */
+export interface StepRecorderState extends RecorderScreenState {
+  step_context: StepRecordingContext;
+}
+
+/**
+ * Step recording result
+ * 
+ * Result of recording actions for a specific step.
+ * 
+ * @interface StepRecordingResult
+ * @extends RecordingResult
+ * @property {string} [step_id] - ID of step that received the actions
+ * @property {boolean} [created_setup_step] - Whether a setup step was auto-created
+ */
+export interface StepRecordingResult extends RecordingResult {
+  step_id?: string;
+  created_setup_step?: boolean;
 }

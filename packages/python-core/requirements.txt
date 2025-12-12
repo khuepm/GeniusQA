@@ -9,3 +9,4 @@ mouse==0.7.1
 pydantic==2.5.0
 aiohttp==3.9.0
 Pillow==10.1.0
+jinja2==3.1.2

@@ -3,10 +3,10 @@
 import time
 import uuid
 import platform
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Callable
 from pathlib import Path
 from pynput import mouse, keyboard
-from storage.models import Action, AIVisionCaptureAction, StaticData, DynamicConfig, CacheData
+from storage.models import Action, AIVisionCaptureAction, StaticData, DynamicConfig, CacheData, TestStep, TestScript
 
 # Type alias for any action type
 AnyAction = Union[Action, AIVisionCaptureAction]
@@ -36,6 +36,12 @@ class Recorder:
         # Cmd+F6 (macOS) or Ctrl+F6 (Windows/Linux)
         self._cmd_ctrl_held: bool = False
         self._is_macos: bool = platform.system() == 'Darwin'
+        
+        # Step-based recording state (Requirements: 2.1, 2.2, 2.5)
+        self.current_active_step_id: Optional[str] = None
+        self.test_script: Optional[TestScript] = None
+        self.step_action_callback: Optional[Callable[[str, AnyAction], None]] = None
+        self.setup_step_callback: Optional[Callable[[AnyAction], str]] = None
     
     @staticmethod
     def check_dependencies(check_pillow: bool = True) -> tuple[bool, str]:
@@ -164,6 +170,57 @@ class Recorder:
         
         return self.actions
     
+    def set_active_step(self, step_id: Optional[str]) -> None:
+        """Set the currently active step for recording.
+        
+        When a step is active, all recorded actions will be mapped to that step's
+        action_ids array. When no step is active (step_id=None), a Setup_Step
+        will be created automatically if actions are recorded.
+        
+        Args:
+            step_id: ID of the step to make active, or None to deactivate
+        
+        Requirements: 2.1, 2.2, 2.5
+        """
+        self.current_active_step_id = step_id
+        
+        import sys
+        if step_id:
+            sys.stderr.write(f"[Recorder] Active step set to: {step_id}\n")
+        else:
+            sys.stderr.write("[Recorder] No active step - will create Setup_Step if needed\n")
+        sys.stderr.flush()
+    
+    def set_test_script(self, test_script: Optional[TestScript]) -> None:
+        """Set the test script being recorded into.
+        
+        Args:
+            test_script: The TestScript instance to record into
+        
+        Requirements: 2.1, 2.2
+        """
+        self.test_script = test_script
+    
+    def set_step_action_callback(self, callback: Optional[Callable[[str, AnyAction], None]]) -> None:
+        """Set callback for when actions are mapped to steps.
+        
+        Args:
+            callback: Function called with (step_id, action) when action is mapped
+        
+        Requirements: 2.1, 2.2
+        """
+        self.step_action_callback = callback
+    
+    def set_setup_step_callback(self, callback: Optional[Callable[[AnyAction], str]]) -> None:
+        """Set callback for creating Setup_Step when no step is active.
+        
+        Args:
+            callback: Function called with action, returns created step_id
+        
+        Requirements: 2.2, 2.5
+        """
+        self.setup_step_callback = callback
+    
     def is_stop_requested(self) -> bool:
         """Check if ESC key was pressed to request stop."""
         return self._stop_requested
@@ -180,7 +237,7 @@ class Recorder:
             x=x,
             y=y
         )
-        self.actions.append(action)
+        self._record_action(action)
         # Log every 10th mouse move to avoid spam
         if len(self.actions) % 10 == 0:
             import sys
@@ -222,7 +279,7 @@ class Recorder:
             button=button_str,
             screenshot=screenshot_filename
         )
-        self.actions.append(action)
+        self._record_action(action)
     
     def _capture_screenshot(self) -> Optional[str]:
         """Capture a screenshot and save it to the screenshots directory.
@@ -352,7 +409,7 @@ class Recorder:
             )
             
             # Add action to recorded actions list
-            self.actions.append(vision_action)
+            self._record_action(vision_action)
             
             sys.stderr.write(f"[Recorder] AI Vision Capture action created: {action_id}\n")
             sys.stderr.flush()
@@ -441,4 +498,222 @@ class Recorder:
             timestamp=timestamp,
             key=key_str
         )
+        self._record_action(action)
+    
+    def _record_action(self, action: AnyAction) -> None:
+        """Record an action and handle step-based mapping.
+        
+        This method handles the core logic for step-based recording:
+        1. If a step is active, map action to that step
+        2. If no step is active, create Setup_Step automatically
+        3. Always add action to the flat actions list for backward compatibility
+        
+        Args:
+            action: The action to record
+        
+        Requirements: 2.1, 2.2, 2.5
+        Validates: Property 2 (Step Recording Behavior)
+        """
+        # Always add to flat actions list for backward compatibility
         self.actions.append(action)
+        
+        # Handle step-based mapping if test script is available
+        if self.test_script is not None:
+            target_step_id = self.current_active_step_id
+            
+            # If no step is active, create Setup_Step automatically (Requirements: 2.2, 2.5)
+            if target_step_id is None:
+                if self.setup_step_callback:
+                    target_step_id = self.setup_step_callback(action)
+                    # Update current active step to the newly created Setup_Step
+                    self.current_active_step_id = target_step_id
+                    
+                    import sys
+                    sys.stderr.write(f"[Recorder] Created Setup_Step: {target_step_id}\n")
+                    sys.stderr.flush()
+            
+            # Map action to the target step (Requirements: 2.1, 2.2)
+            if target_step_id and self.step_action_callback:
+                self.step_action_callback(target_step_id, action)
+                
+                import sys
+                sys.stderr.write(f"[Recorder] Action mapped to step: {target_step_id}\n")
+                sys.stderr.flush()
+    
+    def insert_action_in_step(self, step_id: str, action: AnyAction, position: Optional[int] = None) -> bool:
+        """Insert a new action at a specific position within an existing step.
+        
+        This method allows adding actions to existing steps while maintaining
+        chronological order. If no position is specified, the action is appended
+        to the end of the step's action list.
+        
+        Args:
+            step_id: ID of the step to insert the action into
+            action: The action to insert
+            position: Position to insert at (0-based), or None to append
+        
+        Returns:
+            True if insertion was successful, False otherwise
+        
+        Requirements: 2.4
+        Validates: Property 4 (Action Insertion Preservation)
+        """
+        if not self.test_script:
+            return False
+        
+        # Find the target step
+        target_step = None
+        for step in self.test_script.steps:
+            if step.id == step_id:
+                target_step = step
+                break
+        
+        if not target_step:
+            return False
+        
+        # Generate unique ID for the action
+        action_id = str(uuid.uuid4())
+        
+        # Add action to the action pool
+        self.test_script.action_pool[action_id] = action
+        
+        # Insert action ID into step's action_ids array
+        if position is None or position >= len(target_step.action_ids):
+            # Append to end
+            target_step.action_ids.append(action_id)
+        else:
+            # Insert at specific position
+            target_step.action_ids.insert(max(0, position), action_id)
+        
+        # Also add to flat actions list for backward compatibility
+        self.actions.append(action)
+        
+        import sys
+        sys.stderr.write(f"[Recorder] Action inserted into step {step_id} at position {position}\n")
+        sys.stderr.flush()
+        
+        return True
+    
+    def get_step_actions(self, step_id: str) -> List[AnyAction]:
+        """Get all actions for a specific step in chronological order.
+        
+        Args:
+            step_id: ID of the step to get actions for
+        
+        Returns:
+            List of actions for the step, or empty list if step not found
+        
+        Requirements: 2.4
+        """
+        if not self.test_script:
+            return []
+        
+        # Find the target step
+        target_step = None
+        for step in self.test_script.steps:
+            if step.id == step_id:
+                target_step = step
+                break
+        
+        if not target_step:
+            return []
+        
+        # Get actions from action pool in order
+        step_actions = []
+        for action_id in target_step.action_ids:
+            if action_id in self.test_script.action_pool:
+                step_actions.append(self.test_script.action_pool[action_id])
+        
+        return step_actions
+    
+    def remove_action_from_step(self, step_id: str, action_index: int) -> bool:
+        """Remove an action from a specific position within a step.
+        
+        Args:
+            step_id: ID of the step to remove action from
+            action_index: Index of the action to remove (0-based)
+        
+        Returns:
+            True if removal was successful, False otherwise
+        
+        Requirements: 2.4
+        """
+        if not self.test_script:
+            return False
+        
+        # Find the target step
+        target_step = None
+        for step in self.test_script.steps:
+            if step.id == step_id:
+                target_step = step
+                break
+        
+        if not target_step:
+            return False
+        
+        # Check if index is valid
+        if action_index < 0 or action_index >= len(target_step.action_ids):
+            return False
+        
+        # Remove action ID from step
+        removed_action_id = target_step.action_ids.pop(action_index)
+        
+        # Optionally remove from action pool if not referenced elsewhere
+        # (This is a design decision - we could keep it for potential reuse)
+        action_referenced_elsewhere = False
+        for step in self.test_script.steps:
+            if step.id != step_id and removed_action_id in step.action_ids:
+                action_referenced_elsewhere = True
+                break
+        
+        if not action_referenced_elsewhere:
+            self.test_script.action_pool.pop(removed_action_id, None)
+        
+        import sys
+        sys.stderr.write(f"[Recorder] Action removed from step {step_id} at index {action_index}\n")
+        sys.stderr.flush()
+        
+        return True
+    
+    def reorder_actions_in_step(self, step_id: str, new_order: List[int]) -> bool:
+        """Reorder actions within a step according to new index order.
+        
+        Args:
+            step_id: ID of the step to reorder actions in
+            new_order: List of indices representing the new order
+        
+        Returns:
+            True if reordering was successful, False otherwise
+        
+        Requirements: 2.4
+        Validates: Property 4 (Action Insertion Preservation)
+        """
+        if not self.test_script:
+            return False
+        
+        # Find the target step
+        target_step = None
+        for step in self.test_script.steps:
+            if step.id == step_id:
+                target_step = step
+                break
+        
+        if not target_step:
+            return False
+        
+        # Validate new_order
+        if len(new_order) != len(target_step.action_ids):
+            return False
+        
+        if sorted(new_order) != list(range(len(target_step.action_ids))):
+            return False
+        
+        # Reorder action_ids according to new_order
+        original_action_ids = target_step.action_ids.copy()
+        target_step.action_ids = [original_action_ids[i] for i in new_order]
+        
+        import sys
+        sys.stderr.write(f"[Recorder] Actions reordered in step {step_id}\n")
+        sys.stderr.flush()
+        
+        return True
