@@ -2,6 +2,7 @@
 
 import sys
 import json
+import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -78,6 +79,20 @@ class IPCHandler:
             return self._handle_save_script(params)
         elif command == 'delete_script':
             return self._handle_delete_script(params)
+        elif command == 'set_active_step':
+            return self._handle_set_active_step(params)
+        elif command == 'create_step':
+            return self._handle_create_step(params)
+        elif command == 'get_recording_status':
+            return self._handle_get_recording_status(params)
+        elif command == 'insert_action_in_step':
+            return self._handle_insert_action_in_step(params)
+        elif command == 'remove_action_from_step':
+            return self._handle_remove_action_from_step(params)
+        elif command == 'reorder_actions_in_step':
+            return self._handle_reorder_actions_in_step(params)
+        elif command == 'get_step_actions':
+            return self._handle_get_step_actions(params)
         else:
             return {
                 'success': False,
@@ -100,6 +115,10 @@ class IPCHandler:
             # Get screenshot capture preference from params (default: True)
             capture_screenshots = params.get('captureScreenshots', True)
             
+            # Get step-based recording configuration
+            test_script_data = params.get('testScript')  # Optional TestScript data
+            active_step_id = params.get('activeStepId')  # Optional active step ID
+            
             # Generate a temporary screenshots directory name
             from datetime import datetime
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -109,6 +128,47 @@ class IPCHandler:
                 screenshots_dir=screenshots_dir if capture_screenshots else None,
                 capture_screenshots=capture_screenshots
             )
+            
+            # Set up step-based recording if test script is provided
+            if test_script_data:
+                from storage.models import TestScript
+                try:
+                    test_script = TestScript.model_validate(test_script_data)
+                    self.recorder.set_test_script(test_script)
+                    
+                    # Set up callbacks for step management
+                    def step_action_callback(step_id: str, action):
+                        # This could emit events to the frontend if needed
+                        pass
+                    
+                    def setup_step_callback(action):
+                        # Create Setup_Step automatically
+                        from storage.models import TestStep
+                        setup_step_id = str(uuid.uuid4())
+                        setup_step = TestStep(
+                            id=setup_step_id,
+                            order=1,
+                            description="Setup Step - Auto-created",
+                            expected_result="Setup actions complete",
+                            action_ids=[],
+                            continue_on_failure=False
+                        )
+                        test_script.steps.insert(0, setup_step)  # Insert at beginning
+                        return setup_step_id
+                    
+                    self.recorder.set_step_action_callback(step_action_callback)
+                    self.recorder.set_setup_step_callback(setup_step_callback)
+                    
+                    # Set active step if provided
+                    if active_step_id:
+                        self.recorder.set_active_step(active_step_id)
+                        
+                except Exception as e:
+                    return {
+                        'success': False,
+                        'error': f"Invalid test script data: {str(e)}"
+                    }
+            
             self.recorder.start_recording()
             
             # Start a thread to monitor for ESC key press
@@ -150,7 +210,11 @@ class IPCHandler:
             
             return {
                 'success': True,
-                'data': {'status': 'recording'}
+                'data': {
+                    'status': 'recording',
+                    'step_based': test_script_data is not None,
+                    'active_step_id': active_step_id if test_script_data else None
+                }
             }
         except PermissionError as e:
             return {
@@ -801,4 +865,377 @@ class IPCHandler:
             return {
                 'success': False,
                 'error': f"Failed to delete script: {str(e)}"
+            }
+    
+    def _handle_set_active_step(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle set_active_step command for step-based recording.
+        
+        Sets the currently active step for recording. When a step is active,
+        all recorded actions will be mapped to that step's action_ids array.
+        
+        Args:
+            params: Dictionary containing 'step_id' (string or null)
+        
+        Returns:
+            Response dictionary with success status
+        
+        Requirements: 2.1, 2.2
+        """
+        try:
+            step_id = params.get('step_id')  # Can be None to deactivate
+            
+            if not self.recorder:
+                return {
+                    'success': False,
+                    'error': "No recorder instance available"
+                }
+            
+            self.recorder.set_active_step(step_id)
+            
+            return {
+                'success': True,
+                'data': {
+                    'active_step_id': step_id
+                }
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f"Failed to set active step: {str(e)}"
+            }
+    
+    def _handle_create_step(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle create_step command for step management.
+        
+        Creates a new test step and optionally sets it as the active step
+        for recording.
+        
+        Args:
+            params: Dictionary containing step data and options
+        
+        Returns:
+            Response dictionary with created step information
+        
+        Requirements: 2.1, 2.2
+        """
+        try:
+            from storage.models import TestStep
+            
+            # Extract step data from params
+            description = params.get('description', '')
+            expected_result = params.get('expected_result', '')
+            order = params.get('order', 1)
+            set_active = params.get('set_active', False)
+            
+            if not description:
+                return {
+                    'success': False,
+                    'error': "Step description is required"
+                }
+            
+            # Generate unique step ID
+            step_id = str(uuid.uuid4())
+            
+            # Create new test step
+            new_step = TestStep(
+                id=step_id,
+                order=order,
+                description=description,
+                expected_result=expected_result,
+                action_ids=[],
+                continue_on_failure=False
+            )
+            
+            # Set as active step if requested
+            if set_active and self.recorder:
+                self.recorder.set_active_step(step_id)
+            
+            return {
+                'success': True,
+                'data': {
+                    'step': {
+                        'id': new_step.id,
+                        'order': new_step.order,
+                        'description': new_step.description,
+                        'expected_result': new_step.expected_result,
+                        'action_ids': new_step.action_ids,
+                        'continue_on_failure': new_step.continue_on_failure
+                    },
+                    'is_active': set_active
+                }
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f"Failed to create step: {str(e)}"
+            }
+    
+    def _handle_get_recording_status(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle get_recording_status command.
+        
+        Returns the current recording status including active step information.
+        
+        Args:
+            params: Dictionary (unused)
+        
+        Returns:
+            Response dictionary with recording status
+        
+        Requirements: 2.1, 2.2
+        """
+        try:
+            is_recording = self.recorder and self.recorder.is_recording
+            active_step_id = None
+            action_count = 0
+            
+            if self.recorder:
+                active_step_id = self.recorder.current_active_step_id
+                action_count = len(self.recorder.actions)
+            
+            return {
+                'success': True,
+                'data': {
+                    'is_recording': is_recording,
+                    'active_step_id': active_step_id,
+                    'action_count': action_count
+                }
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f"Failed to get recording status: {str(e)}"
+            }
+    
+    def _handle_insert_action_in_step(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle insert_action_in_step command.
+        
+        Inserts a new action at a specific position within an existing step.
+        
+        Args:
+            params: Dictionary containing step_id, action_data, and optional position
+        
+        Returns:
+            Response dictionary with success status
+        
+        Requirements: 2.4
+        """
+        try:
+            from storage.models import Action, AIVisionCaptureAction
+            
+            step_id = params.get('step_id')
+            action_data = params.get('action_data')
+            position = params.get('position')  # Can be None
+            
+            if not step_id:
+                return {
+                    'success': False,
+                    'error': "Missing required parameter: step_id"
+                }
+            
+            if not action_data:
+                return {
+                    'success': False,
+                    'error': "Missing required parameter: action_data"
+                }
+            
+            if not self.recorder:
+                return {
+                    'success': False,
+                    'error': "No recorder instance available"
+                }
+            
+            # Parse action data
+            try:
+                if action_data.get('type') == 'ai_vision_capture':
+                    action = AIVisionCaptureAction.model_validate(action_data)
+                else:
+                    action = Action.model_validate(action_data)
+            except Exception as e:
+                return {
+                    'success': False,
+                    'error': f"Invalid action data: {str(e)}"
+                }
+            
+            # Insert action
+            success = self.recorder.insert_action_in_step(step_id, action, position)
+            
+            if success:
+                return {
+                    'success': True,
+                    'data': {
+                        'step_id': step_id,
+                        'inserted': True
+                    }
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': "Failed to insert action in step"
+                }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f"Failed to insert action in step: {str(e)}"
+            }
+    
+    def _handle_remove_action_from_step(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle remove_action_from_step command.
+        
+        Removes an action from a specific position within a step.
+        
+        Args:
+            params: Dictionary containing step_id and action_index
+        
+        Returns:
+            Response dictionary with success status
+        
+        Requirements: 2.4
+        """
+        try:
+            step_id = params.get('step_id')
+            action_index = params.get('action_index')
+            
+            if not step_id:
+                return {
+                    'success': False,
+                    'error': "Missing required parameter: step_id"
+                }
+            
+            if action_index is None:
+                return {
+                    'success': False,
+                    'error': "Missing required parameter: action_index"
+                }
+            
+            if not self.recorder:
+                return {
+                    'success': False,
+                    'error': "No recorder instance available"
+                }
+            
+            # Remove action
+            success = self.recorder.remove_action_from_step(step_id, action_index)
+            
+            if success:
+                return {
+                    'success': True,
+                    'data': {
+                        'step_id': step_id,
+                        'removed_index': action_index
+                    }
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': "Failed to remove action from step"
+                }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f"Failed to remove action from step: {str(e)}"
+            }
+    
+    def _handle_reorder_actions_in_step(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle reorder_actions_in_step command.
+        
+        Reorders actions within a step according to new index order.
+        
+        Args:
+            params: Dictionary containing step_id and new_order array
+        
+        Returns:
+            Response dictionary with success status
+        
+        Requirements: 2.4
+        """
+        try:
+            step_id = params.get('step_id')
+            new_order = params.get('new_order')
+            
+            if not step_id:
+                return {
+                    'success': False,
+                    'error': "Missing required parameter: step_id"
+                }
+            
+            if not new_order:
+                return {
+                    'success': False,
+                    'error': "Missing required parameter: new_order"
+                }
+            
+            if not self.recorder:
+                return {
+                    'success': False,
+                    'error': "No recorder instance available"
+                }
+            
+            # Reorder actions
+            success = self.recorder.reorder_actions_in_step(step_id, new_order)
+            
+            if success:
+                return {
+                    'success': True,
+                    'data': {
+                        'step_id': step_id,
+                        'new_order': new_order
+                    }
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': "Failed to reorder actions in step"
+                }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f"Failed to reorder actions in step: {str(e)}"
+            }
+    
+    def _handle_get_step_actions(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle get_step_actions command.
+        
+        Gets all actions for a specific step in chronological order.
+        
+        Args:
+            params: Dictionary containing step_id
+        
+        Returns:
+            Response dictionary with step actions
+        
+        Requirements: 2.4
+        """
+        try:
+            step_id = params.get('step_id')
+            
+            if not step_id:
+                return {
+                    'success': False,
+                    'error': "Missing required parameter: step_id"
+                }
+            
+            if not self.recorder:
+                return {
+                    'success': False,
+                    'error': "No recorder instance available"
+                }
+            
+            # Get step actions
+            actions = self.recorder.get_step_actions(step_id)
+            
+            # Convert actions to dict format for JSON serialization
+            actions_data = [action.model_dump() for action in actions]
+            
+            return {
+                'success': True,
+                'data': {
+                    'step_id': step_id,
+                    'actions': actions_data,
+                    'action_count': len(actions_data)
+                }
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f"Failed to get step actions: {str(e)}"
             }
