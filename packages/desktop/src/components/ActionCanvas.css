@@ -1,0 +1,536 @@
+/**
+ * ActionCanvas Component Styles
+ * 
+ * Styles for the right pane of the dual-pane editor interface.
+ * Includes action list, detail editing, and action insertion controls.
+ * 
+ * Requirements: 4.2, 4.4
+ */
+
+.action-canvas {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #ffffff;
+}
+
+/* ============================================================================
+   Header Section
+   ============================================================================ */
+
+.canvas-header {
+  padding: 16px;
+  border-bottom: 1px solid #dadce0;
+  background-color: #f8f9fa;
+}
+
+.canvas-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #202124;
+  margin: 0 0 8px 0;
+}
+
+.step-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.step-description {
+  font-size: 14px;
+  color: #5f6368;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action-count {
+  font-size: 12px;
+  color: #1a73e8;
+  background-color: #e8f0fe;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ============================================================================
+   Content Section
+   ============================================================================ */
+
+.canvas-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.actions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ============================================================================
+   Empty State
+   ============================================================================ */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  padding: 32px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-state h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #202124;
+  margin: 0 0 8px 0;
+}
+
+.empty-state p {
+  font-size: 14px;
+  color: #5f6368;
+  line-height: 1.5;
+  margin: 0 0 16px 0;
+  max-width: 300px;
+}
+
+.add-first-action-btn {
+  padding: 10px 16px;
+  background-color: #1a73e8;
+  border: none;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.add-first-action-btn:hover {
+  background-color: #1557b0;
+}
+
+/* ============================================================================
+   Action Items
+   ============================================================================ */
+
+.action-item {
+  background-color: #ffffff;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.action-item:hover {
+  border-color: #1a73e8;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.action-item.expanded {
+  border-color: #1a73e8;
+  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.15);
+}
+
+/* ============================================================================
+   Action Header
+   ============================================================================ */
+
+.action-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid #f1f3f4;
+}
+
+.action-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.action-index {
+  font-size: 12px;
+  font-weight: 600;
+  color: #5f6368;
+  background-color: #f8f9fa;
+  padding: 2px 6px;
+  border-radius: 4px;
+  min-width: 32px;
+  text-align: center;
+}
+
+.action-type {
+  font-size: 14px;
+  font-weight: 500;
+  color: #202124;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: #f8f9fa;
+}
+
+.action-type.vision-action {
+  color: #6366f1;
+  background-color: rgba(99, 102, 241, 0.1);
+}
+
+.assertion-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #d93025;
+  background-color: #fce8e6;
+  padding: 2px 6px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.action-controls {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.expand-btn,
+.delete-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  background-color: transparent;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 12px;
+  transition: background-color 0.2s;
+}
+
+.expand-btn:hover {
+  background-color: rgba(26, 115, 232, 0.1);
+}
+
+.delete-btn:hover {
+  background-color: rgba(217, 48, 37, 0.1);
+}
+
+/* ============================================================================
+   Action Details
+   ============================================================================ */
+
+.action-details {
+  padding: 0 12px 12px 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.detail-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.detail-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #5f6368;
+  min-width: 40px;
+}
+
+.detail-value {
+  font-size: 12px;
+  color: #202124;
+  font-family: monospace;
+}
+
+.field-value {
+  font-size: 12px;
+  color: #202124;
+  font-family: monospace;
+  cursor: default;
+}
+
+.field-value.editable {
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 2px;
+  transition: background-color 0.2s;
+}
+
+.field-value.editable:hover {
+  background-color: #f1f3f4;
+}
+
+/* ============================================================================
+   Field Editing
+   ============================================================================ */
+
+.field-edit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.field-input {
+  font-size: 12px;
+  font-family: monospace;
+  padding: 2px 6px;
+  border: 1px solid #1a73e8;
+  border-radius: 2px;
+  background-color: #ffffff;
+  min-width: 60px;
+}
+
+.field-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+}
+
+.field-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.field-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.save-btn {
+  background-color: #34a853;
+  color: #ffffff;
+}
+
+.save-btn:hover {
+  background-color: #2d8f47;
+}
+
+.cancel-btn {
+  background-color: #ea4335;
+  color: #ffffff;
+}
+
+.cancel-btn:hover {
+  background-color: #d33b2c;
+}
+
+/* ============================================================================
+   Vision Editor Container
+   ============================================================================ */
+
+.vision-editor-container {
+  border-top: 1px solid #f1f3f4;
+  padding: 16px;
+  background-color: #fafbfc;
+}
+
+.reference-images-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e8eaed;
+}
+
+/* ============================================================================
+   Action Insertion
+   ============================================================================ */
+
+.action-insert-zone {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.action-insert-zone.final {
+  opacity: 1;
+  padding: 8px 0;
+}
+
+.action-item:hover .action-insert-zone {
+  opacity: 1;
+}
+
+.insert-action-btn {
+  padding: 4px 12px;
+  background-color: #f8f9fa;
+  border: 1px dashed #dadce0;
+  border-radius: 4px;
+  color: #5f6368;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.insert-action-btn:hover {
+  background-color: #e8f0fe;
+  border-color: #1a73e8;
+  color: #1a73e8;
+}
+
+.insert-form {
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 4px;
+  padding: 12px;
+  margin: 8px 12px;
+}
+
+.insert-form h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #202124;
+  margin: 0 0 8px 0;
+}
+
+.action-type-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.action-type-buttons button {
+  padding: 6px 12px;
+  background-color: #1a73e8;
+  border: none;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.action-type-buttons button:hover {
+  background-color: #1557b0;
+}
+
+.cancel-insert {
+  padding: 6px 12px;
+  background-color: #f8f9fa;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  color: #5f6368;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.cancel-insert:hover {
+  background-color: #e8eaed;
+}
+
+/* ============================================================================
+   Responsive Design
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .canvas-header {
+    padding: 12px;
+  }
+
+  .canvas-title {
+    font-size: 16px;
+  }
+
+  .step-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .action-details {
+    grid-template-columns: 1fr;
+  }
+
+  .action-header {
+    padding: 10px;
+  }
+
+  .action-info {
+    gap: 8px;
+  }
+
+  .expand-btn,
+  .delete-btn {
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+  }
+}
+
+/* ============================================================================
+   Accessibility
+   ============================================================================ */
+
+.action-item:focus-within {
+  outline: 2px solid #1a73e8;
+  outline-offset: 2px;
+}
+
+.expand-btn:focus,
+.delete-btn:focus,
+.insert-action-btn:focus {
+  outline: 2px solid #1a73e8;
+  outline-offset: 1px;
+}
+
+.field-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .action-item {
+    border-width: 2px;
+  }
+
+  .action-item.expanded {
+    border-width: 3px;
+  }
+
+  .expand-btn:hover,
+  .delete-btn:hover {
+    background-color: rgba(0, 0, 0, 0.2);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .action-item,
+  .expand-btn,
+  .delete-btn,
+  .insert-action-btn,
+  .field-value,
+  .action-insert-zone {
+    transition: none;
+  }
+}

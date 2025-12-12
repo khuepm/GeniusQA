@@ -1,6 +1,10 @@
 dist/
 build/
 node_modules/
-. expo/
+.expo/
 .DS_Store
 *.log
+
+# Firebase configuration files (contain sensitive credentials)
+google-services.json
+GoogleService-Info.plist

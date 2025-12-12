@@ -1,0 +1,789 @@
+/**
+ * TestStepPlanner Component Styles
+ * 
+ * Styles for the left pane of the dual-pane editor interface.
+ * Includes step list, drag-and-drop indicators, and step management controls.
+ * 
+ * Requirements: 1.3, 4.1, 4.3, 4.5
+ */
+
+.test-step-planner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #ffffff;
+}
+
+/* ============================================================================
+   Header Section
+   ============================================================================ */
+
+.planner-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #dadce0;
+  background-color: #f8f9fa;
+}
+
+.planner-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #202124;
+  margin: 0;
+}
+
+.add-step-btn {
+  padding: 8px 12px;
+  background-color: #1a73e8;
+  border: none;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.add-step-btn:hover {
+  background-color: #1557b0;
+}
+
+.add-step-btn:active {
+  background-color: #0f4c8c;
+}
+
+/* ============================================================================
+   Steps Container
+   ============================================================================ */
+
+.steps-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.empty-steps {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  padding: 32px;
+}
+
+.empty-text {
+  font-size: 14px;
+  color: #5f6368;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* ============================================================================
+   Step Item Styles
+   ============================================================================ */
+
+.step-item {
+  background-color: #ffffff;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.step-item:hover {
+  border-color: #1a73e8;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.step-item.selected {
+  border-color: #1a73e8;
+  background-color: #e8f0fe;
+  box-shadow: 0 2px 4px rgba(26, 115, 232, 0.2);
+}
+
+.step-item.dragged {
+  opacity: 0.5;
+  transform: rotate(2deg);
+}
+
+.step-item.drag-over {
+  border-color: #34a853;
+  background-color: #e6f4ea;
+  border-style: dashed;
+}
+
+.step-item.editing,
+.step-item.adding {
+  border-color: #fbbc04;
+  background-color: #fef7e0;
+}
+
+/* ============================================================================
+   Step Header
+   ============================================================================ */
+
+.step-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.indicator-emoji {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.step-order {
+  font-size: 12px;
+  font-weight: 600;
+  color: #5f6368;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.step-controls {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.step-item:hover .step-controls {
+  opacity: 1;
+}
+
+.control-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background-color: transparent;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 12px;
+  transition: background-color 0.2s;
+}
+
+.control-btn:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.edit-btn:hover {
+  background-color: rgba(26, 115, 232, 0.1);
+}
+
+.delete-btn:hover {
+  background-color: rgba(217, 48, 37, 0.1);
+}
+
+/* ============================================================================
+   Step Content
+   ============================================================================ */
+
+.step-content {
+  margin-left: 24px; /* Align with indicator */
+}
+
+.step-description {
+  font-size: 14px;
+  font-weight: 500;
+  color: #202124;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.step-expected-result {
+  font-size: 12px;
+  color: #5f6368;
+  font-style: italic;
+  margin-bottom: 8px;
+  line-height: 1.3;
+}
+
+.step-meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 11px;
+  color: #5f6368;
+}
+
+.action-count {
+  background-color: #e8f0fe;
+  color: #1a73e8;
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.continue-on-failure {
+  background-color: #fce8e6;
+  color: #d93025;
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+/* ============================================================================
+   Step Edit Form
+   ============================================================================ */
+
+.step-edit-form {
+  background-color: #ffffff;
+  border-radius: 4px;
+  padding: 12px;
+}
+
+.form-group {
+  margin-bottom: 12px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #202124;
+  margin-bottom: 4px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #202124;
+  background-color: #ffffff;
+  transition: border-color 0.2s;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+}
+
+.checkbox-label {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #dadce0;
+}
+
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background-color: #1a73e8;
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background-color: #1557b0;
+}
+
+.btn-secondary {
+  background-color: #f8f9fa;
+  color: #5f6368;
+  border: 1px solid #dadce0;
+}
+
+.btn-secondary:hover {
+  background-color: #e8eaed;
+}
+
+/* ============================================================================
+   Drag and Drop Indicators
+   ============================================================================ */
+
+.drag-indicator {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(26, 115, 232, 0.9);
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+/* ============================================================================
+   Visual Indicator States
+   ============================================================================ */
+
+/* Manual step (no actions) - White circle */
+.step-item .indicator-emoji:has-text("⚪") {
+  filter: grayscale(0);
+}
+
+/* Mapped step (has actions) - Green circle */
+.step-item .indicator-emoji:has-text("🟢") {
+  filter: grayscale(0);
+}
+
+/* Recording step (currently active) - Red circle */
+.step-item .indicator-emoji:has-text("🔴") {
+  filter: grayscale(0);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
+/* ============================================================================
+   Responsive Design
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .planner-header {
+    padding: 12px;
+  }
+
+  .planner-title {
+    font-size: 16px;
+  }
+
+  .add-step-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .step-item {
+    padding: 10px;
+  }
+
+  .step-description {
+    font-size: 13px;
+  }
+
+  .step-expected-result {
+    font-size: 11px;
+  }
+
+  .control-btn {
+    width: 20px;
+    height: 20px;
+    font-size: 10px;
+  }
+}
+
+/* ============================================================================
+   Accessibility
+   ============================================================================ */
+
+.step-item:focus {
+  outline: 2px solid #1a73e8;
+  outline-offset: 2px;
+}
+
+.control-btn:focus {
+  outline: 2px solid #1a73e8;
+  outline-offset: 1px;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .step-item {
+    border-width: 2px;
+  }
+
+  .step-item.selected {
+    border-width: 3px;
+  }
+
+  .control-btn:hover {
+    background-color: rgba(0, 0, 0, 0.2);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .step-item,
+  .control-btn,
+  .btn,
+  .form-input {
+    transition: none;
+  }
+
+  .indicator-emoji:has-text("🔴") {
+    animation: none;
+  }
+}
+/* ============================================================================
+   Merge Functionality Styles
+   ============================================================================ */
+
+/* Header controls for merge mode */
+.header-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.merge-btn {
+  padding: 8px 12px;
+  background-color: #34a853;
+  border: none;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.merge-btn:hover {
+  background-color: #2d8f47;
+}
+
+.merge-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.merge-status {
+  font-size: 14px;
+  color: #5f6368;
+  font-weight: 500;
+}
+
+/* Step item merge mode styles */
+.step-item.merge-mode {
+  cursor: pointer;
+  user-select: none;
+}
+
+.step-item.selected-for-merge {
+  border-color: #34a853;
+  background-color: rgba(52, 168, 83, 0.1);
+}
+
+.step-item.selected-for-merge .step-header {
+  background-color: rgba(52, 168, 83, 0.05);
+}
+
+.merge-checkbox {
+  margin-right: 8px;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Merge dialog styles */
+.merge-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.merge-dialog {
+  background-color: #ffffff;
+  border-radius: 8px;
+  padding: 24px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.merge-dialog h3 {
+  margin: 0 0 16px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #202124;
+}
+
+.merge-dialog p {
+  margin: 0 0 20px 0;
+  color: #5f6368;
+  line-height: 1.5;
+}
+
+.form-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 60px;
+  transition: border-color 0.2s;
+}
+
+.form-textarea:focus {
+  outline: none;
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+}
+
+/* Responsive merge dialog */
+@media (max-width: 768px) {
+  .merge-dialog {
+    width: 95%;
+    padding: 20px;
+  }
+
+  .merge-dialog h3 {
+    font-size: 18px;
+  }
+
+  .header-controls {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .merge-controls {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .merge-status {
+    text-align: center;
+  }
+}
+/* ============================================================================
+   Split Functionality Styles
+   ============================================================================ */
+
+/* Split button in step controls */
+.split-btn {
+  background-color: #ff9800;
+  color: #ffffff;
+}
+
+.split-btn:hover {
+  background-color: #f57c00;
+}
+
+/* Split dialog styles */
+.split-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.split-dialog {
+  background-color: #ffffff;
+  border-radius: 8px;
+  padding: 24px;
+  width: 90%;
+  max-width: 700px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.split-dialog h3 {
+  margin: 0 0 16px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #202124;
+}
+
+.split-dialog h4 {
+  margin: 20px 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #202124;
+}
+
+.split-dialog h5 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #202124;
+}
+
+.split-dialog p {
+  margin: 0 0 20px 0;
+  color: #5f6368;
+  line-height: 1.5;
+}
+
+/* Original actions section */
+.original-actions {
+  margin-bottom: 24px;
+  padding: 16px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
+.action-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.action-item {
+  padding: 6px 12px;
+  background-color: #e8f0fe;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #1a73e8;
+}
+
+/* Split definitions section */
+.split-definitions {
+  margin-bottom: 24px;
+}
+
+.split-definition {
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  background-color: #fafafa;
+}
+
+.split-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.remove-split-btn {
+  background-color: #ea4335;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  color: #ffffff;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-split-btn:hover {
+  background-color: #d33b2c;
+}
+
+.add-split-btn {
+  padding: 8px 16px;
+  background-color: #34a853;
+  border: none;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 14px;
+  cursor: pointer;
+  margin-top: 12px;
+}
+
+.add-split-btn:hover {
+  background-color: #2d8f47;
+}
+
+/* Form elements in split dialog */
+.split-dialog .form-group {
+  margin-bottom: 12px;
+}
+
+.split-dialog .form-group label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #202124;
+}
+
+.split-dialog .form-group small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #5f6368;
+}
+
+/* Responsive split dialog */
+@media (max-width: 768px) {
+  .split-dialog {
+    width: 95%;
+    padding: 20px;
+    max-height: 90vh;
+  }
+
+  .split-dialog h3 {
+    font-size: 18px;
+  }
+
+  .action-list {
+    flex-direction: column;
+  }
+
+  .split-definition {
+    padding: 12px;
+  }
+}

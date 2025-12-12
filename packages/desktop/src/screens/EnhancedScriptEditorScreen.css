@@ -1,0 +1,428 @@
+/**
+ * Enhanced Script Editor Screen Styles
+ * 
+ * Styles for the enhanced script editor with dual-pane layout.
+ * Integrates TestStepPlanner and ActionCanvas components.
+ * 
+ * Requirements: 4.1, 4.2, 4.3
+ */
+
+.enhanced-script-editor-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #f5f5f5;
+}
+
+/* ============================================================================
+   Header Section
+   ============================================================================ */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #ffffff;
+  padding: 16px;
+  border-bottom: 1px solid #dadce0;
+  z-index: 10;
+}
+
+.back-button {
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: #1a73e8;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.back-button:hover {
+  text-decoration: underline;
+}
+
+.header-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #202124;
+  margin: 0;
+}
+
+.refresh-button {
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: #1a73e8;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.refresh-button:hover {
+  text-decoration: underline;
+}
+
+/* ============================================================================
+   Error Display
+   ============================================================================ */
+
+.error-container {
+  background-color: #fce8e6;
+  padding: 12px;
+  margin: 16px;
+  border-radius: 8px;
+  border-left: 4px solid #d93025;
+}
+
+.error-text {
+  color: #d93025;
+  font-size: 14px;
+  text-align: center;
+  margin: 0;
+  font-weight: 500;
+}
+
+/* ============================================================================
+   Main Content Layout
+   ============================================================================ */
+
+.content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.left-panel {
+  width: 300px;
+  min-width: 250px;
+  max-width: 400px;
+  border-right: 1px solid #dadce0;
+  background-color: #ffffff;
+  overflow-y: auto;
+  resize: horizontal;
+}
+
+.right-panel {
+  flex: 1;
+  background-color: #ffffff;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============================================================================
+   Script List (Left Panel)
+   ============================================================================ */
+
+.script-list {
+  padding: 16px;
+  height: 100%;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #202124;
+  margin-bottom: 16px;
+  margin-top: 0;
+}
+
+.empty-text {
+  font-size: 14px;
+  color: #5f6368;
+  text-align: center;
+  margin-top: 32px;
+  line-height: 1.5;
+  padding: 0 16px;
+}
+
+/* ============================================================================
+   Editor Placeholder
+   ============================================================================ */
+
+.editor-placeholder {
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  align-items: center;
+  padding: 32px;
+}
+
+.placeholder-text {
+  font-size: 16px;
+  color: #5f6368;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* ============================================================================
+   Editor Header
+   ============================================================================ */
+
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #dadce0;
+  background-color: #f8f9fa;
+  min-height: 60px;
+}
+
+.editor-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #202124;
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.action-button {
+  min-width: 80px;
+}
+
+/* ============================================================================
+   Dual-Pane Editor Layout
+   ============================================================================ */
+
+.dual-pane-editor {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.step-planner-pane {
+  width: 40%;
+  min-width: 300px;
+  max-width: 50%;
+  border-right: 1px solid #dadce0;
+  background-color: #ffffff;
+  overflow: hidden;
+  resize: horizontal;
+}
+
+.action-canvas-pane {
+  flex: 1;
+  background-color: #ffffff;
+  overflow: hidden;
+}
+
+/* ============================================================================
+   Responsive Design
+   ============================================================================ */
+
+@media (max-width: 1200px) {
+  .left-panel {
+    width: 280px;
+    min-width: 220px;
+  }
+
+  .step-planner-pane {
+    width: 45%;
+    min-width: 280px;
+  }
+
+  .header-title {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 768px) {
+  .enhanced-script-editor-container {
+    height: 100vh;
+  }
+
+  .header {
+    padding: 12px;
+  }
+
+  .header-title {
+    font-size: 16px;
+  }
+
+  .back-button,
+  .refresh-button {
+    padding: 6px 10px;
+    font-size: 14px;
+  }
+
+  .content {
+    flex-direction: column;
+  }
+
+  .left-panel {
+    width: 100%;
+    max-height: 40vh;
+    resize: vertical;
+  }
+
+  .right-panel {
+    flex: 1;
+    min-height: 60vh;
+  }
+
+  .dual-pane-editor {
+    flex-direction: column;
+  }
+
+  .step-planner-pane {
+    width: 100%;
+    max-height: 40%;
+    border-right: none;
+    border-bottom: 1px solid #dadce0;
+    resize: vertical;
+  }
+
+  .action-canvas-pane {
+    flex: 1;
+    min-height: 60%;
+  }
+
+  .editor-header {
+    padding: 12px;
+  }
+
+  .editor-title {
+    font-size: 16px;
+  }
+
+  .editor-actions {
+    gap: 6px;
+  }
+
+  .action-button {
+    min-width: 70px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    padding: 8px;
+  }
+
+  .header-title {
+    font-size: 14px;
+  }
+
+  .script-list {
+    padding: 12px;
+  }
+
+  .section-title {
+    font-size: 16px;
+  }
+
+  .editor-header {
+    padding: 8px;
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .editor-title {
+    font-size: 14px;
+    text-align: center;
+  }
+
+  .editor-actions {
+    justify-content: center;
+  }
+}
+
+/* ============================================================================
+   Accessibility
+   ============================================================================ */
+
+.back-button:focus,
+.refresh-button:focus {
+  outline: 2px solid #1a73e8;
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .header {
+    border-bottom-width: 2px;
+  }
+
+  .left-panel {
+    border-right-width: 2px;
+  }
+
+  .step-planner-pane {
+    border-right-width: 2px;
+  }
+
+  .editor-header {
+    border-bottom-width: 2px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .back-button,
+  .refresh-button {
+    transition: none;
+  }
+}
+
+/* ============================================================================
+   Loading States
+   ============================================================================ */
+
+.enhanced-script-editor-container.loading {
+  pointer-events: none;
+}
+
+.enhanced-script-editor-container.loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+/* ============================================================================
+   Resize Handles
+   ============================================================================ */
+
+.left-panel::-webkit-resizer,
+.step-planner-pane::-webkit-resizer {
+  background-color: #dadce0;
+  border-radius: 2px;
+}
+
+.left-panel:hover::-webkit-resizer,
+.step-planner-pane:hover::-webkit-resizer {
+  background-color: #1a73e8;
+}
+
+/* ============================================================================
+   Focus Management
+   ============================================================================ */
+
+.dual-pane-editor:focus-within .step-planner-pane {
+  border-right-color: #1a73e8;
+}
+
+.dual-pane-editor:focus-within .action-canvas-pane {
+  border-left-color: #1a73e8;
+}

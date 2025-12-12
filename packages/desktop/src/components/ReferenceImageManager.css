@@ -1,0 +1,312 @@
+/**
+ * ReferenceImageManager Component Styles
+ *
+ * Styles for the reference image management component including:
+ * - Thumbnail grid layout
+ * - Drag-and-drop overlay
+ * - Add/remove buttons
+ * - Error display
+ *
+ * Requirements: 2.5, 2.6, 2.8
+ */
+
+/* ============================================================================
+   Container
+   ============================================================================ */
+
+.reference-image-manager {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background-color: #2d2d44;
+  border: 2px dashed #3d3d5c;
+  border-radius: 8px;
+  transition: border-color 0.2s, background-color 0.2s;
+  outline: none;
+}
+
+.reference-image-manager:focus {
+  border-color: #6366f1;
+}
+
+.reference-image-manager.drag-over {
+  border-color: #6366f1;
+  background-color: rgba(99, 102, 241, 0.1);
+}
+
+.reference-image-manager.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* ============================================================================
+   Header
+   ============================================================================ */
+
+.rim-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rim-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #ccc;
+}
+
+.rim-count {
+  font-size: 12px;
+  color: #888;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
+/* ============================================================================
+   Thumbnail Grid (Requirement: 2.8)
+   ============================================================================ */
+
+.rim-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 8px;
+  min-height: 60px;
+}
+
+.rim-thumbnail {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  overflow: hidden;
+  background-color: #1a1a2e;
+  border: 1px solid #3d3d5c;
+  transition: border-color 0.2s, transform 0.2s;
+}
+
+.rim-thumbnail:hover {
+  border-color: #6366f1;
+  transform: scale(1.02);
+}
+
+.rim-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 0.2s;
+}
+
+.rim-thumbnail img.loading {
+  opacity: 0.5;
+}
+
+/* Remove Button */
+.rim-remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(239, 68, 68, 0.9);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.rim-thumbnail:hover .rim-remove-btn {
+  opacity: 1;
+}
+
+.rim-remove-btn:hover {
+  background-color: #ef4444;
+  transform: scale(1.1);
+}
+
+/* ============================================================================
+   Add Button
+   ============================================================================ */
+
+.rim-add-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  aspect-ratio: 1;
+  min-height: 80px;
+  background-color: #1a1a2e;
+  border: 2px dashed #3d3d5c;
+  border-radius: 6px;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.rim-add-btn:hover {
+  border-color: #6366f1;
+  color: #6366f1;
+  background-color: rgba(99, 102, 241, 0.1);
+}
+
+.rim-add-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.rim-add-text {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* ============================================================================
+   Drop Overlay
+   ============================================================================ */
+
+.rim-drop-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(99, 102, 241, 0.2);
+  border-radius: 6px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.rim-drop-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  background-color: rgba(26, 26, 46, 0.95);
+  border-radius: 8px;
+  border: 2px solid #6366f1;
+}
+
+.rim-drop-icon {
+  font-size: 32px;
+}
+
+.rim-drop-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #6366f1;
+}
+
+/* ============================================================================
+   Empty State
+   ============================================================================ */
+
+.rim-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+}
+
+.rim-empty p {
+  margin: 0;
+  color: #888;
+  font-size: 13px;
+}
+
+.rim-empty .rim-hint {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #666;
+}
+
+/* ============================================================================
+   Error Display
+   ============================================================================ */
+
+.rim-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  color: #f87171;
+  font-size: 12px;
+}
+
+.rim-error-icon {
+  flex-shrink: 0;
+}
+
+.rim-error-dismiss {
+  margin-left: auto;
+  padding: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  border: none;
+  color: #f87171;
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.rim-error-dismiss:hover {
+  opacity: 1;
+}
+
+/* ============================================================================
+   Hidden File Input
+   ============================================================================ */
+
+.rim-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ============================================================================
+   Responsive Adjustments
+   ============================================================================ */
+
+@media (max-width: 600px) {
+  .rim-grid {
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  }
+
+  .rim-add-btn {
+    min-height: 60px;
+  }
+
+  .rim-add-icon {
+    font-size: 20px;
+  }
+
+  .rim-add-text {
+    font-size: 10px;
+  }
+}

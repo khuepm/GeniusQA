@@ -1,0 +1,167 @@
+/* ScriptListItem Component Styles */
+/* Requirements: 9.2, 9.5 */
+
+.script-list-item {
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+  border: 1px solid #dadce0;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.script-list-item:hover {
+  background-color: #e8f0fe;
+}
+
+.script-list-item.selected {
+  background-color: #e8f0fe;
+  border-color: #1a73e8;
+}
+
+.script-list-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.script-list-item-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.script-list-item-filename {
+  font-size: 14px;
+  font-weight: 600;
+  color: #202124;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.script-list-item-name {
+  font-size: 12px;
+  color: #5f6368;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.script-list-item-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.script-list-item-delete {
+  padding: 4px 8px;
+  background-color: #d93025;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #ffffff;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.script-list-item-delete:hover {
+  background-color: #b71c1c;
+}
+
+/* Source and OS Badges */
+.script-list-item-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.script-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Source Badges */
+.script-badge.source-recorded {
+  background-color: #e6f4ea;
+  color: #137333;
+  border: 1px solid #ceead6;
+}
+
+.script-badge.source-ai_generated {
+  background-color: #e8f0fe;
+  color: #1967d2;
+  border: 1px solid #d2e3fc;
+}
+
+.script-badge.source-unknown {
+  background-color: #f1f3f4;
+  color: #5f6368;
+  border: 1px solid #e0e0e0;
+}
+
+/* OS Badges */
+.script-badge.os-macos {
+  background-color: #fef7e0;
+  color: #b06000;
+  border: 1px solid #feefc3;
+}
+
+.script-badge.os-windows {
+  background-color: #e8f0fe;
+  color: #1967d2;
+  border: 1px solid #d2e3fc;
+}
+
+.script-badge.os-universal {
+  background-color: #f3e8fd;
+  color: #7627bb;
+  border: 1px solid #e9d2fd;
+}
+
+.script-badge-icon {
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* Script Info */
+.script-list-item-info {
+  font-size: 12px;
+  color: #5f6368;
+  margin: 2px 0;
+}
+
+.script-list-item-info:last-child {
+  margin-bottom: 0;
+}
+
+/* Compact Mode */
+.script-list-item.compact {
+  padding: 8px 10px;
+}
+
+.script-list-item.compact .script-list-item-filename {
+  font-size: 13px;
+}
+
+.script-list-item.compact .script-badge {
+  padding: 2px 6px;
+  font-size: 10px;
+}
+
+.script-list-item.compact .script-list-item-info {
+  font-size: 11px;
+}

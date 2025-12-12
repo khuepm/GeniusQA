@@ -1,0 +1,277 @@
+/**
+ * Script Name Dialog Styles
+ * 
+ * Styles for the script naming dialog component.
+ * Requirements: 4.3, 6.5
+ */
+
+.script-name-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.script-name-dialog {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  width: 90%;
+  max-width: 480px;
+  animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.script-name-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.script-name-dialog-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.script-name-dialog-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.script-name-dialog-close:hover {
+  background-color: #f3f4f6;
+  color: #1f2937;
+}
+
+.script-name-dialog-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.script-name-dialog-body {
+  padding: 24px;
+}
+
+.script-name-dialog-description {
+  margin: 0 0 20px 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.script-name-input-group {
+  margin-bottom: 16px;
+}
+
+.script-name-input-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.script-name-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+
+.script-name-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.script-name-input:disabled {
+  background-color: #f9fafb;
+  cursor: not-allowed;
+}
+
+.script-name-input-error {
+  border-color: #ef4444;
+}
+
+.script-name-input-error:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.script-name-hint {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: #9ca3af;
+  font-family: monospace;
+  word-break: break-all;
+}
+
+.script-name-error {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 16px;
+  color: #dc2626;
+  font-size: 0.9rem;
+}
+
+.script-name-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.script-name-cancel-button {
+  padding: 10px 20px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: white;
+  color: #374151;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.script-name-cancel-button:hover {
+  background-color: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.script-name-cancel-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.script-name-save-button {
+  padding: 10px 24px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.script-name-save-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.script-name-save-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .script-name-dialog {
+    background: #1f2937;
+  }
+
+  .script-name-dialog-header {
+    border-bottom-color: #374151;
+  }
+
+  .script-name-dialog-header h2 {
+    color: #f9fafb;
+  }
+
+  .script-name-dialog-close {
+    color: #9ca3af;
+  }
+
+  .script-name-dialog-close:hover {
+    background-color: #374151;
+    color: #f9fafb;
+  }
+
+  .script-name-dialog-description {
+    color: #9ca3af;
+  }
+
+  .script-name-input-group label {
+    color: #d1d5db;
+  }
+
+  .script-name-input {
+    background-color: #374151;
+    border-color: #4b5563;
+    color: #f9fafb;
+  }
+
+  .script-name-input:focus {
+    border-color: #3b82f6;
+  }
+
+  .script-name-input:disabled {
+    background-color: #1f2937;
+  }
+
+  .script-name-hint {
+    color: #6b7280;
+  }
+
+  .script-name-error {
+    background-color: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+  }
+
+  .script-name-cancel-button {
+    background: #374151;
+    border-color: #4b5563;
+    color: #d1d5db;
+  }
+
+  .script-name-cancel-button:hover {
+    background-color: #4b5563;
+    border-color: #6b7280;
+  }
+}

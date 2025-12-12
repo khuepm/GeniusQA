@@ -1,0 +1,561 @@
+/**
+ * AI Script Builder Screen Styles
+ * 
+ * Provides styling for the AI Script Builder screen including
+ * layout, header, panels, and API key modal.
+ */
+
+/* Container */
+.ai-script-builder-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #f5f5f5;
+}
+
+/* Loading State */
+.ai-script-builder-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 16px;
+}
+
+.ai-script-builder-loading .loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #1a73e8;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ai-script-builder-loading p {
+  color: #5f6368;
+  font-size: 14px;
+}
+
+/* Header */
+.ai-script-builder-header {
+  display: flex;
+  align-items: center;
+  padding: 16px 24px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.ai-script-builder-back-button {
+  background: none;
+  border: none;
+  color: #1a73e8;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.ai-script-builder-back-button:hover {
+  background-color: #e8f0fe;
+}
+
+.ai-script-builder-title {
+  flex: 1;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 600;
+  color: #202124;
+  margin: 0;
+}
+
+.ai-script-builder-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ai-script-builder-settings-button {
+  background: none;
+  border: 1px solid #dadce0;
+  color: #5f6368;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.ai-script-builder-settings-button:hover {
+  background-color: #f1f3f4;
+  border-color: #1a73e8;
+  color: #1a73e8;
+}
+
+/* Main Content */
+.ai-script-builder-main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Chat Panel */
+.ai-script-builder-chat-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #e0e0e0;
+  background-color: #ffffff;
+  min-width: 400px;
+  max-width: 50%;
+  position: relative;
+}
+
+.ai-script-builder-configure-prompt {
+  position: absolute;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+}
+
+.ai-script-builder-configure-button {
+  background-color: #1a73e8;
+  color: #ffffff;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.3);
+  transition: all 0.2s;
+}
+
+.ai-script-builder-configure-button:hover {
+  background-color: #1557b0;
+  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.4);
+}
+
+/* Preview Panel */
+.ai-script-builder-preview-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: #fafafa;
+  min-width: 400px;
+  overflow: hidden;
+}
+
+/* API Key Modal */
+.api-key-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.api-key-modal {
+  background-color: #ffffff;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.api-key-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.api-key-modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #202124;
+}
+
+.api-key-modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #5f6368;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.api-key-modal-close:hover {
+  background-color: #f1f3f4;
+}
+
+.api-key-modal-body {
+  padding: 24px;
+}
+
+.api-key-modal-description {
+  color: #5f6368;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 20px 0;
+}
+
+.api-key-modal-instructions {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.api-key-modal-instructions h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #202124;
+}
+
+.api-key-modal-instructions ol {
+  margin: 0;
+  padding-left: 20px;
+  color: #5f6368;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.api-key-modal-instructions a {
+  color: #1a73e8;
+  text-decoration: none;
+}
+
+.api-key-modal-instructions a:hover {
+  text-decoration: underline;
+}
+
+.api-key-input-group {
+  margin-bottom: 16px;
+}
+
+.api-key-input-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #202124;
+  margin-bottom: 8px;
+}
+
+.api-key-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+
+.api-key-input:focus {
+  outline: none;
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+}
+
+.api-key-input:disabled {
+  background-color: #f1f3f4;
+  cursor: not-allowed;
+}
+
+.api-key-error {
+  background-color: #fce8e6;
+  color: #c5221f;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.api-key-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.api-key-cancel-button {
+  background: none;
+  border: 1px solid #dadce0;
+  color: #5f6368;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.api-key-cancel-button:hover:not(:disabled) {
+  background-color: #f1f3f4;
+}
+
+.api-key-cancel-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.api-key-save-button {
+  background-color: #1a73e8;
+  border: none;
+  color: #ffffff;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.api-key-save-button:hover:not(:disabled) {
+  background-color: #1557b0;
+}
+
+.api-key-save-button:disabled {
+  background-color: #a8c7fa;
+  cursor: not-allowed;
+}
+
+/* Provider Error Banner - Requirements: 4.1, 4.2, 4.3, 4.5 */
+.ai-script-builder-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background-color: #fef3cd;
+  border-bottom: 1px solid #ffc107;
+  gap: 16px;
+}
+
+/* Error type specific styles */
+.ai-script-builder-error-banner.error-type-rate_limit {
+  background-color: #fff3cd;
+  border-bottom-color: #ffc107;
+}
+
+.ai-script-builder-error-banner.error-type-rate_limit .error-banner-message {
+  color: #856404;
+}
+
+.ai-script-builder-error-banner.error-type-network_error {
+  background-color: #cce5ff;
+  border-bottom-color: #004085;
+}
+
+.ai-script-builder-error-banner.error-type-network_error .error-banner-message {
+  color: #004085;
+}
+
+.ai-script-builder-error-banner.error-type-auth_error {
+  background-color: #f8d7da;
+  border-bottom-color: #721c24;
+}
+
+.ai-script-builder-error-banner.error-type-auth_error .error-banner-message {
+  color: #721c24;
+}
+
+.error-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.error-banner-icon {
+  font-size: 18px;
+}
+
+.error-banner-message {
+  color: #856404;
+  font-size: 14px;
+}
+
+.error-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.error-banner-retry-button {
+  background-color: #ffc107;
+  border: none;
+  color: #212529;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.error-banner-retry-button:hover {
+  background-color: #e0a800;
+}
+
+.error-banner-settings-button {
+  background-color: #dc3545;
+  border: none;
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.error-banner-settings-button:hover {
+  background-color: #c82333;
+}
+
+.error-banner-alternatives {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.error-alternatives-label {
+  color: #856404;
+  font-size: 13px;
+}
+
+.error-alternative-button {
+  background-color: #1a73e8;
+  border: none;
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.error-alternative-button:hover {
+  background-color: #1557b0;
+}
+
+.error-banner-dismiss-button {
+  background: none;
+  border: none;
+  color: #856404;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.error-banner-dismiss-button:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Configure Prompt - Requirements: 1.5 */
+.configure-prompt-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 24px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  max-width: 400px;
+}
+
+.configure-prompt-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.configure-prompt-title {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #202124;
+}
+
+.configure-prompt-description {
+  margin: 0 0 20px 0;
+  font-size: 14px;
+  color: #5f6368;
+  line-height: 1.5;
+}
+
+/* Responsive Design */
+@media (max-width: 900px) {
+  .ai-script-builder-main {
+    flex-direction: column;
+  }
+
+  .ai-script-builder-chat-panel,
+  .ai-script-builder-preview-panel {
+    max-width: 100%;
+    min-width: 100%;
+    border-right: none;
+  }
+
+  .ai-script-builder-chat-panel {
+    border-bottom: 1px solid #e0e0e0;
+    max-height: 50vh;
+  }
+
+  .ai-script-builder-preview-panel {
+    flex: 1;
+    min-height: 50vh;
+  }
+}
+
+@media (max-width: 600px) {
+  .ai-script-builder-header {
+    padding: 12px 16px;
+  }
+
+  .ai-script-builder-title {
+    font-size: 16px;
+  }
+
+  .api-key-modal {
+    width: 95%;
+    margin: 16px;
+  }
+
+  .api-key-modal-body {
+    padding: 16px;
+  }
+}
+
+
+/* Usage Statistics in Header - Requirements: 6.4 */
+.ai-script-builder-stats {
+  margin-right: 8px;
+}
+
+.ai-script-builder-stats .usage-statistics-popup {
+  right: 0;
+  left: auto;
+}

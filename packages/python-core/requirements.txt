@@ -3,7 +3,10 @@ uvicorn==0.24.0
 python-dotenv==1.0.0
 requests==2.31.0
 pyautogui==0.9.53
+pynput==1.7.6
 keyboard==0.13.5
 mouse==0.7.1
 pydantic==2.5.0
 aiohttp==3.9.0
+Pillow==10.1.0
+jinja2==3.1.2

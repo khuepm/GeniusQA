@@ -1,0 +1,795 @@
+/**
+ * ProviderSettings Component Styles
+ * 
+ * Styles for the provider settings panel that allows users
+ * to configure API keys for multiple AI providers.
+ * 
+ * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5
+ */
+
+/* Container */
+.provider-settings-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  max-width: 600px;
+  width: 100%;
+}
+
+/* Header */
+.provider-settings-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.provider-settings-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #202124;
+  margin: 0;
+}
+
+.provider-settings-description {
+  font-size: 14px;
+  color: #5f6368;
+  margin: 0;
+}
+
+/* Provider List */
+.provider-settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Provider Card */
+.provider-card {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  background-color: #f8f9fa;
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.provider-card:hover {
+  border-color: #dadce0;
+}
+
+.provider-card.configured {
+  border-color: #34a853;
+  background-color: #f0fdf4;
+}
+
+.provider-card.expanded {
+  border-color: #1a73e8;
+  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.15);
+}
+
+/* Provider Card Header */
+.provider-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.provider-card-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.provider-card-icon {
+  font-size: 24px;
+  line-height: 1;
+  width: 32px;
+  text-align: center;
+}
+
+.provider-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.provider-card-name {
+  font-size: 16px;
+  font-weight: 500;
+  color: #202124;
+}
+
+.provider-card-description {
+  font-size: 13px;
+  color: #5f6368;
+}
+
+/* Provider Status Badge */
+.provider-card-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.provider-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.provider-status-badge.configured {
+  background-color: #e6f4ea;
+  color: #137333;
+}
+
+.provider-status-badge.not-configured {
+  background-color: #f1f3f4;
+  color: #5f6368;
+}
+
+.provider-status-icon {
+  font-size: 12px;
+}
+
+.provider-card-expand {
+  font-size: 12px;
+  color: #5f6368;
+  margin-left: 8px;
+  transition: transform 0.2s ease;
+}
+
+.provider-card-expand.expanded {
+  transform: rotate(180deg);
+}
+
+/* Provider Card Content (Expandable) */
+.provider-card-content {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e8eaed;
+}
+
+.provider-card-content.expanded {
+  display: flex;
+}
+
+/* API Key Input Section */
+.api-key-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.api-key-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #202124;
+}
+
+.api-key-input-wrapper {
+  display: flex;
+  gap: 8px;
+}
+
+.api-key-input {
+  flex: 1;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #dadce0;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: monospace;
+  color: #202124;
+  background-color: #ffffff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.api-key-input:focus {
+  outline: none;
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+}
+
+.api-key-input::placeholder {
+  color: #9aa0a6;
+  font-family: inherit;
+}
+
+.api-key-input.error {
+  border-color: #ea4335;
+}
+
+.api-key-input.success {
+  border-color: #34a853;
+}
+
+/* Toggle Visibility Button */
+.api-key-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid #dadce0;
+  border-radius: 6px;
+  background-color: #ffffff;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.2s ease;
+}
+
+.api-key-toggle:hover {
+  background-color: #f1f3f4;
+}
+
+/* Action Buttons */
+.api-key-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.api-key-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.api-key-button.save {
+  background-color: #1a73e8;
+  color: #ffffff;
+}
+
+.api-key-button.save:hover:not(:disabled) {
+  background-color: #1557b0;
+}
+
+.api-key-button.save:disabled {
+  background-color: #dadce0;
+  color: #9aa0a6;
+  cursor: not-allowed;
+}
+
+.api-key-button.delete {
+  background-color: #ffffff;
+  color: #ea4335;
+  border: 1px solid #ea4335;
+}
+
+.api-key-button.delete:hover:not(:disabled) {
+  background-color: #fce8e6;
+}
+
+.api-key-button.delete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.api-key-button.cancel {
+  background-color: #f1f3f4;
+  color: #5f6368;
+}
+
+.api-key-button.cancel:hover {
+  background-color: #e8eaed;
+}
+
+/* Button Spinner */
+.button-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+.api-key-button.delete .button-spinner {
+  border-color: rgba(234, 67, 53, 0.3);
+  border-top-color: #ea4335;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Feedback Messages */
+.api-key-feedback {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.api-key-feedback.success {
+  background-color: #e6f4ea;
+  color: #137333;
+}
+
+.api-key-feedback.error {
+  background-color: #fce8e6;
+  color: #c5221f;
+}
+
+.api-key-feedback.info {
+  background-color: #e8f0fe;
+  color: #1967d2;
+}
+
+.feedback-icon {
+  font-size: 14px;
+}
+
+/* Help Text */
+.api-key-help {
+  font-size: 12px;
+  color: #5f6368;
+  line-height: 1.4;
+}
+
+.api-key-help a {
+  color: #1a73e8;
+  text-decoration: none;
+}
+
+.api-key-help a:hover {
+  text-decoration: underline;
+}
+
+/* Current Key Display */
+.current-key-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: #e6f4ea;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #137333;
+}
+
+.current-key-icon {
+  font-size: 14px;
+}
+
+.current-key-text {
+  flex: 1;
+}
+
+.current-key-masked {
+  font-family: monospace;
+  letter-spacing: 1px;
+}
+
+/* Modal Overlay (for standalone use) */
+.provider-settings-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.provider-settings-modal {
+  background-color: #ffffff;
+  border-radius: 12px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.provider-settings-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e8eaed;
+}
+
+.provider-settings-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 20px;
+  color: #5f6368;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+}
+
+.provider-settings-modal-close:hover {
+  background-color: #f1f3f4;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .provider-settings-container {
+    padding: 12px;
+  }
+
+  .provider-card {
+    padding: 12px;
+  }
+
+  .api-key-input-wrapper {
+    flex-direction: column;
+  }
+
+  .api-key-toggle {
+    width: 100%;
+  }
+
+  .api-key-actions {
+    flex-direction: column;
+  }
+
+  .api-key-button {
+    width: 100%;
+  }
+}
+
+
+/* ============================================================================
+   Custom Models Section Styles
+   Requirements: 11.1, 11.7, 11.8
+   ============================================================================ */
+
+/* Custom Models Section Container */
+.custom-models-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e8eaed;
+}
+
+/* Custom Models Header */
+.custom-models-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.custom-models-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.custom-models-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #202124;
+  margin: 0;
+}
+
+.custom-models-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background-color: #e8eaed;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #5f6368;
+}
+
+.custom-models-description {
+  font-size: 14px;
+  color: #5f6368;
+  margin: 0 0 16px 0;
+}
+
+/* Add Custom Model Button */
+.add-custom-model-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  background-color: #1a73e8;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.add-custom-model-button:hover {
+  background-color: #1557b0;
+}
+
+/* Custom Models List */
+.custom-models-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Custom Model Card */
+.custom-model-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background-color: #f8f9fa;
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  transition: border-color 0.2s ease;
+}
+
+.custom-model-card:hover {
+  border-color: #dadce0;
+}
+
+.custom-model-card-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.custom-model-card-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.custom-model-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.custom-model-card-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #202124;
+}
+
+.custom-model-card-description {
+  font-size: 13px;
+  color: #5f6368;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.custom-model-card-url {
+  font-size: 12px;
+  color: #9aa0a6;
+  font-family: monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Custom Model Card Actions */
+.custom-model-card-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.custom-model-action-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+}
+
+.custom-model-action-button:hover {
+  background-color: #e8eaed;
+}
+
+.custom-model-action-button.delete:hover {
+  background-color: #fce8e6;
+}
+
+/* Custom Models Loading State */
+.custom-models-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  color: #5f6368;
+  font-size: 14px;
+}
+
+/* Custom Models Empty State */
+.custom-models-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px 16px;
+  background-color: #f8f9fa;
+  border: 1px dashed #dadce0;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.custom-models-empty-icon {
+  font-size: 32px;
+  opacity: 0.5;
+}
+
+.custom-models-empty-text {
+  font-size: 14px;
+  color: #5f6368;
+  max-width: 300px;
+}
+
+/* ============================================================================
+   Delete Confirmation Dialog Styles
+   Requirements: 11.8
+   ============================================================================ */
+
+.delete-confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 20px;
+}
+
+.delete-confirm-dialog {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.delete-confirm-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #202124;
+  margin: 0 0 12px 0;
+}
+
+.delete-confirm-message {
+  font-size: 14px;
+  color: #5f6368;
+  line-height: 1.5;
+  margin: 0 0 20px 0;
+}
+
+.delete-confirm-message strong {
+  color: #202124;
+}
+
+.delete-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.delete-confirm-cancel,
+.delete-confirm-confirm {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.delete-confirm-cancel {
+  background-color: #f1f3f4;
+  color: #5f6368;
+  border: none;
+}
+
+.delete-confirm-cancel:hover {
+  background-color: #e8eaed;
+}
+
+.delete-confirm-confirm {
+  background-color: #ea4335;
+  color: #ffffff;
+  border: none;
+}
+
+.delete-confirm-confirm:hover {
+  background-color: #c5221f;
+}
+
+/* Responsive adjustments for Custom Models */
+@media (max-width: 480px) {
+  .custom-models-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .add-custom-model-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .custom-model-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .custom-model-card-actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .delete-confirm-actions {
+    flex-direction: column;
+  }
+
+  .delete-confirm-cancel,
+  .delete-confirm-confirm {
+    width: 100%;
+    text-align: center;
+  }
+}

@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 8404d8898e067f98aa35bd62701b9808a0db028cb4c821bb1cca24583f091893 # shrinks to empty_core_type = false, empty_platform = false, negative_duration = true, out_of_order_timestamps = false
+cc d99644edfbd89cca47ce6a6e2281f62c982a6b0be9dcd29a967b15744bedb6e3 # shrinks to core_type = "rust", platform = "windows", action_count = 1

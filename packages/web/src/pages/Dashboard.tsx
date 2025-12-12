@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Layout } from '../components/Layout';
-import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { db } from '../lib/firebase';
+import { collection, query, where, getCountFromServer } from 'firebase/firestore';
 import { FolderKanban, FileText, Play, TrendingUp } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
@@ -20,19 +21,25 @@ export const Dashboard: React.FC = () => {
       if (!user) return;
 
       try {
-        const [projectsRes, testcasesRes, testRunsRes] = await Promise.all([
-          supabase.from('projects').select('id', { count: 'exact' }).eq('user_id', user.id),
-          supabase.from('testcases').select('id', { count: 'exact' }),
-          supabase.from('test_runs').select('status', { count: 'exact' }),
+        const projectsQuery = query(collection(db, 'projects'), where('user_id', '==', user.uid));
+        const testcasesQuery = collection(db, 'testcases');
+        const testRunsQuery = collection(db, 'test_runs');
+        const passedRunsQuery = query(collection(db, 'test_runs'), where('status', '==', 'passed'));
+
+        const [projectsRes, testcasesRes, testRunsRes, passedRunsRes] = await Promise.all([
+          getCountFromServer(projectsQuery),
+          getCountFromServer(testcasesQuery),
+          getCountFromServer(testRunsQuery),
+          getCountFromServer(passedRunsQuery),
         ]);
 
-        const totalRuns = testRunsRes.count || 0;
-        const passedRuns = testRunsRes.data?.filter(r => r.status === 'passed').length || 0;
+        const totalRuns = testRunsRes.data().count || 0;
+        const passedRuns = passedRunsRes.data().count || 0;
         const successRate = totalRuns > 0 ? Math.round((passedRuns / totalRuns) * 100) : 0;
 
         setStats({
-          projects: projectsRes.count || 0,
-          testcases: testcasesRes.count || 0,
+          projects: projectsRes.data().count || 0,
+          testcases: testcasesRes.data().count || 0,
           testRuns: totalRuns,
           successRate,
         });
