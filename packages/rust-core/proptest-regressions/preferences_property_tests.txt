@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc d2c7596260a4456ed46821ca48483ab55112fbb693b6aaf54162ff69c1cd68eb # shrinks to user_settings = UserSettings { playback_speed: 9.909819169119281, loop_count: 0, selected_script_path: None, ui_state: UIState { show_preview: false, preview_opacity: 0.0, last_recording_directory: None, window_geometry: None } }

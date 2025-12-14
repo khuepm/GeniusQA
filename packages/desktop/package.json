@@ -6,19 +6,41 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tauri dev",
-    "build": "tauri build",
-    "preview": "tauri dev",
+    "build": "vite build && tauri build",
+    "preview": "vite preview",
     "lint": "eslint src",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "jest",
+    "tauri": "tauri",
+    "tauri:info": "tauri info",
+    "validate": "node scripts/validate-config.js"
   },
   "dependencies": {
+    "axios": "^1.6.0",
+    "firebase": "^12.6.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "axios": "^1.6.0"
+    "react-router-dom": "^6.20.0"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
+    "@babel/preset-env": "^7.28.5",
+    "@babel/preset-flow": "^7.27.1",
+    "@babel/preset-react": "^7.28.5",
+    "@babel/preset-typescript": "^7.28.5",
+    "@tauri-apps/api": "^1.5.0",
     "@tauri-apps/cli": "^1.5.0",
-    "@tauri-apps/api": "^1.5.0"
+    "@testing-library/jest-dom": "^6.1.0",
+    "@testing-library/react": "^14.1.0",
+    "@types/jest": "^29.5.0",
+    "@types/node": "^24.10.1",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "babel-jest": "^29.7.0",
+    "fast-check": "^4.3.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.0"
   }
 }

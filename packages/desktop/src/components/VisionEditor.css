@@ -1,0 +1,436 @@
+/**
+ * VisionEditor Component Styles
+ *
+ * Styles for the AI Vision Capture editor including:
+ * - Layout structure (screenshot panel + config panel)
+ * - Mode toggle and status indicators
+ * - Form controls (prompt, interaction type, search scope)
+ * - Analyze button and loading states
+ * - Error display
+ *
+ * Requirements: 2.1, 2.3, 2.4, 2.7, 3.6, 4.2, 6.5, 6.6, 6.7
+ */
+
+/* ============================================================================
+   Container & Layout
+   ============================================================================ */
+
+.vision-editor {
+  display: flex;
+  flex-direction: column;
+  background-color: #1a1a2e;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #2d2d44;
+}
+
+.vision-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: #16162a;
+  border-bottom: 1px solid #2d2d44;
+}
+
+.vision-editor-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vision-editor-title h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.vision-editor-id {
+  font-size: 12px;
+  color: #888;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.vision-editor-content {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  padding: 16px;
+}
+
+/* ============================================================================
+   Screenshot Panel
+   ============================================================================ */
+
+.vision-editor-screenshot-panel {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vision-editor-roi-controls {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-clear-roi {
+  padding: 6px 12px;
+  font-size: 12px;
+  background-color: #3d3d5c;
+  color: #ccc;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-clear-roi:hover {
+  background-color: #4d4d6c;
+}
+
+/* Analyzing Overlay (Requirement: 6.5) */
+.vision-editor-analyzing-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #fff;
+  font-size: 14px;
+  z-index: 10;
+  border-radius: 8px;
+}
+
+.analyzing-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================================================
+   Config Panel
+   ============================================================================ */
+
+.vision-editor-config-panel {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.config-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.config-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #ccc;
+}
+
+.config-hint {
+  font-size: 11px;
+  color: #888;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* ============================================================================
+   Status Badges (Requirements: 6.6, 6.7, 3.6)
+   ============================================================================ */
+
+.vision-editor-status {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-icon {
+  font-size: 12px;
+}
+
+/* Static Mode - Green (Requirement: 6.6) */
+.status-static {
+  background-color: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+/* Dynamic Mode - Purple/Blue (Requirement: 6.7) */
+.status-dynamic {
+  background-color: rgba(139, 92, 246, 0.2);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+/* Ready for Playback - Green (Requirement: 3.6) */
+.status-ready {
+  background-color: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+/* Cached - Blue */
+.status-cached {
+  background-color: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+/* ============================================================================
+   Mode Toggle (Requirement: 4.2)
+   ============================================================================ */
+
+.mode-toggle {
+  display: flex;
+  background-color: #2d2d44;
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  background-color: transparent;
+  color: #888;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mode-btn:hover:not(.active) {
+  color: #ccc;
+}
+
+.mode-btn.active {
+  background-color: #6366f1;
+  color: #fff;
+}
+
+/* ============================================================================
+   Form Controls
+   ============================================================================ */
+
+/* Textarea (Requirement: 2.4) */
+.config-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  background-color: #2d2d44;
+  color: #fff;
+  border: 1px solid #3d3d5c;
+  border-radius: 6px;
+  resize: vertical;
+  min-height: 80px;
+  transition: border-color 0.2s;
+}
+
+.config-textarea:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+.config-textarea::placeholder {
+  color: #666;
+}
+
+/* Select (Requirement: 2.7) */
+.config-select {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 13px;
+  background-color: #2d2d44;
+  color: #fff;
+  border: 1px solid #3d3d5c;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.config-select:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+.config-select option {
+  background-color: #2d2d44;
+  color: #fff;
+}
+
+/* ============================================================================
+   Search Scope Toggle (Requirement: 2.3)
+   ============================================================================ */
+
+.search-scope-toggle {
+  display: flex;
+  gap: 8px;
+}
+
+.scope-btn {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background-color: #2d2d44;
+  color: #888;
+  border: 1px solid #3d3d5c;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.scope-btn:hover:not(.active) {
+  background-color: #3d3d5c;
+  color: #ccc;
+}
+
+.scope-btn.active {
+  background-color: #6366f1;
+  color: #fff;
+  border-color: #6366f1;
+}
+
+/* ============================================================================
+   Analyze Button (Requirements: 3.2, 3.3)
+   ============================================================================ */
+
+.btn-analyze {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-analyze:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.btn-analyze:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-analyze:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============================================================================
+   Error Display (Requirement: 3.7)
+   ============================================================================ */
+
+.vision-editor-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background-color: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  color: #f87171;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.error-icon {
+  flex-shrink: 0;
+}
+
+/* ============================================================================
+   Coordinates Display
+   ============================================================================ */
+
+.coordinates-display,
+.cache-display {
+  background-color: #2d2d44;
+  padding: 12px;
+  border-radius: 6px;
+}
+
+.coordinates-value {
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 14px;
+  color: #4ade80;
+  padding: 6px 0;
+}
+
+.cache-display .coordinates-value {
+  color: #60a5fa;
+}
+
+/* ============================================================================
+   Responsive Adjustments
+   ============================================================================ */
+
+@media (max-width: 900px) {
+  .vision-editor-content {
+    flex-direction: column;
+  }
+
+  .vision-editor-config-panel {
+    width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .vision-editor-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .vision-editor-status {
+    width: 100%;
+  }
+
+  .status-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+}

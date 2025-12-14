@@ -1,0 +1,38 @@
+[package]
+name = "geniusqa-desktop"
+version = "1.0.0"
+description = "GeniusQA Desktop - System automation and QA platform"
+authors = ["GeniusQA Team"]
+license = ""
+repository = ""
+edition = "2021"
+rust-version = "1.70"
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+tauri = { version = "1.5", features = ["shell-open", "http-request", "window-all", "protocol-asset"] }
+tokio = { version = "1.0", features = ["full"] }
+chrono = { version = "0.4", features = ["serde"] }
+rust-automation-core = { path = "../../rust-core" }
+base64 = "0.21"
+log = "0.4"
+env_logger = "0.10"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+urlencoding = "2.1"
+cocoa = "0.24"
+
+# Platform-specific dependencies for health checks
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winuser", "windef"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-graphics = "0.23"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

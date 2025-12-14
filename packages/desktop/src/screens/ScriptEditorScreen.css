@@ -1,0 +1,498 @@
+.script-editor-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #ffffff;
+  padding: 16px;
+  border-bottom: 1px solid #dadce0;
+}
+
+.back-button {
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: #1a73e8;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.back-button:hover {
+  text-decoration: underline;
+}
+
+.header-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #202124;
+  margin: 0;
+}
+
+.refresh-button {
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: #1a73e8;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.refresh-button:hover {
+  text-decoration: underline;
+}
+
+.error-container {
+  background-color: #fce8e6;
+  padding: 12px;
+  margin: 16px;
+  border-radius: 8px;
+}
+
+.error-text {
+  color: #d93025;
+  font-size: 14px;
+  text-align: center;
+  margin: 0;
+}
+
+.content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.left-panel {
+  width: 35%;
+  border-right: 1px solid #dadce0;
+  background-color: #ffffff;
+  overflow-y: auto;
+}
+
+.right-panel {
+  flex: 1;
+  background-color: #ffffff;
+  overflow-y: auto;
+}
+
+.script-list {
+  padding: 16px;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #202124;
+  margin-bottom: 16px;
+  margin-top: 0;
+}
+
+.empty-text {
+  font-size: 14px;
+  color: #5f6368;
+  text-align: center;
+  margin-top: 32px;
+}
+
+.script-item {
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+  border: 1px solid #dadce0;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.script-item:hover {
+  background-color: #e8f0fe;
+}
+
+.script-item.selected {
+  background-color: #e8f0fe;
+  border-color: #1a73e8;
+}
+
+.script-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.script-filename {
+  font-size: 14px;
+  font-weight: 600;
+  color: #202124;
+  flex: 1;
+}
+
+.delete-button {
+  padding: 4px 8px;
+  background-color: #d93025;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #ffffff;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.delete-button:hover {
+  background-color: #b71c1c;
+}
+
+.script-info {
+  font-size: 12px;
+  color: #5f6368;
+  margin: 2px 0;
+}
+
+.editor-placeholder {
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  align-items: center;
+  padding: 32px;
+}
+
+.placeholder-text {
+  font-size: 16px;
+  color: #5f6368;
+  text-align: center;
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #dadce0;
+}
+
+.editor-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #202124;
+  flex: 1;
+  margin: 0;
+}
+
+.editor-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.action-button {
+  min-width: 80px;
+}
+
+.editor-content {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.metadata-section {
+  margin-bottom: 24px;
+}
+
+.subsection-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #202124;
+  margin-bottom: 12px;
+  margin-top: 0;
+}
+
+.metadata-grid {
+  background-color: #f8f9fa;
+  padding: 16px;
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+}
+
+.metadata-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #5f6368;
+}
+
+.metadata-value {
+  font-size: 14px;
+  color: #202124;
+}
+
+.actions-section {
+  margin-bottom: 24px;
+}
+
+.action-item {
+  background-color: #f8f9fa;
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  border: 1px solid #dadce0;
+}
+
+.action-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.action-index {
+  font-size: 12px;
+  font-weight: 600;
+  color: #5f6368;
+  margin-right: 8px;
+}
+
+.action-type {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a73e8;
+  flex: 1;
+}
+
+.action-delete-button {
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background-color: #d93025;
+  border: none;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.action-delete-button:hover {
+  background-color: #b71c1c;
+}
+
+.action-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.action-detail {
+  font-size: 12px;
+  color: #5f6368;
+  font-family: monospace;
+}
+
+/* ============================================================================
+   AI Vision Capture Action Styles
+   Requirements: 6.1, 6.6, 6.7
+   ============================================================================ */
+
+/* Action item selected state */
+.action-item.selected {
+  border-color: #6366f1;
+  background-color: #f0f0ff;
+}
+
+/* Vision action type badge */
+.action-type.vision-action {
+  color: #6366f1;
+  background-color: rgba(99, 102, 241, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* Expand/collapse button for vision actions */
+.action-expand-button {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background-color: #e8f0fe;
+  border: none;
+  color: #1a73e8;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-left: 8px;
+  transition: background-color 0.2s;
+}
+
+.action-expand-button:hover {
+  background-color: #d2e3fc;
+}
+
+/* VisionEditor container within action item */
+.vision-editor-container {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #dadce0;
+}
+
+/* Reference images section */
+.reference-images-section {
+  margin-top: 16px;
+}
+
+/* ============================================================================
+   ROI Tool Styles (Requirement: 6.1)
+   Dashed red border for ROI rectangles
+   ============================================================================ */
+
+/* These styles are applied via canvas drawing in ROITool component,
+   but we define CSS variables for consistency */
+:root {
+  --roi-border-color: #ff0000;
+  --roi-border-width: 2px;
+  --roi-border-style: dashed;
+  --roi-handle-size: 10px;
+  --roi-handle-color: #ffffff;
+  --roi-handle-border: #ff0000;
+}
+
+/* ============================================================================
+   Mode Indicator Styles (Requirements: 6.6, 6.7)
+   ============================================================================ */
+
+/* Static mode indicator - green */
+.mode-indicator-static {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background-color: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.mode-indicator-static::before {
+  content: '●';
+  font-size: 8px;
+}
+
+/* Dynamic mode indicator - purple/blue */
+.mode-indicator-dynamic {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background-color: rgba(139, 92, 246, 0.15);
+  color: #8b5cf6;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.mode-indicator-dynamic::before {
+  content: '◆';
+  font-size: 8px;
+}
+
+/* Ready for playback indicator */
+.ready-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background-color: rgba(34, 197, 94, 0.1);
+  color: #16a34a;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.ready-indicator::before {
+  content: '✓';
+}
+
+/* ============================================================================
+   Reference Image Thumbnail Styles (Requirement: 2.8)
+   ============================================================================ */
+
+.reference-thumbnail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.reference-thumbnail {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #dadce0;
+  background-color: #f8f9fa;
+}
+
+.reference-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.reference-thumbnail-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: rgba(217, 48, 37, 0.9);
+  border: none;
+  color: #ffffff;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.reference-thumbnail:hover .reference-thumbnail-remove {
+  opacity: 1;
+}
+
+/* ============================================================================
+   Responsive Adjustments for Vision Editor
+   ============================================================================ */
+
+@media (max-width: 1200px) {
+  .vision-editor-container {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .action-expand-button {
+    width: 20px;
+    height: 20px;
+    font-size: 10px;
+  }
+
+  .reference-thumbnail-grid {
+    grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+  }
+}
