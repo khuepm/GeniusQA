@@ -1,0 +1,618 @@
+/**
+ * Diff Viewer Styles
+ *
+ * Styles for the Diff Viewer component including:
+ * - Multiple view modes (side-by-side, slider, overlay)
+ * - Image comparison layouts
+ * - Action buttons and controls
+ * - Metrics display and status indicators
+ */
+
+/* ============================================================================
+   Main Container
+   ============================================================================ */
+
+.diff-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+/* ============================================================================
+   Header
+   ============================================================================ */
+
+.diff-viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.diff-viewer-title {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.diff-viewer-title h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #212529;
+}
+
+.test-status {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+.status-badge.status-passed {
+  background: #28a745;
+}
+
+.status-badge.status-failed {
+  background: #dc3545;
+}
+
+.difference-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+/* View Mode Controls */
+.view-mode-controls {
+  display: flex;
+  gap: 4px;
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  padding: 4px;
+}
+
+.view-mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #495057;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-mode-btn:hover {
+  background: #f8f9fa;
+}
+
+.view-mode-btn.active {
+  background: #007bff;
+  color: #ffffff;
+}
+
+.view-mode-icon {
+  font-size: 14px;
+}
+
+.view-mode-label {
+  white-space: nowrap;
+}
+
+/* ============================================================================
+   Main Content
+   ============================================================================ */
+
+.diff-viewer-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+}
+
+/* Loading State */
+.diff-viewer-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  color: #6c757d;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ============================================================================
+   Side-by-Side View
+   ============================================================================ */
+
+.diff-view-side-by-side {
+  display: flex;
+  height: 100%;
+  gap: 1px;
+  background: #e9ecef;
+}
+
+.image-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  min-width: 0;
+}
+
+.image-panel-header {
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.image-panel-header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #495057;
+  text-align: center;
+}
+
+.image-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: auto;
+}
+
+.comparison-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================================================
+   Slider View
+   ============================================================================ */
+
+.diff-view-slider {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 20px;
+}
+
+.slider-container {
+  flex: 1;
+  position: relative;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f8f9fa;
+}
+
+.slider-images {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.slider-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.slider-baseline {
+  z-index: 1;
+}
+
+.slider-actual {
+  z-index: 2;
+}
+
+.slider-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #007bff;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.slider-divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -6px;
+  width: 14px;
+  height: 14px;
+  background: #007bff;
+  border-radius: 50%;
+  transform: translateY(-50%);
+}
+
+.slider-control {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  z-index: 4;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.slider-control::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: #007bff;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.slider-control::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background: #007bff;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  font-size: 12px;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+/* ============================================================================
+   Overlay View
+   ============================================================================ */
+
+.diff-view-overlay {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.overlay-container {
+  position: relative;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.overlay-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.overlay-baseline {
+  position: relative;
+  z-index: 1;
+}
+
+.overlay-diff {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  opacity: 0.7;
+  mix-blend-mode: multiply;
+}
+
+/* ============================================================================
+   Metrics Panel
+   ============================================================================ */
+
+.diff-viewer-metrics {
+  padding: 16px 20px;
+  background: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+}
+
+.metrics-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #495057;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+}
+
+.metric-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.metric-label {
+  font-size: 12px;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.metric-value {
+  font-size: 12px;
+  color: #212529;
+  font-weight: 600;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
+/* ============================================================================
+   Action Panel
+   ============================================================================ */
+
+.diff-viewer-actions {
+  padding: 16px 20px;
+  background: #ffffff;
+  border-top: 1px solid #e9ecef;
+}
+
+.review-actions,
+.ignore-region-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.btn-approve,
+.btn-reject,
+.btn-add-ignore,
+.btn-retry,
+.btn-add-ignore-confirm,
+.btn-cancel {
+  padding: 8px 16px;
+  border: 1px solid;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-approve {
+  background: #28a745;
+  border-color: #28a745;
+  color: #ffffff;
+}
+
+.btn-approve:hover:not(:disabled) {
+  background: #218838;
+  border-color: #1e7e34;
+}
+
+.btn-approve:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-reject {
+  background: #dc3545;
+  border-color: #dc3545;
+  color: #ffffff;
+}
+
+.btn-reject:hover {
+  background: #c82333;
+  border-color: #bd2130;
+}
+
+.btn-add-ignore,
+.btn-add-ignore-confirm {
+  background: #17a2b8;
+  border-color: #17a2b8;
+  color: #ffffff;
+}
+
+.btn-add-ignore:hover,
+.btn-add-ignore-confirm:hover:not(:disabled) {
+  background: #138496;
+  border-color: #117a8b;
+}
+
+.btn-add-ignore-confirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-retry {
+  background: #6c757d;
+  border-color: #6c757d;
+  color: #ffffff;
+}
+
+.btn-retry:hover:not(:disabled) {
+  background: #5a6268;
+  border-color: #545b62;
+}
+
+.btn-retry:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-cancel {
+  background: #ffffff;
+  border-color: #6c757d;
+  color: #6c757d;
+}
+
+.btn-cancel:hover {
+  background: #f8f9fa;
+  border-color: #5a6268;
+  color: #5a6268;
+}
+
+/* ============================================================================
+   Error Display
+   ============================================================================ */
+
+.diff-viewer-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: #f8d7da;
+  border-top: 1px solid #f5c6cb;
+  color: #721c24;
+  font-size: 14px;
+}
+
+.error-icon {
+  font-size: 16px;
+}
+
+.diff-viewer-error-details {
+  padding: 16px 20px;
+  background: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+}
+
+.diff-viewer-error-details h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #495057;
+}
+
+.diff-viewer-error-details pre {
+  margin: 0;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #495057;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* ============================================================================
+   Responsive Design
+   ============================================================================ */
+
+@media (max-width: 1024px) {
+  .diff-view-side-by-side {
+    flex-direction: column;
+    height: auto;
+  }
+  
+  .image-panel {
+    min-height: 300px;
+  }
+  
+  .metrics-grid {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+  }
+  
+  .review-actions,
+  .ignore-region-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 768px) {
+  .diff-viewer-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  
+  .view-mode-controls {
+    align-self: stretch;
+  }
+  
+  .view-mode-btn {
+    flex: 1;
+    justify-content: center;
+  }
+  
+  .view-mode-label {
+    display: none;
+  }
+  
+  .diff-viewer-actions {
+    padding: 12px 16px;
+  }
+  
+  .review-actions,
+  .ignore-region-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .btn-approve,
+  .btn-reject,
+  .btn-add-ignore,
+  .btn-retry,
+  .btn-add-ignore-confirm,
+  .btn-cancel {
+    justify-content: center;
+  }
+}
