@@ -94,7 +94,7 @@ impl HTMLReportGenerator {
     }
 
     /// Generate HTML content for the report
-    fn generate_html_content(&self, results: &[TestResultWithMetadata]) -> VisualResult<String> {
+    pub fn generate_html_content(&self, results: &[TestResultWithMetadata]) -> VisualResult<String> {
         let mut html = String::new();
         
         // HTML header

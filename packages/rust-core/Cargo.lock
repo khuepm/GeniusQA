@@ -2747,6 +2747,7 @@ dependencies = [
  "log",
  "proptest",
  "rand 0.8.5",
+ "rayon",
  "rdev",
  "reqwest",
  "rustc_version_runtime",

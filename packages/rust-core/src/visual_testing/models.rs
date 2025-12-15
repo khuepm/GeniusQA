@@ -35,7 +35,7 @@ impl Region {
 }
 
 /// Comparison methods available for visual regression testing
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ComparisonMethod {
     /// Strict pixel-by-pixel comparison
     PixelMatch,
@@ -54,7 +54,7 @@ impl Default for ComparisonMethod {
 }
 
 /// Sensitivity profiles for comparison tolerance
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SensitivityProfile {
     /// threshold: 0.001, no tolerance
     Strict,

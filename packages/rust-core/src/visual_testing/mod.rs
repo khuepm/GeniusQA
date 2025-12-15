@@ -12,6 +12,8 @@ pub mod storage;
 pub mod compression;
 pub mod ipc_server;
 pub mod html_report;
+pub mod platform;
+pub mod simd_compare;
 
 #[cfg(test)]
 pub mod property_tests;
@@ -28,6 +30,9 @@ mod storage_tests;
 #[cfg(test)]
 mod simple_tests;
 
+#[cfg(test)]
+mod benchmark_tests;
+
 pub use models::*;
 pub use comparator::*;
 pub use error::*;
@@ -37,3 +42,5 @@ pub use storage::*;
 pub use compression::*;
 pub use ipc_server::*;
 pub use html_report::*;
+pub use platform::*;
+pub use simd_compare::*;

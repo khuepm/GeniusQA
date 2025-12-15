@@ -1,7 +1,7 @@
 //! Screen capture functionality with stability checks and retry logic
 
 use crate::visual_testing::{VisualError, VisualResult};
-use image::DynamicImage;
+use image::{DynamicImage, GenericImageView};
 use std::time::{Duration, Instant};
 
 /// Configuration for screen capture operations

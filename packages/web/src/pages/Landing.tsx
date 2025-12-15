@@ -9,7 +9,8 @@ import {
   ArrowRight,
   Sparkles,
   Target,
-  TrendingUp
+  TrendingUp,
+  Github
 } from 'lucide-react';
 
 export const Landing: React.FC = () => {
@@ -68,6 +69,15 @@ export const Landing: React.FC = () => {
               <span className="text-2xl font-bold text-slate-900">GeniusQA</span>
             </div>
             <div className="flex items-center space-x-4">
+              <a
+                href="https://github.com/khuepm/GeniusQA"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-slate-600 hover:text-slate-900 transition-colors"
+                aria-label="GitHub Repository"
+              >
+                <Github className="w-6 h-6" />
+              </a>
               <Link
                 to="/login"
                 className="text-slate-600 hover:text-slate-900 font-medium transition-colors"
