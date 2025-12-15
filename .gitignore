@@ -43,16 +43,15 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # Misc
-.env
-.env.local
-.env.*.local
+.env*
+!.env.example
 
 # React Native
-. watchmanconfig
+.watchmanconfig
 .metrorc
 android/
 ios/
-. bundle/
+.bundle/
 GoogleService-Info.plist
 packages/rust-core/target/debug/
 packages/rust-core/target/tmp/
