@@ -21,8 +21,8 @@ pub use config::{ConfigManager, GenerationPreferences};
 pub use error::{AITestCaseError, Result};
 pub use models::{
     ComplexityLevel, DocumentationContext, DocumentationResponse, GenerationOptions, 
-    GenerationResponse, ProjectType, RecordedAction, ResponseMetadata, SourceType, 
-    TestCase, TestCaseMetadata, TestSeverity, TestStep, TestType, TokenUsage,
+    GenerationResponse, ProjectMetadata, ProjectType, RecordedAction, ResponseMetadata, ScriptBuilderCompatibility,
+    SourceType, TestCase, TestCaseMetadata, TestSeverity, TestStep, TestType, TokenUsage,
 };
 pub use monitoring::{
     CostEstimation, ErrorLogEntry, MonitoringService, PerformanceMetrics, 

@@ -421,6 +421,87 @@ pub async fn get_recent_errors(
     Ok(service.get_recent_errors(limit).await)
 }
 
+// ============================================================================
+// Integration Commands
+// Requirements: 6.4
+// ============================================================================
+
+/// Add test case to project
+/// 
+/// Integrates generated test cases with existing test case management workflows
+/// while preserving all metadata and ensuring compatibility.
+/// 
+/// Requirements: 6.4
+#[tauri::command]
+pub async fn add_test_case_to_project(
+    test_case: super::TestCase,
+    project_name: String,
+    project_type: super::ProjectType,
+    state: State<'_, AIServiceState>,
+) -> Result<super::TestCase, String> {
+    log::info!(
+        "[AI Test Case] Adding test case '{}' to project '{}'", 
+        test_case.title, 
+        project_name
+    );
+    
+    let service = state.service.read().await;
+    
+    match service.add_test_case_to_project(&test_case, &project_name, project_type).await {
+        Ok(added_test_case) => {
+            log::info!("[AI Test Case] Test case added successfully with ID: {}", added_test_case.id);
+            Ok(added_test_case)
+        }
+        Err(e) => {
+            log::error!("[AI Test Case] Failed to add test case to project: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+/// Get action logs from Desktop Recorder
+/// 
+/// Retrieves recorded actions from the Desktop Recorder for documentation
+/// generation, enabling seamless integration between recording and documentation.
+/// 
+/// Requirements: 6.4
+#[tauri::command]
+pub async fn get_recorder_action_logs(
+    session_id: Option<String>,
+    state: State<'_, AIServiceState>,
+) -> Result<Vec<super::RecordedAction>, String> {
+    log::info!("[AI Test Case] Getting recorder action logs (session: {:?})", session_id);
+    
+    let service = state.service.read().await;
+    
+    match service.get_recorder_action_logs(session_id).await {
+        Ok(actions) => {
+            log::info!("[AI Test Case] Retrieved {} action logs", actions.len());
+            Ok(actions)
+        }
+        Err(e) => {
+            log::error!("[AI Test Case] Failed to get recorder action logs: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+/// Get Script Builder compatibility information
+/// 
+/// Returns compatibility information for integration with existing AI Script Builder
+/// patterns, ensuring consistent behavior across AI features.
+/// 
+/// Requirements: 6.4
+#[tauri::command]
+pub async fn get_script_builder_compatibility(
+    state: State<'_, AIServiceState>,
+) -> Result<super::ScriptBuilderCompatibility, String> {
+    log::debug!("[AI Test Case] Getting Script Builder compatibility info");
+    
+    let service = state.service.read().await;
+    Ok(service.get_script_builder_compatibility_info())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

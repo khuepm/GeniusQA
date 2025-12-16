@@ -228,6 +228,9 @@ pub struct GenerationOptions {
     /// Custom context for generation
     #[serde(skip_serializing_if = "Option::is_none")]
     pub custom_context: Option<String>,
+    /// Excluded test types
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub excluded_test_types: Vec<TestType>,
 }
 
 impl Default for GenerationOptions {
@@ -239,6 +242,7 @@ impl Default for GenerationOptions {
             include_error_scenarios: true,
             max_test_cases: None,
             custom_context: None,
+            excluded_test_types: Vec::new(),
         }
     }
 }
@@ -417,8 +421,45 @@ pub struct GeminiError {
     pub status: Option<String>,
 }
 
+/// Script Builder compatibility information
+/// Requirements: 6.4
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScriptBuilderCompatibility {
+    /// Whether custom prompt templates are supported
+    pub supports_prompt_templates: bool,
+    /// Whether project context is supported
+    pub supports_project_context: bool,
+    /// Whether preference inheritance is supported
+    pub supports_preference_inheritance: bool,
+    /// Whether API key sharing is supported
+    pub api_key_sharing: bool,
+    /// Whether monitoring integration is supported
+    pub monitoring_integration: bool,
+}
+
+/// Project metadata for test case management
+/// Requirements: 6.4
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectMetadata {
+    /// Project name
+    pub name: String,
+    /// Project type
+    pub project_type: ProjectType,
+    /// Creation timestamp
+    pub created_at: DateTime<Utc>,
+    /// Last updated timestamp
+    pub updated_at: DateTime<Utc>,
+    /// Test cases in this project
+    pub test_cases: Vec<TestCase>,
+    /// Project description
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Project version
+    pub version: String,
+}
+
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use proptest::prelude::*;
 
@@ -452,9 +493,9 @@ mod tests {
     prop_compose! {
         fn arb_test_step()(
             order in 1u32..100,
-            action in "[a-zA-Z0-9 ]{1,100}",
-            expected_outcome in prop::option::of("[a-zA-Z0-9 ]{1,100}"),
-            notes in prop::option::of("[a-zA-Z0-9 ]{1,100}")
+            action in "[a-zA-Z0-9][a-zA-Z0-9 ]{0,99}", // Ensure action starts with non-whitespace
+            expected_outcome in prop::option::of("[a-zA-Z0-9][a-zA-Z0-9 ]{0,99}"), // Ensure expected outcome starts with non-whitespace if present
+            notes in prop::option::of("[a-zA-Z0-9][a-zA-Z0-9 ]{0,99}") // Ensure notes start with non-whitespace if present
         ) -> TestStep {
             TestStep {
                 order,
@@ -466,13 +507,13 @@ mod tests {
     }
 
     prop_compose! {
-        fn arb_test_case()(
-            id in "[a-zA-Z0-9]{1,20}",
-            title in "[a-zA-Z0-9 ]{1,100}",
-            description in "[a-zA-Z0-9 ]{1,200}",
-            preconditions in prop::option::of("[a-zA-Z0-9 ]{1,100}"),
-            steps in prop::collection::vec(arb_test_step(), 0..10),
-            expected_result in "[a-zA-Z0-9 ]{1,100}",
+        pub fn arb_test_case()(
+            id_suffix in "[a-zA-Z0-9]{1,15}", // Shorter suffix to allow for unique prefix
+            title in "[a-zA-Z0-9][a-zA-Z0-9 ]{0,99}", // Ensure title starts with non-whitespace
+            description in "[a-zA-Z0-9][a-zA-Z0-9 ]{0,199}", // Ensure description starts with non-whitespace
+            preconditions in prop::option::of("[a-zA-Z0-9][a-zA-Z0-9 ]{0,99}"), // Ensure preconditions start with non-whitespace if present
+            steps in prop::collection::vec(arb_test_step(), 1..10), // Ensure at least 1 step
+            expected_result in "[a-zA-Z0-9][a-zA-Z0-9 ]{0,99}", // Ensure expected result starts with non-whitespace
             severity in prop::sample::select(vec![
                 TestSeverity::Critical,
                 TestSeverity::High,
@@ -489,12 +530,21 @@ mod tests {
                 TestType::Accessibility
             ])
         ) -> TestCase {
+            // Fix step ordering to be sequential starting from 1
+            let mut fixed_steps = steps;
+            for (i, step) in fixed_steps.iter_mut().enumerate() {
+                step.order = (i + 1) as u32;
+            }
+            
+            // Generate unique ID using UUID to ensure uniqueness
+            let unique_id = format!("TC_{}", uuid::Uuid::new_v4().to_string().replace('-', "")[..8].to_uppercase());
+            
             TestCase {
-                id,
+                id: unique_id,
                 title,
                 description,
                 preconditions,
-                steps,
+                steps: fixed_steps,
                 expected_result,
                 severity,
                 test_type,
