@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod ai_test_case;
 mod core_router;
 mod python_process;
 
@@ -1040,9 +1041,22 @@ fn main() {
     let core_router_state = CoreRouterState { router: core_router };
     let monitor_state = MonitorState { monitor: core_monitor.clone() };
 
+    // Initialize AI Test Case service
+    let ai_service_state = match ai_test_case::AIServiceState::new() {
+        Ok(state) => state,
+        Err(e) => {
+            eprintln!("Warning: Failed to initialize AI Test Case service: {}", e);
+            // Create a minimal state that will return errors for all operations
+            ai_test_case::AIServiceState::new().unwrap_or_else(|_| {
+                panic!("Failed to create AI service state")
+            })
+        }
+    };
+
     tauri::Builder::default()
         .manage(core_router_state)
         .manage(monitor_state)
+        .manage(ai_service_state)
         .setup(move |_app| {
             // Start monitoring in background after Tauri runtime is initialized
             tauri::async_runtime::spawn(async move {
@@ -1099,6 +1113,22 @@ fn main() {
             create_click_overlay,
             close_click_overlay,
             show_click_cursor,
+            // AI Test Case Generator commands
+            ai_test_case::commands::generate_test_cases_from_requirements,
+            ai_test_case::commands::generate_documentation_from_actions,
+            ai_test_case::commands::configure_api_key,
+            ai_test_case::commands::validate_api_key,
+            ai_test_case::commands::check_api_key_configured,
+            ai_test_case::commands::remove_api_key,
+            ai_test_case::commands::get_generation_preferences,
+            ai_test_case::commands::update_generation_preferences,
+            ai_test_case::commands::reset_generation_preferences,
+            // AI Test Case Monitoring commands
+            ai_test_case::commands::get_performance_stats,
+            ai_test_case::commands::get_token_usage_stats,
+            ai_test_case::commands::get_usage_patterns,
+            ai_test_case::commands::calculate_cost_estimation,
+            ai_test_case::commands::get_recent_errors,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,16 +1,17 @@
 /**
  * RecorderScreen Component
  * Main UI for Desktop Recorder MVP
- * Requirements: 1.2, 1.5, 2.5, 4.1, 4.2, 4.3, 4.4, 4.5, 9.1, 9.2, 9.3, 9.5
+ * Requirements: 1.2, 1.5, 2.1, 2.2, 2.5, 4.1, 4.2, 4.3, 4.4, 4.5, 9.1, 9.2, 9.3, 9.5
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthButton } from '../components/AuthButton';
 import { CoreType, CoreStatus, PerformanceMetrics, PerformanceComparison } from '../components/CoreSelector';
 import { ScriptListItem } from '../components/ScriptListItem';
 import { ScriptFilter } from '../components/ScriptFilter';
 import { ClickCursorOverlay } from '../components/ClickCursorOverlay';
+import { RecorderStepSelector } from '../components/RecorderStepSelector';
 import { getIPCBridge } from '../services/ipcBridgeService';
 import { scriptStorageService, StoredScriptInfo, ScriptFilter as ScriptFilterType, ScriptSource, TargetOS } from '../services/scriptStorageService';
 import {
@@ -19,6 +20,7 @@ import {
   ActionData,
   ActionPreviewData,
 } from '../types/recorder.types';
+import { TestScript, TestStep } from '../types/testCaseDriven.types';
 import './RecorderScreen.css';
 
 /**
@@ -71,6 +73,13 @@ const RecorderScreen: React.FC = () => {
   const [performanceComparison, setPerformanceComparison] = useState<PerformanceComparison | null>(null);
   const [coreLoading, setCoreLoading] = useState<boolean>(false);
   const [coreError, setCoreError] = useState<string | null>(null);
+
+  // Step-based recording state
+  // Requirements: 2.1, 2.2, 4.1
+  const [stepRecordingEnabled, setStepRecordingEnabled] = useState<boolean>(false);
+  const [activeRecordingScript, setActiveRecordingScript] = useState<TestScript | null>(null);
+  const [activeRecordingStepId, setActiveRecordingStepId] = useState<string | null>(null);
+  const [showScriptLoaderForRecording, setShowScriptLoaderForRecording] = useState<boolean>(false);
 
   const navigate = useNavigate();
   const ipcBridge = getIPCBridge();
@@ -598,6 +607,100 @@ const RecorderScreen: React.FC = () => {
   };
 
   /**
+   * Handle step selection for recording
+   * Requirements: 2.1, 2.2
+   */
+  const handleRecordingStepSelect = useCallback((stepId: string | null) => {
+    setActiveRecordingStepId(stepId);
+    console.log('[RecorderScreen] Active recording step changed:', stepId);
+  }, []);
+
+  /**
+   * Handle creating a new step for recording
+   * Requirements: 2.1, 2.2
+   */
+  const handleCreateRecordingStep = useCallback((description: string, expectedResult: string) => {
+    if (!activeRecordingScript) return;
+
+    const newStepId = `step_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const newStep: TestStep = {
+      id: newStepId,
+      order: activeRecordingScript.steps.length + 1,
+      description,
+      expected_result: expectedResult,
+      action_ids: [],
+      continue_on_failure: false,
+    };
+
+    const updatedScript: TestScript = {
+      ...activeRecordingScript,
+      steps: [...activeRecordingScript.steps, newStep],
+    };
+
+    setActiveRecordingScript(updatedScript);
+    setActiveRecordingStepId(newStepId);
+    console.log('[RecorderScreen] Created new step for recording:', newStep);
+  }, [activeRecordingScript]);
+
+  /**
+   * Handle loading a script for step-based recording
+   * Requirements: 2.1, 4.1
+   */
+  const handleLoadScriptForRecording = useCallback(() => {
+    setShowScriptLoaderForRecording(true);
+  }, []);
+
+  /**
+   * Handle script selection for step-based recording
+   * Requirements: 2.1, 4.1
+   */
+  const handleSelectScriptForRecording = useCallback(async (scriptPath: string) => {
+    try {
+      setLoading(true);
+      const scriptData = await ipcBridge.loadScript(scriptPath);
+
+      // Check if it's a step-based script
+      if (scriptData && scriptData.steps && Array.isArray(scriptData.steps)) {
+        setActiveRecordingScript(scriptData as TestScript);
+        setStepRecordingEnabled(true);
+        // Select first step by default if available
+        if (scriptData.steps.length > 0) {
+          setActiveRecordingStepId(scriptData.steps[0].id);
+        }
+        console.log('[RecorderScreen] Loaded script for step-based recording:', scriptPath);
+      } else {
+        // Legacy script - migrate or show message
+        setError('Selected script is not in step-based format. Please use the Script Editor to convert it.');
+      }
+
+      setShowScriptLoaderForRecording(false);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load script';
+      setError(errorMessage);
+      console.error('[RecorderScreen] Failed to load script for recording:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [ipcBridge]);
+
+  /**
+   * Clear step-based recording mode
+   */
+  const handleClearStepRecording = useCallback(() => {
+    setStepRecordingEnabled(false);
+    setActiveRecordingScript(null);
+    setActiveRecordingStepId(null);
+  }, []);
+
+  /**
+   * Get active step for display
+   */
+  const activeRecordingStep = useMemo((): TestStep | null => {
+    if (!activeRecordingScript || !activeRecordingStepId) return null;
+    return activeRecordingScript.steps.find(step => step.id === activeRecordingStepId) || null;
+  }, [activeRecordingScript, activeRecordingStepId]);
+
+  /**
    * Filter scripts based on current filter settings
    * Requirements: 9.4
    */
@@ -839,6 +942,30 @@ const RecorderScreen: React.FC = () => {
           </div>
         )}
 
+        {/* Step-Based Recording Selector */}
+        {/* Requirements: 2.1, 2.2, 4.1 */}
+        <RecorderStepSelector
+          script={activeRecordingScript}
+          activeStepId={activeRecordingStepId}
+          isRecording={status === 'recording'}
+          onStepSelect={handleRecordingStepSelect}
+          onCreateStep={handleCreateRecordingStep}
+          onLoadScript={handleLoadScriptForRecording}
+          hasScript={stepRecordingEnabled && activeRecordingScript !== null}
+        />
+
+        {/* Step Recording Mode Toggle */}
+        {stepRecordingEnabled && status === 'idle' && (
+          <div className="step-recording-toggle">
+            <button
+              className="clear-step-recording-btn"
+              onClick={handleClearStepRecording}
+            >
+              Exit Step Recording Mode
+            </button>
+          </div>
+        )}
+
         {/* Recording Status */}
         {status === 'recording' && (
           <div className="recording-status-container">
@@ -856,6 +983,16 @@ const RecorderScreen: React.FC = () => {
                 </span>
               </div>
             </div>
+
+            {/* Active Step Info During Recording */}
+            {stepRecordingEnabled && activeRecordingStep && (
+              <div className="recording-step-target">
+                <span className="recording-step-target-label">Recording to Step:</span>
+                <span className="recording-step-target-name">
+                  Step {activeRecordingStep.order}: {activeRecordingStep.description}
+                </span>
+              </div>
+            )}
 
             <div className="recording-info-text">
               <span>Capturing all mouse movements, clicks, and keyboard inputs</span>
@@ -1094,6 +1231,72 @@ const RecorderScreen: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Script Loader Modal for Step-Based Recording */}
+        {/* Requirements: 2.1, 4.1 */}
+        {showScriptLoaderForRecording && (
+          <div className="modal-overlay" onClick={() => setShowScriptLoaderForRecording(false)}>
+            <div className="modal-content script-selector-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2 className="modal-title">Select Script for Step Recording</h2>
+                <button
+                  className="modal-close-button"
+                  onClick={() => setShowScriptLoaderForRecording(false)}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="step-recording-info-banner">
+                <p>Select a step-based script to record actions for specific test steps.</p>
+                <p className="step-recording-info-note">
+                  Only scripts with test steps can be used for step-based recording.
+                </p>
+              </div>
+
+              {/* Script Filter */}
+              <div className="script-filter-wrapper">
+                <ScriptFilter
+                  filter={scriptFilter}
+                  onFilterChange={setScriptFilter}
+                  totalCount={availableScripts.length}
+                  filteredCount={filteredScripts.length}
+                  showOSFilter={hasAIScripts}
+                  showSearch={true}
+                  compact={true}
+                />
+              </div>
+
+              <div className="script-list">
+                {availableScripts.length === 0 ? (
+                  <p className="empty-text">No scripts available</p>
+                ) : filteredScripts.length === 0 ? (
+                  <p className="empty-text">No scripts match the current filter</p>
+                ) : (
+                  filteredScripts.map((item) => (
+                    <ScriptListItem
+                      key={item.path}
+                      script={{
+                        filename: item.filename,
+                        path: item.path,
+                        createdAt: item.created_at,
+                        duration: item.duration,
+                        actionCount: item.action_count,
+                        source: item.source,
+                        targetOS: item.targetOS,
+                        scriptName: item.scriptName,
+                      }}
+                      selected={false}
+                      onClick={(script) => handleSelectScriptForRecording(script.path)}
+                      showDelete={false}
+                      compact={true}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Script Selector Modal */}
         {/* Requirements: 9.1, 9.2, 9.3, 9.4, 9.5 */}

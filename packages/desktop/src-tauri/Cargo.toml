@@ -26,6 +26,19 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 urlencoding = "2.1"
 cocoa = "0.24"
 
+# AI Test Case Generator dependencies (Requirements: 1.1, 4.1, 11.1, 11.2)
+reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
+keyring = "2.3"
+anyhow = "1.0"
+thiserror = "1.0"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+dirs = "5.0"
+
+[dev-dependencies]
+proptest = "1.4"
+tokio-test = "0.4"
+futures = "0.3"
+
 # Platform-specific dependencies for health checks
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winuser", "windef"] }
