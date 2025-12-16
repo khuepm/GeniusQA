@@ -781,4 +781,615 @@ mod tests {
             });
         }
     }
+
+    // **Feature: ai-test-case-generator, Property 21: Cost Information Display Accuracy**
+    // **Validates: Requirements 10.3**
+    proptest! {
+        #[test]
+        fn property_cost_information_display_accuracy(
+            token_usages in prop::collection::vec(arb_token_usage(), 1..100),
+            prompt_cost_per_1k in 0.00001f64..0.01, // Reasonable range for API pricing
+            completion_cost_per_1k in 0.00001f64..0.01
+        ) {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(async {
+                let monitor = MonitoringService::new();
+                
+                // Log all token usages
+                for (i, token_usage) in token_usages.iter().enumerate() {
+                    monitor.log_performance(
+                        format!("operation_{}", i),
+                        Duration::from_millis(100),
+                        true,
+                        Some(token_usage.clone()),
+                    ).await;
+                }
+                
+                // Calculate cost estimation with custom pricing
+                let mut cost_estimation = CostEstimation {
+                    estimated_cost_usd: 0.0,
+                    prompt_token_cost_per_1k: prompt_cost_per_1k,
+                    completion_token_cost_per_1k: completion_cost_per_1k,
+                    calculated_at: Utc::now(),
+                };
+                
+                // Calculate total token usage
+                let total_prompt_tokens: u64 = token_usages.iter()
+                    .map(|usage| usage.prompt_tokens as u64)
+                    .sum();
+                let total_completion_tokens: u64 = token_usages.iter()
+                    .map(|usage| usage.completion_tokens as u64)
+                    .sum();
+                let total_tokens = total_prompt_tokens + total_completion_tokens;
+                
+                let total_usage = TokenUsage {
+                    prompt_tokens: total_prompt_tokens as u32,
+                    completion_tokens: total_completion_tokens as u32,
+                    total_tokens: total_tokens as u32,
+                };
+                
+                cost_estimation.calculate_cost(&total_usage);
+                
+                // Property: Cost calculation should be mathematically accurate
+                let expected_prompt_cost = (total_prompt_tokens as f64 / 1000.0) * prompt_cost_per_1k;
+                let expected_completion_cost = (total_completion_tokens as f64 / 1000.0) * completion_cost_per_1k;
+                let expected_total_cost = expected_prompt_cost + expected_completion_cost;
+                
+                prop_assert!((cost_estimation.estimated_cost_usd - expected_total_cost).abs() < 0.000001,
+                           "Cost calculation should be mathematically accurate: expected {}, got {}",
+                           expected_total_cost, cost_estimation.estimated_cost_usd);
+                
+                // Property: Cost should be non-negative
+                prop_assert!(cost_estimation.estimated_cost_usd >= 0.0,
+                           "Cost should never be negative");
+                
+                // Property: Cost should scale linearly with token usage
+                if total_tokens > 0 {
+                    let cost_per_token = cost_estimation.estimated_cost_usd / total_tokens as f64;
+                    prop_assert!(cost_per_token >= 0.0,
+                               "Cost per token should be non-negative");
+                    
+                    // Test with double the tokens
+                    let double_usage = TokenUsage {
+                        prompt_tokens: (total_prompt_tokens * 2) as u32,
+                        completion_tokens: (total_completion_tokens * 2) as u32,
+                        total_tokens: (total_tokens * 2) as u32,
+                    };
+                    
+                    let mut double_cost_estimation = CostEstimation {
+                        estimated_cost_usd: 0.0,
+                        prompt_token_cost_per_1k: prompt_cost_per_1k,
+                        completion_token_cost_per_1k: completion_cost_per_1k,
+                        calculated_at: Utc::now(),
+                    };
+                    
+                    double_cost_estimation.calculate_cost(&double_usage);
+                    
+                    // Cost should approximately double (within floating point precision)
+                    let expected_double_cost = expected_total_cost * 2.0;
+                    prop_assert!((double_cost_estimation.estimated_cost_usd - expected_double_cost).abs() < 0.000001,
+                               "Cost should scale linearly: expected {}, got {}",
+                               expected_double_cost, double_cost_estimation.estimated_cost_usd);
+                }
+                
+                // Property: Timestamp should be recent and accurate
+                let now = Utc::now();
+                let time_diff = now.signed_duration_since(cost_estimation.calculated_at);
+                prop_assert!(time_diff.num_seconds() < 60,
+                           "Cost calculation timestamp should be recent (within 60 seconds)");
+                
+                // Property: Cost breakdown should be consistent
+                let manual_prompt_cost = (total_prompt_tokens as f64 / 1000.0) * cost_estimation.prompt_token_cost_per_1k;
+                let manual_completion_cost = (total_completion_tokens as f64 / 1000.0) * cost_estimation.completion_token_cost_per_1k;
+                let manual_total = manual_prompt_cost + manual_completion_cost;
+                
+                prop_assert!((cost_estimation.estimated_cost_usd - manual_total).abs() < 0.000001,
+                           "Cost breakdown should be consistent with manual calculation");
+                
+                // Property: Zero tokens should result in zero cost
+                let zero_usage = TokenUsage {
+                    prompt_tokens: 0,
+                    completion_tokens: 0,
+                    total_tokens: 0,
+                };
+                
+                let mut zero_cost_estimation = CostEstimation {
+                    estimated_cost_usd: 0.0,
+                    prompt_token_cost_per_1k: prompt_cost_per_1k,
+                    completion_token_cost_per_1k: completion_cost_per_1k,
+                    calculated_at: Utc::now(),
+                };
+                
+                zero_cost_estimation.calculate_cost(&zero_usage);
+                prop_assert_eq!(zero_cost_estimation.estimated_cost_usd, 0.0,
+                              "Zero tokens should result in zero cost");
+                
+                // Property: Cost estimation from monitoring service should match manual calculation
+                let service_cost_estimation = monitor.calculate_cost_estimation().await;
+                
+                // The service uses default pricing, so we need to calculate with default values
+                let default_cost = CostEstimation::default();
+                let service_expected_prompt_cost = (total_prompt_tokens as f64 / 1000.0) * default_cost.prompt_token_cost_per_1k;
+                let service_expected_completion_cost = (total_completion_tokens as f64 / 1000.0) * default_cost.completion_token_cost_per_1k;
+                let service_expected_total = service_expected_prompt_cost + service_expected_completion_cost;
+                
+                prop_assert!((service_cost_estimation.estimated_cost_usd - service_expected_total).abs() < 0.000001,
+                           "Service cost estimation should match manual calculation with default pricing");
+                
+                Ok(())
+            });
+        }
+    }
+
+    // **Feature: ai-test-case-generator, Property 22: Usage Pattern Tracking Consistency**
+    // **Validates: Requirements 10.5**
+    proptest! {
+        #[test]
+        fn property_usage_pattern_tracking_consistency(
+            operations in prop::collection::vec(
+                (
+                    prop::sample::select(vec![
+                        "generate_from_requirements", "generate_from_actions", 
+                        "validate_api_key", "api_call", "json_parsing"
+                    ]),
+                    1u64..1000, // response time in ms
+                    any::<bool>(), // success status
+                    prop::option::of(arb_token_usage())
+                ),
+                1..100
+            ),
+            // Simulate operations across different days by using different timestamps
+            days_offset in prop::collection::vec(0i64..30, 1..10) // Up to 30 days back, up to 10 different days
+        ) {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(async {
+                let monitor = MonitoringService::new();
+                
+                // Property: Usage patterns should track daily and monthly requests consistently
+                let mut expected_daily_counts: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
+                let mut expected_monthly_counts: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
+                
+                // Simulate operations on different days
+                let chunk_size = if days_offset.is_empty() { 1 } else { (operations.len() / days_offset.len()).max(1) };
+                for (day_offset, operations_for_day) in days_offset.iter().zip(operations.chunks(chunk_size)) {
+                    let simulated_date = Utc::now() - chrono::Duration::days(*day_offset);
+                    let date_key = simulated_date.format("%Y-%m-%d").to_string();
+                    let month_key = simulated_date.format("%Y-%m").to_string();
+                    
+                    // Track expected counts
+                    *expected_daily_counts.entry(date_key.clone()).or_insert(0) += operations_for_day.len() as u64;
+                    *expected_monthly_counts.entry(month_key.clone()).or_insert(0) += operations_for_day.len() as u64;
+                    
+                    // Log operations for this day
+                    for (i, (operation_type, response_time_ms, success, token_usage)) in operations_for_day.iter().enumerate() {
+                        monitor.log_performance(
+                            format!("{}_{}", operation_type, i),
+                            Duration::from_millis(*response_time_ms),
+                            *success,
+                            token_usage.clone(),
+                        ).await;
+                    }
+                }
+                
+                let usage_patterns = monitor.get_usage_patterns().await;
+                
+                // Property: Daily request counts should be tracked accurately
+                let today = Utc::now().format("%Y-%m-%d").to_string();
+                prop_assert!(usage_patterns.daily_requests.contains_key(&today),
+                           "Usage patterns should track today's requests");
+                
+                // Property: Monthly request counts should be tracked accurately
+                let this_month = Utc::now().format("%Y-%m").to_string();
+                prop_assert!(usage_patterns.monthly_requests.contains_key(&this_month),
+                           "Usage patterns should track this month's requests");
+                
+                // Property: Total daily requests should equal sum of all operations for today
+                let total_operations_today = operations.len() as u64;
+                if let Some(&daily_count) = usage_patterns.daily_requests.get(&today) {
+                    prop_assert_eq!(daily_count, total_operations_today,
+                                  "Daily request count should match total operations logged today");
+                }
+                
+                // Property: Total monthly requests should be at least the daily count
+                if let Some(&monthly_count) = usage_patterns.monthly_requests.get(&this_month) {
+                    if let Some(&daily_count) = usage_patterns.daily_requests.get(&today) {
+                        prop_assert!(monthly_count >= daily_count,
+                                   "Monthly count should be at least the daily count");
+                    }
+                }
+                
+                // Property: Last request timestamp should be recent
+                prop_assert!(usage_patterns.last_request.is_some(),
+                           "Last request timestamp should be set");
+                
+                if let Some(last_request) = usage_patterns.last_request {
+                    let now = Utc::now();
+                    let time_diff = now.signed_duration_since(last_request);
+                    prop_assert!(time_diff.num_seconds() < 60,
+                               "Last request timestamp should be recent (within 60 seconds)");
+                }
+                
+                // Property: Peak usage day should be tracked correctly
+                if usage_patterns.peak_usage_day.is_some() {
+                    let (peak_date, peak_count) = usage_patterns.peak_usage_day.unwrap();
+                    
+                    // Peak count should exist in daily requests
+                    prop_assert!(usage_patterns.daily_requests.contains_key(&peak_date),
+                               "Peak usage day should exist in daily requests");
+                    
+                    if let Some(&actual_count) = usage_patterns.daily_requests.get(&peak_date) {
+                        prop_assert_eq!(actual_count, peak_count,
+                                      "Peak usage count should match daily request count for that day");
+                    }
+                    
+                    // Peak count should be the maximum among all days
+                    for (_, &count) in usage_patterns.daily_requests.iter() {
+                        prop_assert!(peak_count >= count,
+                                   "Peak usage count should be >= all other daily counts");
+                    }
+                }
+                
+                // Property: Usage pattern tracking should be deterministic
+                let second_usage_patterns = monitor.get_usage_patterns().await;
+                prop_assert_eq!(&usage_patterns.daily_requests, &second_usage_patterns.daily_requests,
+                              "Usage patterns should be deterministic");
+                prop_assert_eq!(&usage_patterns.monthly_requests, &second_usage_patterns.monthly_requests,
+                              "Usage patterns should be deterministic");
+                
+                // Store original counts before adding more operations
+                let original_daily_count = usage_patterns.daily_requests.get(&today).copied().unwrap_or(0);
+                let original_monthly_count = usage_patterns.monthly_requests.get(&this_month).copied().unwrap_or(0);
+                
+                // Property: Adding more operations should increase counts correctly
+                let additional_operations = 5;
+                for i in 0..additional_operations {
+                    monitor.log_performance(
+                        format!("additional_operation_{}", i),
+                        Duration::from_millis(100),
+                        true,
+                        None,
+                    ).await;
+                }
+                
+                let updated_usage_patterns = monitor.get_usage_patterns().await;
+                
+                // Daily count should increase by the number of additional operations
+                if let Some(&updated_count) = updated_usage_patterns.daily_requests.get(&today) {
+                    prop_assert_eq!(updated_count, original_daily_count + additional_operations,
+                                  "Daily count should increase by number of additional operations");
+                }
+                
+                // Monthly count should also increase
+                if let Some(&updated_count) = updated_usage_patterns.monthly_requests.get(&this_month) {
+                    prop_assert_eq!(updated_count, original_monthly_count + additional_operations,
+                                  "Monthly count should increase by number of additional operations");
+                }
+                
+                // Property: Usage patterns should handle edge cases correctly
+                
+                // Test with zero operations (should not crash)
+                let empty_monitor = MonitoringService::new();
+                let empty_patterns = empty_monitor.get_usage_patterns().await;
+                prop_assert!(empty_patterns.daily_requests.is_empty() || 
+                           empty_patterns.daily_requests.values().all(|&count| count == 0),
+                           "Empty monitor should have no usage or zero counts");
+                
+                // Property: Date formatting should be consistent
+                for date_key in usage_patterns.daily_requests.keys() {
+                    // Date should be in YYYY-MM-DD format
+                    prop_assert!(date_key.len() == 10, "Date key should be 10 characters long");
+                    prop_assert!(date_key.chars().nth(4) == Some('-'), "Date should have dash at position 4");
+                    prop_assert!(date_key.chars().nth(7) == Some('-'), "Date should have dash at position 7");
+                    
+                    // Should be parseable as a date
+                    prop_assert!(chrono::NaiveDate::parse_from_str(date_key, "%Y-%m-%d").is_ok(),
+                               "Date key should be parseable as YYYY-MM-DD");
+                }
+                
+                for month_key in usage_patterns.monthly_requests.keys() {
+                    // Month should be in YYYY-MM format
+                    prop_assert!(month_key.len() == 7, "Month key should be 7 characters long");
+                    prop_assert!(month_key.chars().nth(4) == Some('-'), "Month should have dash at position 4");
+                    
+                    // Should be parseable as a year-month
+                    prop_assert!(month_key.parse::<String>().is_ok() && month_key.contains('-'),
+                               "Month key should be in YYYY-MM format");
+                }
+                
+                // Property: Counts should never be negative
+                for &count in usage_patterns.daily_requests.values() {
+                    prop_assert!(count >= 0, "Daily request counts should never be negative");
+                }
+                
+                for &count in usage_patterns.monthly_requests.values() {
+                    prop_assert!(count >= 0, "Monthly request counts should never be negative");
+                }
+                
+                Ok(())
+            });
+        }
+    }
+
+    // Unit tests for rate limiting and quota warnings
+    // Requirements: 8.2, 8.4, 10.2, 10.4
+
+    #[tokio::test]
+    async fn test_rate_limit_error_handling() {
+        let monitor = MonitoringService::new();
+        
+        // Test rate limit error logging
+        let rate_limit_error = AITestCaseError::RateLimitError { seconds: 60 };
+        
+        monitor.log_error(
+            &rate_limit_error,
+            "api_request",
+            Some("POST /generate".to_string()),
+            Some("429 Too Many Requests".to_string()),
+            Some(1),
+        ).await;
+        
+        let errors = monitor.get_recent_errors(Some(10)).await;
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].error_type, "RateLimitError");
+        assert_eq!(errors[0].retry_attempt, Some(1));
+        assert!(errors[0].message.contains("60 seconds"));
+    }
+
+    #[tokio::test]
+    async fn test_exponential_backoff_calculation() {
+        // Test exponential backoff delay calculation
+        let rate_limit_error = AITestCaseError::RateLimitError { seconds: 60 };
+        let api_error = AITestCaseError::api_error("Server error", Some(500));
+        let timeout_error = AITestCaseError::TimeoutError { timeout_secs: 30 };
+        
+        // Rate limit error should have specific retry delay
+        assert_eq!(rate_limit_error.retry_delay(), Some(Duration::from_secs(60)));
+        
+        // API error without retry_after should have no delay
+        assert_eq!(api_error.retry_delay(), None);
+        
+        // Timeout error should have default delay
+        assert_eq!(timeout_error.retry_delay(), Some(Duration::from_secs(5)));
+        
+        // Test that errors are retryable
+        assert!(rate_limit_error.is_retryable());
+        assert!(api_error.is_retryable());
+        assert!(timeout_error.is_retryable());
+    }
+
+    #[tokio::test]
+    async fn test_quota_warning_display() {
+        let monitor = MonitoringService::new();
+        
+        // Simulate high usage that should trigger quota warnings
+        let high_token_usage = TokenUsage {
+            prompt_tokens: 50000,  // High usage
+            completion_tokens: 25000,
+            total_tokens: 75000,
+        };
+        
+        // Log multiple high-usage operations
+        for i in 0..10 {
+            monitor.log_performance(
+                format!("high_usage_operation_{}", i),
+                Duration::from_millis(500),
+                true,
+                Some(high_token_usage.clone()),
+            ).await;
+        }
+        
+        let token_stats = monitor.get_token_stats().await;
+        let cost_estimation = monitor.calculate_cost_estimation().await;
+        
+        // Verify high usage is tracked
+        assert_eq!(token_stats.total_tokens, 750000); // 75000 * 10
+        assert_eq!(token_stats.request_count, 10);
+        
+        // Verify cost calculation for high usage
+        assert!(cost_estimation.estimated_cost_usd > 0.0);
+        
+        // Test quota warning thresholds (simulated)
+        let daily_request_limit = 100;
+        let monthly_token_limit = 1000000;
+        
+        let usage_patterns = monitor.get_usage_patterns().await;
+        let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        let daily_requests = usage_patterns.daily_requests.get(&today).unwrap_or(&0);
+        
+        // Check if we're approaching limits (this would trigger warnings in real implementation)
+        let daily_usage_percentage = (*daily_requests as f64 / daily_request_limit as f64) * 100.0;
+        let monthly_token_percentage = (token_stats.total_tokens as f64 / monthly_token_limit as f64) * 100.0;
+        
+        assert!(daily_usage_percentage >= 0.0);
+        assert!(monthly_token_percentage >= 0.0);
+        
+        // In a real implementation, these would trigger warnings at 80% and 90%
+        if daily_usage_percentage >= 80.0 {
+            println!("Warning: Approaching daily request limit ({}%)", daily_usage_percentage);
+        }
+        
+        if monthly_token_percentage >= 80.0 {
+            println!("Warning: Approaching monthly token limit ({}%)", monthly_token_percentage);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_error_recovery_mechanisms() {
+        let monitor = MonitoringService::new();
+        
+        // Test recovery from various error types
+        let errors = vec![
+            AITestCaseError::RateLimitError { seconds: 30 },
+            AITestCaseError::api_error("Temporary server error", Some(503)),
+            AITestCaseError::TimeoutError { timeout_secs: 30 },
+            AITestCaseError::parse_error("Invalid JSON", "malformed response"),
+            AITestCaseError::validation_error("field", "Invalid value"),
+        ];
+        
+        for (i, error) in errors.iter().enumerate() {
+            monitor.log_error(
+                error,
+                format!("recovery_test_{}", i),
+                Some("test request".to_string()),
+                Some("test response".to_string()),
+                Some((i + 1) as u32),
+            ).await;
+        }
+        
+        let logged_errors = monitor.get_recent_errors(Some(10)).await;
+        assert_eq!(logged_errors.len(), 5);
+        
+        // Verify error types are correctly classified
+        let error_types: Vec<&String> = logged_errors.iter().map(|e| &e.error_type).collect();
+        assert!(error_types.contains(&&"RateLimitError".to_string()));
+        assert!(error_types.contains(&&"ApiError".to_string()));
+        assert!(error_types.contains(&&"TimeoutError".to_string()));
+        assert!(error_types.contains(&&"ParseError".to_string()));
+        assert!(error_types.contains(&&"ValidationError".to_string()));
+        
+        // Verify retry attempts are tracked (errors are returned in reverse order)
+        for (i, logged_error) in logged_errors.iter().enumerate() {
+            let expected_retry = (5 - i) as u32; // Reverse order: 5, 4, 3, 2, 1
+            assert_eq!(logged_error.retry_attempt, Some(expected_retry));
+        }
+        
+        // Test that retryable errors are identified correctly
+        let retryable_errors = errors.iter().filter(|e| e.is_retryable()).count();
+        assert_eq!(retryable_errors, 3); // RateLimit, Api, Timeout are retryable
+    }
+
+    #[tokio::test]
+    async fn test_rate_limiting_with_user_friendly_messaging() {
+        let monitor = MonitoringService::new();
+        
+        // Test different rate limit scenarios
+        let rate_limit_scenarios = vec![
+            (30, "Rate limit exceeded, retry after 30 seconds"),
+            (60, "Rate limit exceeded, retry after 60 seconds"),
+            (300, "Rate limit exceeded, retry after 300 seconds"),
+        ];
+        
+        for (seconds, expected_message) in rate_limit_scenarios {
+            let error = AITestCaseError::RateLimitError { seconds };
+            
+            // Verify error message format
+            assert_eq!(error.to_string(), expected_message);
+            
+            // Verify retry delay
+            assert_eq!(error.retry_delay(), Some(Duration::from_secs(seconds)));
+            
+            // Log the error
+            monitor.log_error(
+                &error,
+                "rate_limit_test",
+                Some("API request".to_string()),
+                Some(format!("HTTP 429 - {}", expected_message)),
+                Some(1),
+            ).await;
+        }
+        
+        let errors = monitor.get_recent_errors(Some(10)).await;
+        assert_eq!(errors.len(), 3);
+        
+        // Verify all errors are rate limit errors
+        for error in &errors {
+            assert_eq!(error.error_type, "RateLimitError");
+            assert!(error.message.contains("Rate limit exceeded"));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_api_failure_recovery_patterns() {
+        let monitor = MonitoringService::new();
+        
+        // Simulate a sequence of failures followed by recovery
+        let failure_sequence = vec![
+            (false, Some(AITestCaseError::TimeoutError { timeout_secs: 30 })),
+            (false, Some(AITestCaseError::RateLimitError { seconds: 60 })),
+            (false, Some(AITestCaseError::api_error("Server overloaded", Some(503)))),
+            (true, None), // Recovery
+        ];
+        
+        for (i, (success, error)) in failure_sequence.iter().enumerate() {
+            if let Some(err) = error {
+                monitor.log_error(
+                    err,
+                    format!("recovery_sequence_{}", i),
+                    Some("retry attempt".to_string()),
+                    Some("error response".to_string()),
+                    Some((i + 1) as u32),
+                ).await;
+            }
+            
+            monitor.log_performance(
+                format!("operation_{}", i),
+                Duration::from_millis(if *success { 200 } else { 5000 }),
+                *success,
+                if *success { Some(TokenUsage { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 }) } else { None },
+            ).await;
+        }
+        
+        let performance_stats = monitor.get_performance_stats().await;
+        let error_logs = monitor.get_recent_errors(Some(10)).await;
+        
+        // Verify performance tracking
+        assert_eq!(performance_stats.total_requests, 4);
+        assert_eq!(performance_stats.successful_requests, 1);
+        assert_eq!(performance_stats.success_rate, 25.0); // 1 out of 4 successful
+        
+        // Verify error logging
+        assert_eq!(error_logs.len(), 3); // 3 failures logged
+        
+        // Verify retry attempts are sequential (errors are returned in reverse order)
+        for (i, error_log) in error_logs.iter().enumerate() {
+            let expected_retry = (3 - i) as u32; // Reverse order: 3, 2, 1
+            assert_eq!(error_log.retry_attempt, Some(expected_retry));
+        }
+    }
+
+    #[test]
+    fn test_cost_estimation_quota_calculations() {
+        // Test cost calculations for quota management
+        let mut cost_estimation = CostEstimation::default();
+        
+        // Test with different usage levels
+        let usage_scenarios = vec![
+            (1000, 500, "Low usage"),
+            (10000, 5000, "Medium usage"),
+            (100000, 50000, "High usage"),
+            (1000000, 500000, "Very high usage"),
+        ];
+        
+        for (prompt_tokens, completion_tokens, scenario) in usage_scenarios {
+            let token_usage = TokenUsage {
+                prompt_tokens,
+                completion_tokens,
+                total_tokens: prompt_tokens + completion_tokens,
+            };
+            
+            cost_estimation.calculate_cost(&token_usage);
+            
+            // Verify cost is calculated
+            assert!(cost_estimation.estimated_cost_usd > 0.0, "Cost should be positive for {}", scenario);
+            
+            // Verify cost scales with usage
+            let expected_cost = (prompt_tokens as f64 / 1000.0) * cost_estimation.prompt_token_cost_per_1k +
+                               (completion_tokens as f64 / 1000.0) * cost_estimation.completion_token_cost_per_1k;
+            
+            assert!((cost_estimation.estimated_cost_usd - expected_cost).abs() < 0.000001, 
+                   "Cost calculation should be accurate for {}", scenario);
+            
+            // Test quota warning thresholds
+            let monthly_budget = 10.0; // $10 monthly budget
+            let usage_percentage = (cost_estimation.estimated_cost_usd / monthly_budget) * 100.0;
+            
+            if usage_percentage >= 80.0 {
+                println!("Quota warning: {}% of monthly budget used ({})", usage_percentage, scenario);
+            }
+            
+            if usage_percentage >= 95.0 {
+                println!("Quota critical: {}% of monthly budget used ({})", usage_percentage, scenario);
+            }
+        }
+    }
 }

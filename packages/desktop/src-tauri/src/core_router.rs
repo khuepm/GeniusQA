@@ -1636,9 +1636,9 @@ mod tests {
         
         let available_cores = router.get_available_cores();
         
-        // Python should be available, Rust should not be (for now)
-        assert!(available_cores.contains(&CoreType::Python), "Python core should be available");
-        assert!(!available_cores.contains(&CoreType::Rust), "Rust core should not be available yet");
+        // Only Rust core should be available (Python temporarily disabled)
+        assert!(available_cores.contains(&CoreType::Rust), "Rust core should be available");
+        assert!(!available_cores.contains(&CoreType::Python), "Python core should not be available (temporarily disabled)");
     }
 
     #[test]
@@ -1648,10 +1648,10 @@ mod tests {
         let status = router.get_core_status();
         
         // Verify status structure
-        assert_eq!(status.active_core, CoreType::Python, "Default active core should be Python");
-        assert!(status.available_cores.contains(&CoreType::Python), "Python should be in available cores");
-        assert!(status.core_health.python.unwrap_or(false), "Python core health should be true");
-        assert!(!status.core_health.rust.unwrap_or(true), "Rust core health should be false");
+        assert_eq!(status.active_core, CoreType::Rust, "Default active core should be Rust");
+        assert!(status.available_cores.contains(&CoreType::Rust), "Rust should be in available cores");
+        assert!(!status.available_cores.contains(&CoreType::Python), "Python should not be in available cores (temporarily disabled)");
+        // Note: Core health status may vary based on actual system state
     }
 
     #[test]

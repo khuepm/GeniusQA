@@ -8,6 +8,14 @@ repository = ""
 edition = "2021"
 rust-version = "1.70"
 
+[lib]
+name = "geniusqa_desktop"
+path = "src/lib.rs"
+
+[[bin]]
+name = "geniusqa-desktop"
+path = "src/main.rs"
+
 [build-dependencies]
 tauri-build = { version = "1.5", features = [] }
 
@@ -38,6 +46,11 @@ dirs = "5.0"
 proptest = "1.4"
 tokio-test = "0.4"
 futures = "0.3"
+
+# Integration test configuration
+[[test]]
+name = "integration_tests"
+path = "tests/integration_tests.rs"
 
 # Platform-specific dependencies for health checks
 [target.'cfg(windows)'.dependencies]

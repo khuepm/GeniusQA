@@ -10,6 +10,8 @@
 pub mod commands;
 pub mod config;
 pub mod error;
+#[cfg(test)]
+pub mod integration_tests;
 pub mod models;
 pub mod monitoring;
 pub mod service;

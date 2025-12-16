@@ -530,6 +530,10 @@ mod tests {
         // Note: This test is simplified since we can't easily create a Tauri State in tests
         let state = AIServiceState::new().unwrap();
         let mut config_manager = state.config_manager.write().await;
+        
+        // Reset to defaults first to ensure clean test state
+        config_manager.reset_preferences().unwrap();
+        
         let result = config_manager.get_preferences();
         assert!(result.is_ok(), "Should be able to get default preferences");
         
@@ -708,15 +712,19 @@ mod tests {
                 // Property: Async operations should be cancellable
                 let config_manager = state.config_manager.clone();
                 let operation_handle = tokio::spawn(async move {
-                    // This operation might take some time in a real scenario
+                    // Simulate a longer-running operation that can be cancelled
                     let mut config_mgr = config_manager.write().await;
+                    
+                    // Add a deliberate delay to make cancellation possible
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    
                     let _result = config_mgr.get_preferences();
                     drop(config_mgr);
                     "should_not_complete"
                 });
 
-                // Give the operation a tiny bit of time to start
-                tokio::time::sleep(Duration::from_millis(1)).await;
+                // Give the operation a moment to start
+                tokio::time::sleep(Duration::from_millis(10)).await;
 
                 // Cancel the operation
                 operation_handle.abort();
