@@ -1,5 +1,11 @@
 # TODO
 
+- [ ] AI Builder: không hỏi lại Operating System (đã chọn target OS trên UI) và thêm nút Record để lấy tọa độ (x,y) cho username/password/login button.  
+  - Status: pending
+
+- [x] Fix lỗi "Failed to generate script: API key not valid. Please pass a valid API key."  
+  - Status: completed
+
 - [x] Investigate and fix why Start Playback is not working in RecorderScreen (Python/Rust cores, IPC, events).  
   - Status: completed
 

@@ -18,6 +18,7 @@ import {
 } from '../types/aiScriptBuilder.types';
 import { AIProvider } from '../types/providerAdapter.types';
 import { geminiService } from '../services/geminiService';
+import { unifiedAIService } from '../services/unifiedAIService';
 import { apiKeyService } from '../services/apiKeyService';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -36,6 +37,7 @@ interface UseChatStateProps {
   onScriptGenerated: (script: ScriptData) => void;
   /** Current active provider for tracking provider switches */
   activeProvider?: AIProvider | null;
+  targetOS?: 'macos' | 'windows' | 'universal';
 }
 
 /**
@@ -64,7 +66,7 @@ interface UseChatStateReturn {
  * @param props - Hook configuration
  * @returns Chat state and actions
  */
-export function useChatState({ onScriptGenerated, activeProvider }: UseChatStateProps): UseChatStateReturn {
+export function useChatState({ onScriptGenerated, activeProvider, targetOS }: UseChatStateProps): UseChatStateReturn {
   const { user } = useAuth();
   
   // Message history - maintained in chronological order (Requirements: 2.5)
@@ -138,7 +140,8 @@ export function useChatState({ onScriptGenerated, activeProvider }: UseChatState
   const addMessage = useCallback((
     role: ChatMessage['role'],
     content: string,
-    scriptPreview?: ScriptData
+    scriptPreview?: ScriptData,
+    clarificationQuestions?: string[]
   ): ChatMessage => {
     const message: ChatMessage = {
       id: generateMessageId(),
@@ -146,6 +149,7 @@ export function useChatState({ onScriptGenerated, activeProvider }: UseChatState
       content,
       timestamp: new Date(),
       scriptPreview,
+      clarificationQuestions,
     };
 
     setMessages(prev => [...prev, message]);
@@ -197,7 +201,7 @@ export function useChatState({ onScriptGenerated, activeProvider }: UseChatState
     clearError();
 
     // Add user message to history (Requirements: 2.2)
-    addMessage('user', content);
+    const userMessage = addMessage('user', content);
 
     // Set loading state (Requirements: 2.3)
     setIsLoading(true);
@@ -205,17 +209,23 @@ export function useChatState({ onScriptGenerated, activeProvider }: UseChatState
     try {
       // Build conversation context
       const context: ConversationContext = {
-        previousMessages: messages,
+        previousMessages: [...messages, userMessage],
         currentScript: currentScript || undefined,
         availableActions: AVAILABLE_ACTION_TYPES as ActionType[],
+        targetOS,
       };
 
-      // Call Gemini service
-      const result = await geminiService.generateScript(content, context);
+      // Ensure unified AI service is initialized (API keys loaded) before calling
+      if (user?.uid && !unifiedAIService.isInitialized()) {
+        await unifiedAIService.initialize(user.uid);
+      }
+
+      // Call unified AI service (respects selected provider/model and loaded API keys)
+      const result = await unifiedAIService.generateScript(content, context);
 
       if (result.success) {
         // Add AI response to history (Requirements: 2.4)
-        addMessage('assistant', result.message, result.script);
+        addMessage('assistant', result.message, result.script, result.clarificationQuestions);
 
         // If a script was generated, update state and notify parent
         if (result.script) {
@@ -242,7 +252,7 @@ export function useChatState({ onScriptGenerated, activeProvider }: UseChatState
     } finally {
       setIsLoading(false);
     }
-  }, [messages, currentScript, addMessage, clearError, onScriptGenerated]);
+  }, [messages, currentScript, addMessage, clearError, onScriptGenerated, user?.uid, targetOS]);
 
   return {
     messages,

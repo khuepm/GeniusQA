@@ -133,6 +133,10 @@ export function buildContextString(context: ConversationContext): string {
   // Add available actions context
   parts.push('Available action types: ' + context.availableActions.join(', '));
 
+  if (context.targetOS) {
+    parts.push('Target OS (already selected): ' + context.targetOS);
+  }
+
   // Add current script context if exists
   if (context.currentScript) {
     parts.push(`\nCurrent script has ${context.currentScript.actions.length} actions.`);

@@ -395,12 +395,52 @@ export class IPCBridgeService {
   /**
    * Format error message for user display
    */
-  private formatErrorMessage(error: Error): string {
-    const message = error.message;
+  private formatErrorMessage(error: unknown): string {
+    const message = (() => {
+      if (typeof error === 'string') return error;
+      if (error && typeof error === 'object') {
+        const maybeMessage = (error as { message?: unknown }).message;
+        if (typeof maybeMessage === 'string') return maybeMessage;
+        try {
+          const json = JSON.stringify(error);
+          if (json && json !== '{}' && json !== '[]') return json;
+        } catch {
+          // ignore
+        }
+      }
+      try {
+        return String(error);
+      } catch {
+        return '';
+      }
+    })();
     
     // Handle empty or missing error messages
     if (!message || message.trim() === '' || message === 'Unknown error') {
       return 'An unknown error occurred. Please try again.';
+    }
+
+    if (message.includes('Failed to capture screenshot')) {
+      const lower = message.toLowerCase();
+      const looksLikePermission =
+        lower.includes('permission') ||
+        lower.includes('not permitted') ||
+        lower.includes('not authorized') ||
+        lower.includes('screen recording') ||
+        lower.includes('accessibility') ||
+        lower.includes('denied');
+
+      if (looksLikePermission) {
+        return (
+          message +
+          '\n\nTo enable screenshot capture on macOS:\n' +
+          '1. System Settings → Privacy & Security → Screen Recording\n' +
+          '2. Enable GeniusQA (or the app name)\n' +
+          '3. Quit & reopen the app\n'
+        );
+      }
+
+      return message;
     }
     
     // Check for Rust core "not yet implemented" errors

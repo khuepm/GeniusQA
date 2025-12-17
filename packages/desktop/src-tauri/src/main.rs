@@ -832,10 +832,63 @@ async fn capture_screenshot() -> Result<String, String> {
             Ok(STANDARD.encode(&screenshot_data))
         }
         Err(e) => {
-            log::error!("[AI Vision] Failed to capture screenshot: {}", e);
-            Err(format!("Failed to capture screenshot: {}", e))
+            let err_string = format!("{}", e);
+
+            #[cfg(target_os = "macos")]
+            {
+                let lower = err_string.to_lowercase();
+                if lower.contains("not yet implemented") || lower.contains("not implemented") {
+                    match capture_screenshot_macos_fallback() {
+                        Ok(bytes) => {
+                            log::info!("[AI Vision] Screenshot captured via macOS fallback ({} bytes)", bytes.len());
+                            return Ok(STANDARD.encode(&bytes));
+                        }
+                        Err(fallback_err) => {
+                            log::error!("[AI Vision] macOS screenshot fallback failed: {}", fallback_err);
+                        }
+                    }
+                }
+            }
+
+            log::error!("[AI Vision] Failed to capture screenshot: {}", err_string);
+            Err(format!("Failed to capture screenshot: {}", err_string))
         }
     }
+}
+
+#[cfg(target_os = "macos")]
+fn capture_screenshot_macos_fallback() -> Result<Vec<u8>, String> {
+    use std::process::Command;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| format!("Failed to read system time: {}", e))?
+        .as_nanos();
+
+    let path = std::env::temp_dir().join(format!(
+        "geniusqa_screenshot_{}_{}.png",
+        std::process::id(),
+        nanos
+    ));
+
+    let path_str = path
+        .to_str()
+        .ok_or_else(|| "Failed to build temp screenshot path".to_string())?
+        .to_string();
+
+    let status = Command::new("screencapture")
+        .args(["-x", "-t", "png", &path_str])
+        .status()
+        .map_err(|e| format!("Failed to run screencapture: {}", e))?;
+
+    if !status.success() {
+        return Err(format!("screencapture failed with status: {}", status));
+    }
+
+    let bytes = std::fs::read(&path).map_err(|e| format!("Failed to read screenshot file: {}", e))?;
+    let _ = std::fs::remove_file(&path);
+    Ok(bytes)
 }
 
 /// Save an asset file (e.g., reference image)

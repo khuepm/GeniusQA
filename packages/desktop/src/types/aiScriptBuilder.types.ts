@@ -93,6 +93,7 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
   scriptPreview?: ScriptData;
+  clarificationQuestions?: string[];
 }
 
 /**
@@ -112,6 +113,7 @@ export interface ChatInterfaceState {
 export interface ChatInterfaceProps {
   onScriptGenerated: (script: ScriptData) => void;
   apiKeyConfigured: boolean;
+  targetOS?: 'macos' | 'windows' | 'universal';
   /** List of available providers with their status */
   providers?: import('./providerAdapter.types').ProviderInfo[];
   /** Currently active provider */
@@ -142,6 +144,7 @@ export interface ConversationContext {
   previousMessages: ChatMessage[];
   currentScript?: ScriptData;
   availableActions: ActionType[];
+  targetOS?: 'macos' | 'windows' | 'universal';
 }
 
 /**

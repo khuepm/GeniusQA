@@ -682,27 +682,14 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
         {/* Chat Panel */}
         <div className="ai-builder-chat-panel">
           <div className="ai-builder-chat-header">
-            <OSSelector
-              selectedOS={targetOS}
-              onOSChange={handleOSChange}
-            />
-            <UsageStatistics
-              statistics={sessionStats}
-              variant="tooltip"
-              className="ai-builder-stats"
-            />
-            <button
-              className="provider-settings-button"
-              onClick={() => handleConfigureProvider()}
-              title="Configure AI Providers"
-            >
-              ⚙️ Settings
-            </button>
+            <OSSelector selectedOS={targetOS} onOSChange={handleOSChange} />
+            <UsageStatistics statistics={sessionStats} variant="tooltip" />
           </div>
 
           <AIChatInterface
             onScriptGenerated={handleScriptGenerated}
             apiKeyConfigured={providersConfigured}
+            targetOS={targetOS}
             providers={availableProviders}
             activeProvider={activeProvider}
             onProviderSelect={handleProviderSelect}
@@ -712,22 +699,6 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
             onModelSelect={handleModelSelect}
             providerLoading={providerLoading}
           />
-
-          {!providersConfigured && (
-            <div className="configure-prompt">
-              <div className="configure-prompt-content">
-                <span className="configure-prompt-icon">🔑</span>
-                <h3>Configure AI Provider</h3>
-                <p>To use AI Script Builder, configure at least one AI provider.</p>
-                <button
-                  className="configure-button"
-                  onClick={() => handleConfigureProvider()}
-                >
-                  🔧 Configure Provider
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Preview Panel */}
