@@ -855,7 +855,7 @@ def test_data_persistence_architecture(script):
     # Verify steps contain only static data (no runtime status)
     for step_data in parsed_data['steps']:
         step_fields = set(step_data.keys())
-        expected_step_fields = {'id', 'order', 'description', 'expected_result', 'action_ids', 'continue_on_failure'}
+        expected_step_fields = {'id', 'order', 'description', 'expected_result', 'action_ids', 'continue_on_failure', 'execution_condition'}
         assert step_fields == expected_step_fields, f"Step fields should be {expected_step_fields}, got {step_fields}"
         
         # Verify no runtime status fields in steps

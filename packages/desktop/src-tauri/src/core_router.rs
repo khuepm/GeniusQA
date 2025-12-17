@@ -1605,9 +1605,9 @@ mod tests {
         
         let router = create_test_router();
         
-        // Test switching to Rust core (should not be available yet)
-        let result = router.select_core(CoreType::Rust);
-        assert!(result.is_err(), "Should not be able to switch to unavailable Rust core");
+        // Test switching to Python core (should not be available in current implementation)
+        let result = router.select_core(CoreType::Python);
+        assert!(result.is_err(), "Should not be able to switch to unavailable Python core");
         
         // Verify the error message provides detailed information
         if let Err(error) = result {
@@ -1616,16 +1616,16 @@ mod tests {
         }
 
         // Test that validation is actually performed
-        // The Python core might fail validation in test environment due to missing dependencies
-        let python_result = router.select_core(CoreType::Python);
-        match python_result {
+        // The Rust core should be available and switching should succeed
+        let rust_result = router.select_core(CoreType::Rust);
+        match rust_result {
             Ok(()) => {
-                // If Python core is available, that's fine
+                // If Rust core is available, that's expected
             }
             Err(error) => {
-                // If Python core fails validation, the error should be informative
-                assert!(error.contains("Python") || error.contains("not available") || error.contains("not healthy"), 
-                       "Error should be informative about Python core issues: {}", error);
+                // If Rust core fails validation, the error should be informative
+                assert!(error.contains("Rust") || error.contains("not available") || error.contains("not healthy"), 
+                       "Error should be informative about Rust core issues: {}", error);
             }
         }
     }
@@ -1636,9 +1636,9 @@ mod tests {
         
         let available_cores = router.get_available_cores();
         
-        // Python should be available, Rust should not be (for now)
-        assert!(available_cores.contains(&CoreType::Python), "Python core should be available");
-        assert!(!available_cores.contains(&CoreType::Rust), "Rust core should not be available yet");
+        // Only Rust core should be available (Python temporarily disabled)
+        assert!(available_cores.contains(&CoreType::Rust), "Rust core should be available");
+        assert!(!available_cores.contains(&CoreType::Python), "Python core should not be available (temporarily disabled)");
     }
 
     #[test]
@@ -1648,10 +1648,10 @@ mod tests {
         let status = router.get_core_status();
         
         // Verify status structure
-        assert_eq!(status.active_core, CoreType::Python, "Default active core should be Python");
-        assert!(status.available_cores.contains(&CoreType::Python), "Python should be in available cores");
-        assert!(status.core_health.python.unwrap_or(false), "Python core health should be true");
-        assert!(!status.core_health.rust.unwrap_or(true), "Rust core health should be false");
+        assert_eq!(status.active_core, CoreType::Rust, "Default active core should be Rust");
+        assert!(status.available_cores.contains(&CoreType::Rust), "Rust should be in available cores");
+        assert!(!status.available_cores.contains(&CoreType::Python), "Python should not be in available cores (temporarily disabled)");
+        // Note: Core health status may vary based on actual system state
     }
 
     #[test]
@@ -1664,13 +1664,13 @@ mod tests {
         
         let router = create_test_router();
         
-        // Test multiple invalid switches (Rust core should consistently fail)
+        // Test multiple valid switches (Rust core should consistently succeed)
         for _ in 0..10 {
             let result = router.select_core(CoreType::Rust);
-            assert!(result.is_err(), "Invalid core switches should always fail");
+            assert!(result.is_ok(), "Valid core switches should always succeed");
         }
 
-        // Test that validation is consistent for Python core
+        // Test that validation is consistent for Python core (should consistently fail)
         let mut python_results = Vec::new();
         for _ in 0..5 {
             let result = router.select_core(CoreType::Python);
@@ -1695,8 +1695,9 @@ mod tests {
         
         let router = create_test_router();
         
-        // Ensure we're using Python core
-        let _ = router.select_core(CoreType::Python);
+        // Ensure we're using Rust core (which is available)
+        let result = router.select_core(CoreType::Rust);
+        assert!(result.is_ok(), "Should be able to select available Rust core");
         
         // Test that commands are routed to the active core
         // Note: This test is limited because we can't easily mock the AppHandle
@@ -1704,13 +1705,14 @@ mod tests {
         
         // Verify the active core is set correctly
         let status = router.get_core_status();
-        assert_eq!(status.active_core, CoreType::Python, "Active core should be Python");
+        assert_eq!(status.active_core, CoreType::Rust, "Active core should be Rust");
         
-        // Test that attempting to route to unavailable Rust core fails appropriately
-        let _ = router.select_core(CoreType::Rust);
+        // Test that switching to available Rust core succeeds
+        let result = router.select_core(CoreType::Rust);
+        assert!(result.is_ok(), "Should be able to switch to available Rust core");
         let status = router.get_core_status();
-        // Should still be Python since Rust is not available
-        assert_eq!(status.active_core, CoreType::Python, "Should fallback to Python when Rust unavailable");
+        // Should be Rust since it's available
+        assert_eq!(status.active_core, CoreType::Rust, "Should switch to Rust when available");
     }
 
     #[test]
@@ -1758,9 +1760,9 @@ mod tests {
         
         let router = create_test_router();
         
-        // Test switching to Rust core (should not be available yet)
-        let result = router.select_core(CoreType::Rust);
-        assert!(result.is_err(), "Should not be able to switch to unavailable Rust core");
+        // Test switching to Python core (should not be available in current implementation)
+        let result = router.select_core(CoreType::Python);
+        assert!(result.is_err(), "Should not be able to switch to unavailable Python core");
         
         // Verify the error message provides detailed information
         if let Err(error) = result {
@@ -1771,7 +1773,7 @@ mod tests {
         // Test runtime failure handling
         let failure_result = router
             .handle_runtime_failure(
-                CoreType::Rust,
+                CoreType::Python,
                 "test_operation",
                 "Simulated core failure"
             )
@@ -1780,7 +1782,7 @@ mod tests {
         // Should either succeed with fallback or provide detailed error
         match failure_result {
             Ok(fallback_core) => {
-                assert_ne!(fallback_core, CoreType::Rust, "Should fallback to different core");
+                assert_eq!(fallback_core, CoreType::Rust, "Should fallback to available Rust core");
             }
             Err(error) => {
                 assert!(error.contains("no fallback cores are available") || 

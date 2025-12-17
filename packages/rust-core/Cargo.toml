@@ -28,6 +28,23 @@ hostname = "0.3"
 rustc_version_runtime = "0.3"
 rdev = "0.5"
 
+# Visual regression testing dependencies
+image = { version = "0.24", features = ["png", "jpeg", "webp"] }
+imageproc = "0.23"
+fast_image_resize = "3.0"
+sha2 = "0.10"
+base64 = "0.21"
+rayon = "1.8"  # Parallel processing for large image comparisons
+
+# External storage dependencies
+aws-sdk-s3 = "1.0"
+aws-config = "1.0"
+aws-credential-types = "1.0"
+git2 = "0.18"
+url = "2.4"
+reqwest = { version = "0.11", features = ["json", "stream"] }
+futures = "0.3"
+
 # Platform-specific dependencies
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = [
@@ -56,3 +73,10 @@ rand = "0.8"
 
 [features]
 default = []
+
+# Performance optimization profile for release builds
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
