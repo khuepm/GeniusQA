@@ -210,35 +210,51 @@ mod tests {
     // **Validates: Requirements 8.1, 8.2, 8.3, 8.4, 5.3**
     #[tokio::test]
     async fn integration_test_error_handling_across_boundaries() {
-        let mut helper = IntegrationTestHelper::new().unwrap();
-        helper.setup_test_environment().await.unwrap();
+        // Add timeout to prevent hanging
+        let test_future = async {
+            let mut helper = IntegrationTestHelper::new().unwrap();
+            helper.setup_test_environment().await.unwrap();
 
-        // Test error handling across different system components
+            // Test error handling across different system components
 
-        // 1. Test configuration errors
-        let invalid_config_result = helper.config_manager.retrieve_api_key();
-        // This may succeed or fail depending on system state, both are valid
+            // 1. Test configuration errors
+            let invalid_config_result = helper.config_manager.retrieve_api_key();
+            // This may succeed or fail depending on system state, both are valid
 
-        // 2. Test validation errors
-        let empty_requirements = "";
-        assert!(empty_requirements.trim().is_empty(), "Empty requirements should be invalid");
+            // 2. Test validation errors
+            let empty_requirements = "";
+            assert!(empty_requirements.trim().is_empty(), "Empty requirements should be invalid");
 
-        // 3. Test input validation errors
-        let invalid_test_case = TestCase::new("", "", "Test", "Expected result");
+            // 3. Test input validation errors
+            let invalid_test_case = TestCase::new("", "", "Test", "Expected result");
 
-        // Test that invalid test case has empty required fields
-        assert!(invalid_test_case.id.is_empty(), "Invalid test case should have empty ID");
-        assert!(invalid_test_case.title.is_empty(), "Invalid test case should have empty title");
+            // Test that invalid test case has empty required fields
+            assert!(invalid_test_case.id.is_empty(), "Invalid test case should have empty ID");
+            assert!(invalid_test_case.title.is_empty(), "Invalid test case should have empty title");
 
-        // 4. Test error logging integration (using public methods)
-        let recent_errors = helper.service.get_recent_errors(Some(10)).await;
-        // Recent errors may or may not be empty depending on previous test runs
-        assert!(recent_errors.len() >= 0, "Should be able to get recent errors");
+            // 4. Test error logging integration (using public methods) with timeout
+            let recent_errors = tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                helper.service.get_recent_errors(Some(10))
+            ).await.expect("get_recent_errors should not hang");
+            
+            // Recent errors may or may not be empty depending on previous test runs
+            assert!(recent_errors.len() >= 0, "Should be able to get recent errors");
 
-        // 5. Test performance monitoring during errors
-        let performance_stats = helper.service.get_performance_stats().await;
-        // Performance stats should be available even when errors occur
-        assert!(performance_stats.total_requests >= 0);
+            // 5. Test performance monitoring during errors with timeout
+            let performance_stats = tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                helper.service.get_performance_stats()
+            ).await.expect("get_performance_stats should not hang");
+            
+            // Performance stats should be available even when errors occur
+            assert!(performance_stats.total_requests >= 0);
+        };
+
+        // Overall test timeout of 30 seconds
+        tokio::time::timeout(std::time::Duration::from_secs(30), test_future)
+            .await
+            .expect("Test should complete within 30 seconds");
     }
 
     // **Integration Test 4: Concurrent Operations and Performance**

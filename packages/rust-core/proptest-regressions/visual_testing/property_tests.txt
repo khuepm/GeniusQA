@@ -14,3 +14,5 @@ cc 7ff5bdd6cc3d074bfb961f522b07d40c2577a23022e34c0bd1d2f7bcf59822c8 # shrinks to
 cc 72dcddf90818d450726e1c6b7dcbe87111c1a3a071a50477c36cf6ca055c1f39 # shrinks to dimensions = (190, 178), baseline_color = [28, 201, 26, 79], actual_color = [248, 247, 41, 35]
 cc 1a1161b863c35ee5f14b033d4e40c0114d7755c0d8989bfd1ec3f8dbb14586db # shrinks to dimensions = (144, 15), baseline_color = [20, 34, 17, 156], actual_color = [83, 69, 199, 28]
 cc 38b272c04390996f24ffb238938c6ae4fc27189de82bc0c290fa931e31795234 # shrinks to dimensions = (115, 154), baseline_color = [70, 134, 9, 154], actual_color = [241, 27, 162, 208]
+cc d7f645508ebf97821d73f81ff067074743c10f2f2bdb37a32b21039a506bdc56 # shrinks to dimensions = (1, 1), base_color = [245, 245, 245, 0]
+cc a194a0224295baeb9cf532c070351828bf61fdc954f11abbb09fb7ffa16b8933 # shrinks to dimensions = (185, 130), baseline_color = [70, 83, 87, 5], actual_color = [106, 133, 91, 134]

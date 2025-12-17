@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc ec37780b21707211314f109d3eed8ec43c1acf9e1741752a9fd61ee17aa364d9 # shrinks to prefs = GenerationPreferences { complexity_level: Basic, project_type: Web, include_edge_cases: true, include_error_scenarios: false, excluded_test_types: [], custom_prompt_template: Some("IpSc M081vtg81RgmUy 6 6p mxY1  p jQ1 ZmSyB6eRQ  Dsz 4 tRgd OJ0 cswF6j4UJ z2oh3FK"), show_cost_info: true }
