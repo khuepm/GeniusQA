@@ -1,0 +1,200 @@
+/**
+ * Styles for AITestCaseConfigurationUI Component
+ */
+
+.config-modal {
+  max-width: 700px;
+  max-height: 85vh;
+}
+
+.config-section {
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.config-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.config-section h3 {
+  margin: 0 0 8px 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.section-description {
+  margin: 0 0 16px 0;
+  color: #6b7280;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.api-key-input-group {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.api-key-input-group input {
+  flex: 1;
+}
+
+.toggle-visibility-button,
+.validate-button {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: white;
+  color: #374151;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.toggle-visibility-button {
+  padding: 8px 10px;
+  font-size: 16px;
+}
+
+.toggle-visibility-button:hover,
+.validate-button:hover:not(:disabled) {
+  background-color: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.validate-button {
+  background-color: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+  font-weight: 500;
+}
+
+.validate-button:hover:not(:disabled) {
+  background-color: #2563eb;
+  border-color: #2563eb;
+}
+
+.validate-button:disabled {
+  background-color: #9ca3af;
+  border-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.success-message {
+  margin-top: 6px;
+  color: #059669;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.test-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.test-type-checkbox {
+  margin-bottom: 0;
+  padding: 8px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background-color: #fafafa;
+  transition: all 0.2s;
+}
+
+.test-type-checkbox:hover {
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.test-type-checkbox input[type="checkbox"]:checked + * {
+  font-weight: 500;
+}
+
+.test-type-checkbox:has(input[type="checkbox"]:checked) {
+  background-color: #eff6ff;
+  border-color: #3b82f6;
+  color: #1d4ed8;
+}
+
+.field-help {
+  margin-top: 4px;
+  color: #6b7280;
+  font-size: 0.8125rem;
+  font-style: italic;
+}
+
+/* Form styling overrides for config modal */
+.config-modal .form-group {
+  margin-bottom: 20px;
+}
+
+.config-modal .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.config-modal .checkbox-group {
+  margin: 16px 0;
+}
+
+.config-modal .checkbox-label {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 0.875rem;
+  color: #374151;
+  cursor: pointer;
+  padding: 8px 0;
+}
+
+.config-modal .checkbox-label input[type="checkbox"] {
+  width: auto;
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .config-modal {
+    width: 95%;
+    max-width: none;
+    margin: 20px;
+  }
+  
+  .config-modal .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .api-key-input-group {
+    flex-direction: column;
+  }
+  
+  .test-type-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .config-section {
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .toggle-visibility-button,
+  .validate-button {
+    padding: 10px 12px;
+    font-size: 0.8125rem;
+  }
+  
+  .api-key-input-group {
+    gap: 6px;
+  }
+}

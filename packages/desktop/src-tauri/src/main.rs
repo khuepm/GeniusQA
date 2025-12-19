@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod ai_test_case;
 mod core_router;
 mod python_process;
 
@@ -831,10 +832,63 @@ async fn capture_screenshot() -> Result<String, String> {
             Ok(STANDARD.encode(&screenshot_data))
         }
         Err(e) => {
-            log::error!("[AI Vision] Failed to capture screenshot: {}", e);
-            Err(format!("Failed to capture screenshot: {}", e))
+            let err_string = format!("{}", e);
+
+            #[cfg(target_os = "macos")]
+            {
+                let lower = err_string.to_lowercase();
+                if lower.contains("not yet implemented") || lower.contains("not implemented") {
+                    match capture_screenshot_macos_fallback() {
+                        Ok(bytes) => {
+                            log::info!("[AI Vision] Screenshot captured via macOS fallback ({} bytes)", bytes.len());
+                            return Ok(STANDARD.encode(&bytes));
+                        }
+                        Err(fallback_err) => {
+                            log::error!("[AI Vision] macOS screenshot fallback failed: {}", fallback_err);
+                        }
+                    }
+                }
+            }
+
+            log::error!("[AI Vision] Failed to capture screenshot: {}", err_string);
+            Err(format!("Failed to capture screenshot: {}", err_string))
         }
     }
+}
+
+#[cfg(target_os = "macos")]
+fn capture_screenshot_macos_fallback() -> Result<Vec<u8>, String> {
+    use std::process::Command;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| format!("Failed to read system time: {}", e))?
+        .as_nanos();
+
+    let path = std::env::temp_dir().join(format!(
+        "geniusqa_screenshot_{}_{}.png",
+        std::process::id(),
+        nanos
+    ));
+
+    let path_str = path
+        .to_str()
+        .ok_or_else(|| "Failed to build temp screenshot path".to_string())?
+        .to_string();
+
+    let status = Command::new("screencapture")
+        .args(["-x", "-t", "png", &path_str])
+        .status()
+        .map_err(|e| format!("Failed to run screencapture: {}", e))?;
+
+    if !status.success() {
+        return Err(format!("screencapture failed with status: {}", status));
+    }
+
+    let bytes = std::fs::read(&path).map_err(|e| format!("Failed to read screenshot file: {}", e))?;
+    let _ = std::fs::remove_file(&path);
+    Ok(bytes)
 }
 
 /// Save an asset file (e.g., reference image)
@@ -1040,9 +1094,22 @@ fn main() {
     let core_router_state = CoreRouterState { router: core_router };
     let monitor_state = MonitorState { monitor: core_monitor.clone() };
 
+    // Initialize AI Test Case service
+    let ai_service_state = match ai_test_case::AIServiceState::new() {
+        Ok(state) => state,
+        Err(e) => {
+            eprintln!("Warning: Failed to initialize AI Test Case service: {}", e);
+            // Create a minimal state that will return errors for all operations
+            ai_test_case::AIServiceState::new().unwrap_or_else(|_| {
+                panic!("Failed to create AI service state")
+            })
+        }
+    };
+
     tauri::Builder::default()
         .manage(core_router_state)
         .manage(monitor_state)
+        .manage(ai_service_state)
         .setup(move |_app| {
             // Start monitoring in background after Tauri runtime is initialized
             tauri::async_runtime::spawn(async move {
@@ -1099,6 +1166,22 @@ fn main() {
             create_click_overlay,
             close_click_overlay,
             show_click_cursor,
+            // AI Test Case Generator commands
+            ai_test_case::commands::generate_test_cases_from_requirements,
+            ai_test_case::commands::generate_documentation_from_actions,
+            ai_test_case::commands::configure_api_key,
+            ai_test_case::commands::validate_api_key,
+            ai_test_case::commands::check_api_key_configured,
+            ai_test_case::commands::remove_api_key,
+            ai_test_case::commands::get_generation_preferences,
+            ai_test_case::commands::update_generation_preferences,
+            ai_test_case::commands::reset_generation_preferences,
+            // AI Test Case Monitoring commands
+            ai_test_case::commands::get_performance_stats,
+            ai_test_case::commands::get_token_usage_stats,
+            ai_test_case::commands::get_usage_patterns,
+            ai_test_case::commands::calculate_cost_estimation,
+            ai_test_case::commands::get_recent_errors,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

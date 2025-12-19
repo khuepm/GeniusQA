@@ -473,7 +473,7 @@ def test_loop_progress_callback():
 # =========================================================================
 
 @st.composite
-def test_step_strategy(draw):
+def step_strategy(draw):
     """Generate a valid TestStep."""
     step_id = str(uuid.uuid4())
     order = draw(st.integers(min_value=1, max_value=100))
@@ -494,7 +494,7 @@ def test_step_strategy(draw):
 
 
 @st.composite
-def test_script_strategy(draw):
+def script_strategy(draw):
     """Generate a valid TestScript with steps and action pool."""
     # Generate metadata
     meta = EnhancedScriptMetadata(
@@ -512,7 +512,7 @@ def test_script_strategy(draw):
     all_action_ids = []
     
     for i in range(step_count):
-        step = draw(test_step_strategy())
+        step = draw(step_strategy())
         step.order = i + 1  # Ensure sequential order
         steps.append(step)
         all_action_ids.extend(step.action_ids)
@@ -536,7 +536,7 @@ def test_script_strategy(draw):
 
 # Feature: test-case-driven-automation, Property 11: Execution Flow Management
 @settings(max_examples=100, deadline=None)
-@given(test_script_strategy())
+@given(script_strategy())
 def test_execution_flow_management(test_script):
     """For any test script execution, steps SHALL execute in sequential order,
     failed steps SHALL cause subsequent steps to be marked as SKIPPED (unless

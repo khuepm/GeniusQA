@@ -23,6 +23,15 @@ import {
   MigrationResult 
 } from '../types/testCaseDriven.types';
 import { TestScriptMigrationService } from './testScriptMigrationService';
+import { 
+  validateTestScript as validateTestScriptStructure, 
+  repairTestScript, 
+  createFallbackScript,
+  formatStepErrors,
+  canSafelyLoadScript,
+  StepValidationResult,
+  RecoveryResult,
+} from '../utils/stepErrorHandling';
 
 /**
  * Extended action type that includes AI Vision Capture actions
@@ -739,7 +748,7 @@ class ScriptStorageService {
       if (TestScriptMigrationService.isStepBasedFormat(scriptData)) {
         const testScript = scriptData as TestScript;
         const legacyScript = TestScriptMigrationService.convertToLegacyFormat(testScript);
-        return this.processActionsOnLoad(legacyScript as ExtendedScriptData, scriptPath);
+        return this.processActionsOnLoad(legacyScript as unknown as ExtendedScriptData, scriptPath);
       }
       
       console.warn('[ScriptStorageService] Unknown script format in loadScript:', scriptPath);
@@ -1051,6 +1060,177 @@ class ScriptStorageService {
     repaired.meta.action_count = Object.keys(repaired.action_pool).length;
 
     return repaired;
+  }
+
+  /**
+   * Performs comprehensive validation and repair of a test script
+   * Uses the stepErrorHandling utilities for thorough validation
+   * Requirements: 6.4, 8.4
+   * 
+   * @param scriptPath - Path to the script to validate and repair
+   * @returns Validation and repair result
+   */
+  async validateAndRepairScript(scriptPath: string): Promise<{
+    validation: StepValidationResult;
+    recovery?: RecoveryResult;
+    repairedScript?: TestScript;
+  }> {
+    try {
+      // Load the raw script data
+      const rawScriptData = await this.ipcBridge.loadScript(scriptPath);
+      
+      if (!rawScriptData) {
+        return {
+          validation: {
+            isValid: false,
+            errors: [{
+              type: 'CORRUPTED_STEP_DATA' as any,
+              message: 'Script file not found or empty',
+              recoverable: false,
+            }],
+            warnings: [],
+            repairableIssues: [],
+          },
+        };
+      }
+
+      // Check if it can be safely loaded
+      const safetyCheck = canSafelyLoadScript(rawScriptData);
+      if (!safetyCheck.safe) {
+        console.warn('[ScriptStorageService] Script safety check failed:', safetyCheck.reason);
+      }
+
+      // Perform comprehensive validation
+      const validation = validateTestScriptStructure(rawScriptData);
+      
+      // If validation passed, return success
+      if (validation.isValid) {
+        return { validation };
+      }
+
+      // If there are repairable issues, attempt repair
+      if (validation.repairableIssues.length > 0) {
+        console.log('[ScriptStorageService] Attempting to repair script:', scriptPath);
+        console.log('[ScriptStorageService] Repairable issues:', validation.repairableIssues);
+        
+        const recovery = repairTestScript(rawScriptData);
+        
+        if (recovery.success && recovery.repairedScript) {
+          console.log('[ScriptStorageService] Script repaired successfully');
+          console.log('[ScriptStorageService] Repairs applied:', recovery.repairsApplied);
+          
+          return {
+            validation,
+            recovery,
+            repairedScript: recovery.repairedScript,
+          };
+        } else {
+          console.error('[ScriptStorageService] Script repair failed:', recovery.unresolvedIssues);
+          return {
+            validation,
+            recovery,
+          };
+        }
+      }
+
+      // Return validation result without repair
+      return { validation };
+    } catch (error) {
+      console.error('[ScriptStorageService] Validation and repair failed:', error);
+      return {
+        validation: {
+          isValid: false,
+          errors: [{
+            type: 'UNKNOWN_ERROR' as any,
+            message: error instanceof Error ? error.message : 'Unknown error during validation',
+            recoverable: false,
+          }],
+          warnings: [],
+          repairableIssues: [],
+        },
+      };
+    }
+  }
+
+  /**
+   * Loads a script with automatic recovery for corrupted data
+   * Requirements: 6.4, 8.4
+   * 
+   * @param scriptPath - Path to the script to load
+   * @param autoRepair - Whether to automatically repair corrupted scripts
+   * @returns The loaded script or a fallback script if recovery fails
+   */
+  async loadScriptWithRecovery(
+    scriptPath: string, 
+    autoRepair: boolean = true
+  ): Promise<{
+    script: TestScript;
+    wasRepaired: boolean;
+    repairsApplied: string[];
+    warnings: string[];
+  }> {
+    try {
+      // First try normal loading
+      const migrationResult = await this.loadScriptAsTestScript(scriptPath);
+      
+      if (migrationResult.success && migrationResult.migrated_script) {
+        return {
+          script: migrationResult.migrated_script,
+          wasRepaired: false,
+          repairsApplied: [],
+          warnings: migrationResult.was_legacy ? ['Script was migrated from legacy format'] : [],
+        };
+      }
+
+      // If normal loading failed and autoRepair is enabled, try repair
+      if (autoRepair) {
+        console.log('[ScriptStorageService] Normal loading failed, attempting recovery:', scriptPath);
+        
+        const validationResult = await this.validateAndRepairScript(scriptPath);
+        
+        if (validationResult.repairedScript) {
+          return {
+            script: validationResult.repairedScript,
+            wasRepaired: true,
+            repairsApplied: validationResult.recovery?.repairsApplied || [],
+            warnings: [
+              'Script was automatically repaired',
+              ...validationResult.validation.warnings,
+            ],
+          };
+        }
+
+        // If repair failed, create a fallback script
+        console.warn('[ScriptStorageService] Repair failed, creating fallback script');
+        const fallbackScript = createFallbackScript(scriptPath);
+        
+        return {
+          script: fallbackScript,
+          wasRepaired: true,
+          repairsApplied: ['Created fallback script due to unrecoverable corruption'],
+          warnings: [
+            'Original script could not be recovered',
+            formatStepErrors(validationResult.validation.errors),
+          ],
+        };
+      }
+
+      // If autoRepair is disabled, throw an error
+      throw new Error(migrationResult.error || 'Failed to load script');
+    } catch (error) {
+      console.error('[ScriptStorageService] Load with recovery failed:', error);
+      
+      // Return a fallback script as last resort
+      const fallbackScript = createFallbackScript(scriptPath);
+      return {
+        script: fallbackScript,
+        wasRepaired: true,
+        repairsApplied: ['Created fallback script due to load failure'],
+        warnings: [
+          `Load failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        ],
+      };
+    }
   }
 
   /**

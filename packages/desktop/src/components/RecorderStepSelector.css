@@ -1,0 +1,466 @@
+/**
+ * RecorderStepSelector Component Styles
+ * 
+ * Styles for the compact step selection UI in the RecorderScreen.
+ * Provides visual feedback for step selection and recording state.
+ * 
+ * Requirements: 2.1, 2.2, 4.1
+ */
+
+.recorder-step-selector {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================================================
+   Header Section
+   ============================================================================ */
+
+.step-selector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.step-selector-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #202124;
+}
+
+.script-name {
+  font-size: 12px;
+  color: #5f6368;
+  background-color: #f1f3f4;
+  padding: 4px 8px;
+  border-radius: 4px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================================================
+   No Script State
+   ============================================================================ */
+
+.no-script-container {
+  text-align: center;
+  padding: 16px 0;
+}
+
+.no-script-text {
+  font-size: 14px;
+  color: #5f6368;
+  margin-bottom: 12px;
+}
+
+.load-script-btn {
+  padding: 10px 20px;
+  background-color: #1a73e8;
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.load-script-btn:hover:not(:disabled) {
+  background-color: #1557b0;
+}
+
+.load-script-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.setup-step-hint {
+  font-size: 12px;
+  color: #80868b;
+  margin-top: 12px;
+  font-style: italic;
+}
+
+/* ============================================================================
+   Active Step Display
+   ============================================================================ */
+
+.active-step-display {
+  margin-bottom: 8px;
+}
+
+.step-selector-button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 12px;
+  background-color: #f8f9fa;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.step-selector-button:hover:not(:disabled) {
+  background-color: #e8f0fe;
+  border-color: #1a73e8;
+}
+
+.step-selector-button:disabled {
+  cursor: default;
+}
+
+.step-selector-button.recording {
+  background-color: #fce8e6;
+  border-color: #d93025;
+}
+
+.step-indicator-emoji {
+  font-size: 18px;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.step-selector-text {
+  flex: 1;
+  font-size: 14px;
+  color: #202124;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step-selector-icon {
+  font-size: 10px;
+  color: #5f6368;
+  margin-left: 8px;
+}
+
+/* ============================================================================
+   Recording Step Info
+   ============================================================================ */
+
+.recording-step-info {
+  background-color: #fce8e6;
+  border: 1px solid #f5c6cb;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.recording-step-indicator {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.recording-dot {
+  width: 10px;
+  height: 10px;
+  background-color: #d93025;
+  border-radius: 50%;
+  margin-right: 8px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.recording-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #d93025;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.recording-step-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.recording-step-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #202124;
+}
+
+.recording-step-expected {
+  font-size: 12px;
+  color: #5f6368;
+  font-style: italic;
+}
+
+/* ============================================================================
+   Step List Dropdown
+   ============================================================================ */
+
+.step-list-dropdown {
+  position: relative;
+  background-color: #ffffff;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  margin-top: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-height: 300px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.step-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid #dadce0;
+  background-color: #f8f9fa;
+}
+
+.step-list-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #202124;
+}
+
+.create-step-btn {
+  padding: 6px 12px;
+  background-color: #34a853;
+  border: none;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.create-step-btn:hover {
+  background-color: #2d8e47;
+}
+
+.step-list-items {
+  overflow-y: auto;
+  max-height: 220px;
+  padding: 8px;
+}
+
+.step-list-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-bottom: 4px;
+}
+
+.step-list-item:last-child {
+  margin-bottom: 0;
+}
+
+.step-list-item:hover {
+  background-color: #f1f3f4;
+}
+
+.step-list-item.selected {
+  background-color: #e8f0fe;
+  border: 1px solid #1a73e8;
+}
+
+.step-item-indicator {
+  font-size: 16px;
+  margin-right: 10px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.step-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-item-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #202124;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.step-item-description {
+  font-size: 12px;
+  color: #5f6368;
+  display: block;
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step-item-actions {
+  font-size: 11px;
+  color: #80868b;
+  display: block;
+}
+
+.empty-steps-message {
+  text-align: center;
+  padding: 20px;
+  color: #5f6368;
+  font-size: 13px;
+}
+
+.empty-steps-message p {
+  margin: 4px 0;
+}
+
+/* ============================================================================
+   Create Step Form
+   ============================================================================ */
+
+.create-step-form {
+  background-color: #ffffff;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  margin-top: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #dadce0;
+  background-color: #f8f9fa;
+}
+
+.form-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #202124;
+}
+
+.form-close-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  font-size: 18px;
+  color: #5f6368;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.form-close-btn:hover {
+  background-color: #e8eaed;
+}
+
+.form-body {
+  padding: 16px;
+}
+
+.form-field {
+  margin-bottom: 12px;
+}
+
+.form-field:last-of-type {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #5f6368;
+  margin-bottom: 6px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #dadce0;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #202124;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+}
+
+.form-input::placeholder {
+  color: #80868b;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.form-cancel-btn {
+  padding: 8px 16px;
+  background-color: #f1f3f4;
+  border: 1px solid #dadce0;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #5f6368;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.form-cancel-btn:hover {
+  background-color: #e8eaed;
+}
+
+.form-submit-btn {
+  padding: 8px 16px;
+  background-color: #1a73e8;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.form-submit-btn:hover:not(:disabled) {
+  background-color: #1557b0;
+}
+
+.form-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

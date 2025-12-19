@@ -803,7 +803,13 @@ export class UnifiedAIService implements IUnifiedAIService {
       return 'network_error';
     }
     
-    if (lowerMessage.includes('unauthorized') || lowerMessage.includes('401') || lowerMessage.includes('invalid api key') || lowerMessage.includes('authentication')) {
+    if (
+      lowerMessage.includes('unauthorized') ||
+      lowerMessage.includes('401') ||
+      lowerMessage.includes('invalid api key') ||
+      lowerMessage.includes('api key not valid') ||
+      lowerMessage.includes('authentication')
+    ) {
       return 'auth_error';
     }
     

@@ -87,6 +87,21 @@ jest.mock('../../services/geminiService', () => ({
 }));
 
 /**
+ * Mock the unifiedAIService (used by useChatState for generation)
+ */
+jest.mock('../../services/unifiedAIService', () => ({
+  unifiedAIService: {
+    initialize: jest.fn().mockResolvedValue(undefined),
+    isInitialized: jest.fn().mockReturnValue(true),
+    generateScript: jest.fn().mockResolvedValue({
+      success: true,
+      message: 'Test response',
+      script: undefined,
+    }),
+  },
+}));
+
+/**
  * Helper to create a mock onScriptGenerated callback
  */
 const createMockCallback = () => jest.fn<void, [ScriptData]>();

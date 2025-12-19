@@ -8,13 +8,14 @@
  * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 5.1, 5.2, 5.3, 5.4, 6.2
  */
 
-import React, { useRef, useEffect, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { ChatMessage, ScriptData, ChatInterfaceProps, ActionSuggestion, ExamplePrompt } from '../types/aiScriptBuilder.types';
 import { AIProvider, ProviderInfo, ProviderModel } from '../types/providerAdapter.types';
 import { useChatState } from '../hooks/useChatState';
 import { getSuggestions, getExamplePrompts } from '../utils/scriptSuggestions';
 import { ProviderSelector } from './ProviderSelector';
 import { ModelSelector } from './ModelSelector';
+import { getIPCBridge } from '../services/ipcBridgeService';
 import './AIChatInterface.css';
 
 /**
@@ -152,32 +153,113 @@ const ExamplePromptsPanel: React.FC<ExamplePromptsPanelProps> = ({
 interface ClarificationQuestionsProps {
   questions: string[];
   onAnswerSelect: (answer: string) => void;
+  onRecordCoordinate: (question: string) => void;
 }
 
 const ClarificationQuestions: React.FC<ClarificationQuestionsProps> = ({
   questions,
   onAnswerSelect,
+  onRecordCoordinate,
 }) => {
   if (!questions || questions.length === 0) {
     return null;
   }
 
+  const filteredQuestions = questions.filter((q) => {
+    const lower = q.toLowerCase();
+    return !(
+      lower.includes('operating system') ||
+      lower.includes('are you running this on') ||
+      (lower.includes('windows') && lower.includes('mac') && lower.includes('linux'))
+    );
+  });
+
+  if (filteredQuestions.length === 0) {
+    return null;
+  }
+
+  const isCoordinateQuestion = (q: string) => {
+    const lower = q.toLowerCase();
+    const mentionsXY =
+      (lower.includes('x') && lower.includes('y')) ||
+      lower.includes('(x') ||
+      lower.includes('x,') ||
+      lower.includes('x=') ||
+      lower.includes('y=');
+
+    const coordinateKeywords = [
+      'coordinate',
+      'coordinates',
+      'position',
+      'location',
+      'where',
+      'tọa độ',
+      'toạ độ',
+      'toa do',
+      'vị trí',
+      'vi tri',
+      'ở đâu',
+      'o dau',
+      'chỗ nào',
+      'cho nao',
+      'điểm',
+      'diem',
+      'point',
+    ];
+
+    const targetElementKeywords = [
+      'username',
+      'password',
+      'login',
+      'sign in',
+      'email',
+      'user name',
+      'nút',
+      'nut',
+      'ô',
+      'o ',
+      'textbox',
+      'field',
+      'button',
+    ];
+
+    const hasCoordinateKeyword = coordinateKeywords.some((k) => lower.includes(k));
+    const hasTargetElement = targetElementKeywords.some((k) => lower.includes(k));
+
+    return mentionsXY || hasCoordinateKeyword || (hasTargetElement && (lower.includes('tọa') || lower.includes('vị trí') || lower.includes('where')));
+  };
+
   return (
     <div className="chat-clarification" data-testid="clarification-questions">
       <div className="chat-clarification-header">AI cần thêm thông tin:</div>
-      {questions.map((question, index) => (
-        <button
-          key={index}
-          className="chat-clarification-item"
-          onClick={() => onAnswerSelect(question)}
-          data-testid={`clarification-${index}`}
-        >
-          {question}
-        </button>
+      {filteredQuestions.map((question, index) => (
+        <div key={index} className="chat-clarification-row">
+          <button
+            className="chat-clarification-item"
+            onClick={() => onAnswerSelect(question)}
+            data-testid={`clarification-${index}`}
+          >
+            {question}
+          </button>
+          {isCoordinateQuestion(question) && (
+            <button
+              type="button"
+              className="chat-clarification-record"
+              onClick={() => onRecordCoordinate(question)}
+              data-testid={`clarification-record-${index}`}
+            >
+              Record
+            </button>
+          )}
+        </div>
       ))}
     </div>
   );
 };
+
+type CoordinatePickState =
+  | { open: false }
+  | { open: true; question: string; screenshot: string; loading: boolean; error: string | null };
 
 
 /**
@@ -212,6 +294,7 @@ const ApiKeyPrompt: React.FC<ApiKeyPromptProps> = ({ onConfigureKey }) => (
 export const AIChatInterface: React.FC<ChatInterfaceProps> = ({
   onScriptGenerated,
   apiKeyConfigured,
+  targetOS,
   providers = [],
   activeProvider = null,
   onProviderSelect,
@@ -221,6 +304,7 @@ export const AIChatInterface: React.FC<ChatInterfaceProps> = ({
   onModelSelect,
   providerLoading = false,
 }) => {
+  const ipcBridge = getIPCBridge();
   const {
     messages,
     inputValue,
@@ -229,7 +313,7 @@ export const AIChatInterface: React.FC<ChatInterfaceProps> = ({
     setInputValue,
     sendMessage,
     clearError,
-  } = useChatState({ onScriptGenerated });
+  } = useChatState({ onScriptGenerated, activeProvider, targetOS });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -237,25 +321,85 @@ export const AIChatInterface: React.FC<ChatInterfaceProps> = ({
   // State for suggestions dropdown visibility
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  const [coordinatePick, setCoordinatePick] = useState<CoordinatePickState>({ open: false });
+
   // Get example prompts (Requirements: 5.1)
   const examplePrompts = useMemo(() => getExamplePrompts(), []);
 
   // Get suggestions based on current input (Requirements: 5.2)
   const suggestions = useMemo(() => getSuggestions(inputValue), [inputValue]);
 
-  // Get clarification questions from the last AI message (Requirements: 5.3)
-  const clarificationQuestions = useMemo(() => {
-    const lastAssistantMessage = [...messages].reverse().find(m => m.role === 'assistant');
-    if (lastAssistantMessage?.scriptPreview === undefined) {
-      // Check if the message contains clarification questions pattern
-      const content = lastAssistantMessage?.content || '';
-      const questionMatch = content.match(/\?[\s]*$/);
-      if (questionMatch) {
-        // Extract potential questions from the message
-        return [];
-      }
+  const extractQuestionsFromText = (text: string): string[] => {
+    const lines = text
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    const qLines = lines.filter((l) => l.includes('?'));
+    if (qLines.length > 0) return qLines;
+
+    const numbered = lines.filter((l) => /^\d+\./.test(l));
+    if (numbered.length > 0) return numbered;
+
+    const dashed = lines.filter((l) => /^[-*]\s+/.test(l));
+    if (dashed.length > 0) return dashed;
+
+    const sentenceMatches = text.match(/[^?]+\?/g);
+    if (sentenceMatches && sentenceMatches.length > 0) {
+      return sentenceMatches.map((s) => s.trim()).filter(Boolean);
     }
+
+    const lower = text.toLowerCase();
+    const fallbackKeywords = [
+      'tọa độ',
+      'toạ độ',
+      'toa do',
+      'vị trí',
+      'vi tri',
+      'ở đâu',
+      'o dau',
+      'chỗ nào',
+      'cho nao',
+      'coordinate',
+      'coordinates',
+      'position',
+      'location',
+      '(x',
+      'x=',
+      'y=',
+      'username',
+      'password',
+      'login',
+      'sign in',
+      'email',
+      'button',
+      'field',
+      'textbox',
+      'nút',
+      'nut',
+    ];
+
+    if (fallbackKeywords.some((k) => lower.includes(k))) {
+      const roughSentences = text
+        .split(/[\n.!]/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const candidates = roughSentences.filter((s) =>
+        fallbackKeywords.some((k) => s.toLowerCase().includes(k))
+      );
+      return candidates.length > 0 ? candidates : [text.trim()];
+    }
+
     return [];
+  };
+
+  const clarificationQuestions = useMemo(() => {
+    const lastAssistantMessage = [...messages].reverse().find((m) => m.role === 'assistant');
+    if (!lastAssistantMessage) return [];
+    if (lastAssistantMessage.clarificationQuestions && lastAssistantMessage.clarificationQuestions.length > 0) {
+      return lastAssistantMessage.clarificationQuestions;
+    }
+    return extractQuestionsFromText(lastAssistantMessage.content);
   }, [messages]);
 
   // Auto-scroll to bottom when new messages arrive
@@ -330,6 +474,63 @@ export const AIChatInterface: React.FC<ChatInterfaceProps> = ({
   const handleClarificationSelect = (answer: string) => {
     setInputValue(answer);
     inputRef.current?.focus();
+  };
+
+  const normalizeScreenshotSrc = (raw: string) => {
+    if (!raw) return '';
+    if (raw.startsWith('data:image')) return raw;
+    return `data:image/png;base64,${raw}`;
+  };
+
+  const handleRecordCoordinate = useCallback(async (question: string) => {
+    try {
+      setCoordinatePick({ open: true, question, screenshot: '', loading: true, error: null });
+      const screenshot = await ipcBridge.captureScreenshot();
+      setCoordinatePick({
+        open: true,
+        question,
+        screenshot,
+        loading: false,
+        error: null,
+      });
+    } catch (e) {
+      setCoordinatePick({
+        open: true,
+        question,
+        screenshot: '',
+        loading: false,
+        error: e instanceof Error ? e.message : 'Failed to capture screenshot',
+      });
+    }
+  }, [ipcBridge]);
+
+  const closeCoordinatePick = () => setCoordinatePick({ open: false });
+
+  const handleCoordinateClick = async (e: React.MouseEvent<HTMLImageElement>) => {
+    if (!coordinatePick.open || coordinatePick.loading) return;
+    const img = e.currentTarget;
+    const rect = img.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    const naturalWidth = img.naturalWidth || rect.width;
+    const naturalHeight = img.naturalHeight || rect.height;
+    const scaleX = naturalWidth / rect.width;
+    const scaleY = naturalHeight / rect.height;
+
+    const x = Math.round(clickX * scaleX);
+    const y = Math.round(clickY * scaleY);
+
+    const q = coordinatePick.question;
+    closeCoordinatePick();
+
+    const lower = q.toLowerCase();
+    let label = 'Coordinates';
+    if (lower.includes('username')) label = 'Username field';
+    else if (lower.includes('password')) label = 'Password field';
+    else if (lower.includes('login')) label = 'Login button';
+
+    await sendMessage(`${label}: x=${x}, y=${y}`);
   };
 
   // Show API key prompt if not configured
@@ -465,6 +666,7 @@ export const AIChatInterface: React.FC<ChatInterfaceProps> = ({
             <ClarificationQuestions
               questions={clarificationQuestions}
               onAnswerSelect={handleClarificationSelect}
+              onRecordCoordinate={handleRecordCoordinate}
             />
           </>
         )}
@@ -509,6 +711,37 @@ export const AIChatInterface: React.FC<ChatInterfaceProps> = ({
           </button>
         </form>
       </div>
+
+      {coordinatePick.open && (
+        <div className="coordinate-picker-overlay" onClick={closeCoordinatePick}>
+          <div className="coordinate-picker-content" onClick={(ev) => ev.stopPropagation()}>
+            <div className="coordinate-picker-header">
+              <div className="coordinate-picker-title">Pick coordinates</div>
+              <button className="coordinate-picker-close" onClick={closeCoordinatePick} aria-label="Close">
+                ×
+              </button>
+            </div>
+            <div className="coordinate-picker-body">
+              <div className="coordinate-picker-question">{coordinatePick.question}</div>
+              {coordinatePick.error && (
+                <div className="coordinate-picker-error">{coordinatePick.error}</div>
+              )}
+              {coordinatePick.loading ? (
+                <div className="coordinate-picker-loading">Capturing screenshot…</div>
+              ) : coordinatePick.screenshot ? (
+                <img
+                  className="coordinate-picker-image"
+                  src={normalizeScreenshotSrc(coordinatePick.screenshot)}
+                  onClick={handleCoordinateClick}
+                  alt="Screenshot"
+                />
+              ) : (
+                <div className="coordinate-picker-loading">No screenshot</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

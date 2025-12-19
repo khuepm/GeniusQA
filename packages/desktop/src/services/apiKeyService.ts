@@ -87,11 +87,16 @@ class ApiKeyService {
     }
 
     try {
+      console.log(`[ApiKeyService] Storing ${provider} API key for user: ${userId}`);
       const encryptedKey = encryptApiKey(apiKey);
       const now = Timestamp.now();
 
       const docRef = doc(this.db, API_KEYS_COLLECTION, userId);
+      console.log(`[ApiKeyService] Document path: ${API_KEYS_COLLECTION}/${userId}`);
+      
       const existingDoc = await getDoc(docRef);
+      console.log(`[ApiKeyService] Existing doc exists: ${existingDoc.exists()}`);
+      
       const existingData = existingDoc.exists() ? (existingDoc.data() as UserApiKeysData) : {};
 
       const providerData: ProviderKeyData = {
@@ -104,9 +109,16 @@ class ApiKeyService {
         ...existingData,
         [provider]: providerData,
       });
-    } catch (error) {
-      console.error(`Failed to store ${provider} API key:`, error);
-      throw new Error(`Failed to store ${provider} API key in Firebase`);
+      console.log(`[ApiKeyService] Successfully stored ${provider} API key`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorCode = (error as { code?: string })?.code || 'unknown';
+      console.error(`[ApiKeyService] Failed to store ${provider} API key:`, {
+        errorCode,
+        errorMessage,
+        error,
+      });
+      throw new Error(`Failed to store ${provider} API key in Firebase: ${errorCode} - ${errorMessage}`);
     }
   }
 
