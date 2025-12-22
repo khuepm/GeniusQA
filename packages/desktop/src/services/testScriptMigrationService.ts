@@ -10,12 +10,13 @@
 import { TestScript, TestStep, ActionWithId, EnhancedScriptMetadata } from '../types/testCaseDriven.types';
 
 interface LegacyAction {
-  type: 'mouse_move' | 'mouse_click' | 'key_press' | 'key_release' | 'ai_vision_capture';
+  type: 'mouse_move' | 'mouse_click' | 'key_press' | 'key_release' | 'ai_vision_capture' | 'visual_assert';
   timestamp: number;
   x?: number;
   y?: number;
   button?: 'left' | 'right' | 'middle';
   key?: string;
+  additional_data?: any;
   // AI Vision Capture specific fields
   id?: string;
   is_dynamic?: boolean;
@@ -23,6 +24,11 @@ interface LegacyAction {
   static_data?: any;
   dynamic_config?: any;
   cache_data?: any;
+  // Visual Assert specific fields
+  config?: any;
+  regions?: any;
+  assets?: any;
+  context?: any;
 }
 
 interface LegacyScriptData {
@@ -152,6 +158,7 @@ export class TestScriptMigrationService {
             ...(action.y !== null && { y: action.y }),
             ...(action.button && { button: action.button }),
             ...(action.key && { key: action.key }),
+            ...(action.additional_data !== undefined && { additional_data: action.additional_data }),
             // AI Vision specific fields
             ...(action.id && { id: action.id }),
             ...(action.is_dynamic !== undefined && { is_dynamic: action.is_dynamic }),
@@ -159,6 +166,11 @@ export class TestScriptMigrationService {
             ...(action.static_data && { static_data: action.static_data }),
             ...(action.dynamic_config && { dynamic_config: action.dynamic_config }),
             ...(action.cache_data && { cache_data: action.cache_data }),
+            // Visual Assert specific fields
+            ...(action.config && { config: action.config }),
+            ...(action.regions && { regions: action.regions }),
+            ...(action.assets && { assets: action.assets }),
+            ...(action.context && { context: action.context }),
           };
           allActions.push(legacyAction);
         }

@@ -81,8 +81,9 @@ export interface TauriEventPayload {
  * - complete: Operation completed successfully
  * - error: Error occurred during operation
  * - action_preview: Preview of action about to be executed
+ * - visual_assert_result: Visual assertion result
  */
-export type IPCEventType = 'progress' | 'complete' | 'error' | 'action_preview';
+export type IPCEventType = 'progress' | 'complete' | 'error' | 'action_preview' | 'visual_assert_result';
 
 /**
  * IPC event message from Python Core

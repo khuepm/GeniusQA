@@ -12,8 +12,11 @@ import { ScriptListItem } from '../components/ScriptListItem';
 import { ScriptFilter } from '../components/ScriptFilter';
 import { ClickCursorOverlay } from '../components/ClickCursorOverlay';
 import { RecorderStepSelector } from '../components/RecorderStepSelector';
+import DiffViewer from '../components/DiffViewer';
 import { getIPCBridge } from '../services/ipcBridgeService';
 import { scriptStorageService, StoredScriptInfo, ScriptFilter as ScriptFilterType, ScriptSource, TargetOS } from '../services/scriptStorageService';
+import { VisualTestResult } from '../types/visualTesting.types';
+import { invoke } from '@tauri-apps/api/tauri';
 import {
   RecorderStatus,
   IPCEvent,
@@ -80,6 +83,13 @@ const RecorderScreen: React.FC = () => {
   const [activeRecordingScript, setActiveRecordingScript] = useState<TestScript | null>(null);
   const [activeRecordingStepId, setActiveRecordingStepId] = useState<string | null>(null);
   const [showScriptLoaderForRecording, setShowScriptLoaderForRecording] = useState<boolean>(false);
+
+  // Screenshot capture option
+  const [captureScreenshotOnClick, setCaptureScreenshotOnClick] = useState<boolean>(false);
+
+  // Visual Assert Result
+  const [showDiffViewer, setShowDiffViewer] = useState<boolean>(false);
+  const [latestVisualTestResult, setLatestVisualTestResult] = useState<VisualTestResult | null>(null);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -217,6 +227,18 @@ const RecorderScreen: React.FC = () => {
       setIsPaused(event.data?.isPaused ?? false);
     };
 
+    const handleVisualAssertResultEvent = (event: IPCEvent) => {
+      const result = (event.data as any)?.data?.result ?? (event.data as any)?.result ?? event.data;
+      if (!result) return;
+
+      setLatestVisualTestResult(result as VisualTestResult);
+
+      // Open DiffViewer on failures
+      if ((result as VisualTestResult).passed === false) {
+        setShowDiffViewer(true);
+      }
+    };
+
     ipcBridge.addEventListener('progress', handleProgressEvent);
     ipcBridge.addEventListener('action_preview', handleActionPreviewEvent);
     ipcBridge.addEventListener('complete', handleCompleteEvent);
@@ -224,6 +246,7 @@ const RecorderScreen: React.FC = () => {
     ipcBridge.addEventListener('recording_stopped', handleRecordingStoppedEvent);
     ipcBridge.addEventListener('playback_stopped', handlePlaybackStoppedEvent);
     ipcBridge.addEventListener('playback_paused', handlePlaybackPausedEvent);
+    ipcBridge.addEventListener('visual_assert_result', handleVisualAssertResultEvent);
 
     // Cleanup
     return () => {
@@ -234,8 +257,31 @@ const RecorderScreen: React.FC = () => {
       ipcBridge.removeEventListener('recording_stopped', handleRecordingStoppedEvent);
       ipcBridge.removeEventListener('playback_stopped', handlePlaybackStoppedEvent);
       ipcBridge.removeEventListener('playback_paused', handlePlaybackPausedEvent);
+      ipcBridge.removeEventListener('visual_assert_result', handleVisualAssertResultEvent);
     };
   }, [location.state]);
+
+  const handleApproveVisualDiff = async () => {
+    if (!latestVisualTestResult) return;
+
+    // Copy actual -> baseline
+    const base64 = await invoke<string>('load_asset', { assetPath: latestVisualTestResult.actual_path });
+    await invoke('save_asset', { assetPath: latestVisualTestResult.baseline_path, base64Data: base64 });
+
+    setShowDiffViewer(false);
+  };
+
+  const handleRejectVisualDiff = async () => {
+    setShowDiffViewer(false);
+  };
+
+  const handleRetryVisualTest = async () => {
+    // Quick retry: just run playback again with current settings
+    const scriptPath = selectedScriptPath || lastRecordingPath || undefined;
+    await ipcBridge.startPlayback(scriptPath, playbackSpeed, loopCount);
+    setStatus('playing');
+    setShowDiffViewer(false);
+  };
 
   /**
    * Update recording time while recording
@@ -456,7 +502,7 @@ const RecorderScreen: React.FC = () => {
     try {
       setError(null);
       setLoading(true);
-      await ipcBridge.startRecording();
+      await ipcBridge.startRecording(captureScreenshotOnClick);
       setStatus('recording');
       setRecordingStartTime(Date.now());
       setRecordingTime(0);
@@ -974,6 +1020,28 @@ const RecorderScreen: React.FC = () => {
           </div>
         )}
 
+        {/* Recording Options */}
+        <div className="recording-options-card">
+          <h2 className="recording-options-title">Recording Options</h2>
+          <div className="recording-options-content">
+            <label className="recording-option-item">
+              <input
+                type="checkbox"
+                checked={captureScreenshotOnClick}
+                onChange={(e) => setCaptureScreenshotOnClick(e.target.checked)}
+                disabled={status !== 'idle'}
+                className="recording-option-checkbox"
+              />
+              <div className="recording-option-label">
+                <span className="recording-option-title">Chụp màn hình mỗi khi nhấn chuột</span>
+                <span className="recording-option-description">
+                  AI sẽ phân tích vùng được chọn trước khi thực hiện hành động. Ví dụ: khi nhấn vào ô input, AI sẽ kiểm tra xem đó có phải là ô input trước khi nhập ký tự.
+                </span>
+              </div>
+            </label>
+          </div>
+        </div>
+
         {/* Recording Status */}
         {status === 'recording' && (
           <div className="recording-status-container">
@@ -1370,6 +1438,23 @@ const RecorderScreen: React.FC = () => {
                   ))
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Visual Diff Viewer Modal */}
+        {showDiffViewer && latestVisualTestResult && (
+          <div className="modal-overlay" onClick={() => setShowDiffViewer(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <DiffViewer
+                testResult={latestVisualTestResult}
+                onApprove={handleApproveVisualDiff}
+                onReject={handleRejectVisualDiff}
+                onRetryTest={handleRetryVisualTest}
+                onAddIgnoreRegion={async () => {
+                  // Not wired yet
+                }}
+              />
             </div>
           </div>
         )}

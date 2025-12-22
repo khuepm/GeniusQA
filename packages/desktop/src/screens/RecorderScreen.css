@@ -983,3 +983,75 @@
   margin-top: 4px;
   font-style: italic;
 }
+
+/* Recording Options Card */
+.recording-options-card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.recording-options-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #202124;
+  margin-bottom: 16px;
+  margin-top: 0;
+}
+
+.recording-options-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.recording-option-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.recording-option-item:hover {
+  background-color: #e8eaed;
+}
+
+.recording-option-checkbox {
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.recording-option-checkbox:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.recording-option-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.recording-option-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #202124;
+  display: block;
+}
+
+.recording-option-description {
+  font-size: 13px;
+  color: #5f6368;
+  line-height: 1.5;
+  display: block;
+}

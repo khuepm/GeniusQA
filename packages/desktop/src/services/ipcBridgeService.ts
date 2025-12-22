@@ -62,7 +62,7 @@ export class IPCBridgeService {
   private async initializeEventListeners(): Promise<void> {
     try {
       // Listen for all Python events (progress, action_preview, complete, error)
-      const eventTypes = ['progress', 'action_preview', 'complete', 'error'];
+      const eventTypes = ['progress', 'action_preview', 'complete', 'error', 'visual_assert_result'];
       
       for (const eventType of eventTypes) {
         const unlisten = await listen<any>(eventType, (event) => {
@@ -131,13 +131,14 @@ export class IPCBridgeService {
    * mouse movements, clicks, and keyboard inputs. The recording continues until
    * stopRecording() is called.
    * 
+   * @param captureScreenshotOnClick - Whether to capture screenshots on mouse clicks for AI analysis
    * @throws {Error} If Python Core is unavailable or recording fails to start
    * @throws {Error} If a recording is already in progress
    * @throws {Error} If permissions are insufficient (macOS Accessibility)
    * 
    * @example
    * try {
-   *   await ipcBridge.startRecording();
+   *   await ipcBridge.startRecording(true);
    *   console.log('Recording started');
    * } catch (error) {
    *   console.error('Failed to start recording:', error.message);
@@ -145,7 +146,7 @@ export class IPCBridgeService {
    * 
    * Requirements: 1.1, 5.1, 5.3
    */
-  public async startRecording(): Promise<void> {
+  public async startRecording(captureScreenshotOnClick: boolean = false): Promise<void> {
     try {
       // Get current core status for logging (gracefully handle failures)
       let coreType = 'unknown';
@@ -156,9 +157,9 @@ export class IPCBridgeService {
         // Ignore core status errors for logging purposes
       }
       
-      console.log(`[IPC Bridge] Invoking start_recording command with ${coreType} core...`);
+      console.log(`[IPC Bridge] Invoking start_recording command with ${coreType} core, captureScreenshotOnClick: ${captureScreenshotOnClick}...`);
       
-      await invoke('start_recording');
+      await invoke('start_recording', { captureScreenshotOnClick });
       console.log(`[IPC Bridge] start_recording command successful with ${coreType} core`);
     } catch (error) {
       console.error('[IPC Bridge] start_recording command failed:', error);

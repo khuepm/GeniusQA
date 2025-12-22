@@ -189,13 +189,15 @@ async fn set_preview_opacity(
 async fn start_recording(
     core_router: State<'_, CoreRouterState>,
     app_handle: tauri::AppHandle,
+    capture_screenshot_on_click: Option<bool>,
 ) -> Result<(), String> {
     let start_time = std::time::Instant::now();
     let active_core = core_router.router.get_core_status().active_core;
     
-    let response = core_router.router.route_command(
+    let response = core_router.router.route_command_with_options(
         AutomationCommand::StartRecording,
         &app_handle,
+        capture_screenshot_on_click.unwrap_or(false),
     ).await;
 
     let operation_duration = start_time.elapsed();

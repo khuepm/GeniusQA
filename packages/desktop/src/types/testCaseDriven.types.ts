@@ -74,13 +74,15 @@ export interface TestStep {
  */
 export interface ActionWithId {
   id: string;
-  type: 'mouse_move' | 'mouse_click' | 'key_press' | 'key_release' | 'ai_vision_capture';
+  type: 'mouse_move' | 'mouse_click' | 'key_press' | 'key_release' | 'ai_vision_capture' | 'visual_assert';
   timestamp: number;
   x: number | null;
   y: number | null;
   button: 'left' | 'right' | 'middle' | null;
   key: string | null;
   screenshot: string | null;
+  /** Optional extra data for action types that don't fit the flat legacy schema (e.g., visual_assert) */
+  additional_data?: any;
   // AI Vision Capture specific fields (when type is 'ai_vision_capture')
   is_dynamic?: boolean;
   interaction?: 'click' | 'dblclick' | 'rclick' | 'hover';
@@ -88,6 +90,12 @@ export interface ActionWithId {
   dynamic_config?: any;
   cache_data?: any;
   is_assertion?: boolean; // For assertion mode
+
+  // Visual Assert specific fields (when type is 'visual_assert')
+  config?: any;
+  regions?: any;
+  assets?: any;
+  context?: any;
 }
 
 /**
