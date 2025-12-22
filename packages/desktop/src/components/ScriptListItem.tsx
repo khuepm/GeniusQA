@@ -24,8 +24,12 @@ export interface ScriptListItemProps {
   selected?: boolean;
   /** Callback when the item is clicked */
   onClick?: (script: StoredScriptInfo) => void;
+  /** Callback when reveal in Finder is clicked */
+  onReveal?: (script: StoredScriptInfo) => void;
   /** Callback when delete is clicked */
   onDelete?: (script: StoredScriptInfo) => void;
+  /** Whether to show the reveal button */
+  showReveal?: boolean;
   /** Whether to show the delete button */
   showDelete?: boolean;
   /** Compact mode for smaller spaces */
@@ -81,7 +85,9 @@ export const ScriptListItem: React.FC<ScriptListItemProps> = ({
   script,
   selected = false,
   onClick,
+  onReveal,
   onDelete,
+  showReveal = true,
   showDelete = true,
   compact = false,
 }) => {
@@ -98,6 +104,11 @@ export const ScriptListItem: React.FC<ScriptListItemProps> = ({
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     onDelete?.(script);
+  };
+
+  const handleReveal = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onReveal?.(script);
   };
 
   // Get badge configurations
@@ -124,8 +135,18 @@ export const ScriptListItem: React.FC<ScriptListItemProps> = ({
             <span className="script-list-item-name">{script.scriptName}</span>
           )}
         </div>
-        {showDelete && onDelete && (
+        {((showReveal && onReveal) || (showDelete && onDelete)) && (
           <div className="script-list-item-actions">
+            {showReveal && onReveal && (
+              <button
+                className="script-list-item-reveal"
+                onClick={handleReveal}
+                type="button"
+                aria-label={`Reveal ${script.filename} in Finder`}
+              >
+                Reveal in Finder
+              </button>
+            )}
             <button
               className="script-list-item-delete"
               onClick={handleDelete}

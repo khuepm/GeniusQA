@@ -583,6 +583,59 @@ async fn delete_script(
     }
 }
 
+#[tauri::command]
+async fn reveal_in_finder(script_path: String) -> Result<(), String> {
+    let path = Path::new(&script_path);
+    if !path.exists() {
+        return Err(format!("File not found: {}", script_path));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        let status = Command::new("open")
+            .args(["-R", &script_path])
+            .status()
+            .map_err(|e| format!("Failed to run open: {}", e))?;
+
+        if status.success() {
+            return Ok(());
+        }
+        return Err(format!("Failed to reveal file in Finder: exit code {:?}", status.code()));
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        let status = Command::new("explorer")
+            .args(["/select,", &script_path])
+            .status()
+            .map_err(|e| format!("Failed to run explorer: {}", e))?;
+
+        if status.success() {
+            return Ok(());
+        }
+        return Err(format!("Failed to reveal file in Explorer: exit code {:?}", status.code()));
+    }
+
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    {
+        use std::process::Command;
+        let folder = path
+            .parent()
+            .ok_or_else(|| format!("Failed to get parent folder for: {}", script_path))?;
+        let status = Command::new("xdg-open")
+            .arg(folder)
+            .status()
+            .map_err(|e| format!("Failed to run xdg-open: {}", e))?;
+
+        if status.success() {
+            return Ok(());
+        }
+        return Err(format!("Failed to open folder: exit code {:?}", status.code()));
+    }
+}
+
 // Monitoring commands
 #[tauri::command]
 async fn get_health_status(
@@ -1152,6 +1205,7 @@ fn main() {
             load_script,
             save_script,
             delete_script,
+            reveal_in_finder,
             // AI Vision Capture commands
             capture_vision_marker,
             analyze_vision,

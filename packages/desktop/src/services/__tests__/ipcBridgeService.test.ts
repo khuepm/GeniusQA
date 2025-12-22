@@ -508,6 +508,14 @@ describe('IPCBridgeService', () => {
 
       expect(mockInvoke).toHaveBeenCalledWith('delete_script', { scriptPath: '/path/to/script.json' });
     });
+
+    it('should call revealInFinder command', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+
+      await service.revealInFinder('/path/to/script.json');
+
+      expect(mockInvoke).toHaveBeenCalledWith('reveal_in_finder', { scriptPath: '/path/to/script.json' });
+    });
   });
 
   describe('Property Tests for IPC Command Interface Consistency', () => {

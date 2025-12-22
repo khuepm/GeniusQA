@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthButton } from '../components/AuthButton';
 import { CoreType, CoreStatus, PerformanceMetrics, PerformanceComparison } from '../components/CoreSelector';
 import { ScriptListItem } from '../components/ScriptListItem';
@@ -82,6 +82,7 @@ const RecorderScreen: React.FC = () => {
   const [showScriptLoaderForRecording, setShowScriptLoaderForRecording] = useState<boolean>(false);
 
   const navigate = useNavigate();
+  const location = useLocation();
   const ipcBridge = getIPCBridge();
 
   /**
@@ -94,18 +95,25 @@ const RecorderScreen: React.FC = () => {
         // Initialize core status first
         await initializeCoreStatus();
 
+        const requestedScriptPath = (location.state as { scriptPath?: string } | null)?.scriptPath;
+
         // Check for existing recordings
         const recordings = await ipcBridge.checkForRecordings();
-        setHasRecordings(recordings);
+        setHasRecordings(recordings || Boolean(requestedScriptPath));
 
-        if (recordings) {
-          // Get the latest recording path
-          const latestPath = await ipcBridge.getLatestRecording();
-          setLastRecordingPath(latestPath);
-          setSelectedScriptPath(latestPath);
-
+        if (recordings || requestedScriptPath) {
           // Load list of available scripts
           await loadAvailableScripts();
+
+          if (requestedScriptPath) {
+            setLastRecordingPath(requestedScriptPath);
+            setSelectedScriptPath(requestedScriptPath);
+          } else {
+            // Get the latest recording path
+            const latestPath = await ipcBridge.getLatestRecording();
+            setLastRecordingPath(latestPath);
+            setSelectedScriptPath(latestPath);
+          }
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to initialize recorder';
@@ -227,7 +235,7 @@ const RecorderScreen: React.FC = () => {
       ipcBridge.removeEventListener('playback_stopped', handlePlaybackStoppedEvent);
       ipcBridge.removeEventListener('playback_paused', handlePlaybackPausedEvent);
     };
-  }, []);
+  }, [location.state]);
 
   /**
    * Update recording time while recording

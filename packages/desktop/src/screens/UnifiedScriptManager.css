@@ -271,6 +271,47 @@
   background-color: #fafafa;
 }
 
+.ai-builder-chat-header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ai-builder-header-button {
+  background: none;
+  border: 1px solid #dadce0;
+  color: #5f6368;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ai-builder-header-button:hover {
+  background-color: #f1f3f4;
+  border-color: #1a73e8;
+  color: #1a73e8;
+}
+
+.ai-builder-header-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ai-builder-header-button.primary {
+  background-color: #1a73e8;
+  border-color: #1a73e8;
+  color: #ffffff;
+}
+
+.ai-builder-header-button.primary:hover {
+  background-color: #1557b0;
+  border-color: #1557b0;
+  color: #ffffff;
+}
+
 .ai-builder-stats {
   margin-left: auto;
 }
