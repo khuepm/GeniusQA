@@ -1,0 +1,127 @@
+//! Simple test for the Ignore focus strategy implementation
+
+#[cfg(test)]
+mod tests {
+    use super::super::{
+        playback_controller::{PlaybackController, PlaybackSession},
+        types::{FocusEvent, FocusLossStrategy, PlaybackState, WarningCategory, WarningSeverity},
+    };
+    use chrono::Utc;
+
+    #[test]
+    fn test_ignore_focus_strategy_logs_warning() {
+        // Create a playback controller
+        let mut controller = PlaybackController::new();
+        
+        // Start a session with Ignore strategy
+        let session_result = controller.start_playback(
+            "test_app".to_string(),
+            1234,
+            FocusLossStrategy::Ignore,
+        );
+        assert!(session_result.is_ok(), "Should be able to start session");
+        
+        // Verify initial state
+        assert!(controller.has_active_session(), "Should have active session");
+        let session = controller.get_playback_status().unwrap();
+        assert_eq!(session.state, PlaybackState::Running, "Should be running");
+        assert_eq!(session.focus_strategy, FocusLossStrategy::Ignore, "Should use Ignore strategy");
+        
+        // Verify no warnings initially
+        let initial_warnings = controller.get_session_warnings();
+        assert_eq!(initial_warnings.len(), 0, "Should have no warnings initially");
+        
+        // Simulate focus loss event
+        let focus_lost_event = FocusEvent::TargetProcessLostFocus {
+            app_id: "test_app".to_string(),
+            process_id: 1234,
+            new_focused_app: Some("other_app".to_string()),
+            timestamp: Utc::now(),
+        };
+        
+        // Handle the focus loss event
+        let result = controller.handle_focus_event(focus_lost_event);
+        assert!(result.is_ok(), "Should handle focus loss event successfully");
+        
+        // Verify session is still running (Ignore strategy continues execution)
+        let session_after = controller.get_playback_status().unwrap();
+        assert_eq!(session_after.state, PlaybackState::Running, "Should still be running with Ignore strategy");
+        
+        // Verify warning was logged
+        let warnings = controller.get_session_warnings();
+        assert_eq!(warnings.len(), 1, "Should have one warning logged");
+        
+        let warning = &warnings[0];
+        assert_eq!(warning.category, WarningCategory::Focus, "Should be a focus warning");
+        assert_eq!(warning.severity, WarningSeverity::Medium, "Should be medium severity");
+        assert!(warning.message.contains("Focus lost from target application"), "Warning message should describe focus loss");
+        assert!(warning.message.contains("test_app"), "Warning should mention target app");
+        assert!(warning.message.contains("other_app"), "Warning should mention new focused app");
+        
+        // Verify warning context
+        assert!(warning.context.is_some(), "Warning should have context");
+        let context = warning.context.as_ref().unwrap();
+        assert!(context.contains("Ignore strategy"), "Context should mention Ignore strategy");
+        assert!(context.contains("continued execution"), "Context should mention continued execution");
+        
+        // Verify related data
+        assert!(warning.related_data.is_some(), "Warning should have related data");
+        let related_data = warning.related_data.as_ref().unwrap();
+        assert!(related_data.get("focus_strategy").is_some(), "Related data should include focus strategy");
+        assert!(related_data.get("new_focused_app").is_some(), "Related data should include new focused app");
+        
+        // Test warning retrieval methods
+        let focus_warnings = controller.get_warnings_by_category(WarningCategory::Focus);
+        assert_eq!(focus_warnings.len(), 1, "Should find one focus warning");
+        
+        let medium_warnings = controller.get_warnings_by_severity(WarningSeverity::Medium);
+        assert_eq!(medium_warnings.len(), 1, "Should find one medium severity warning");
+        
+        // Test warning statistics
+        let stats = controller.get_session_warning_stats().unwrap();
+        assert_eq!(stats.total_warnings, 1, "Stats should show one total warning");
+        assert_eq!(stats.medium_severity, 1, "Stats should show one medium severity warning");
+        assert_eq!(stats.focus_warnings, 1, "Stats should show one focus warning");
+        assert_eq!(stats.low_severity, 0, "Stats should show no low severity warnings");
+        assert_eq!(stats.high_severity, 0, "Stats should show no high severity warnings");
+    }
+    
+    #[test]
+    fn test_ignore_focus_strategy_multiple_warnings() {
+        let mut controller = PlaybackController::new();
+        
+        // Start session
+        controller.start_playback(
+            "test_app".to_string(),
+            1234,
+            FocusLossStrategy::Ignore,
+        ).unwrap();
+        
+        // Simulate multiple focus loss events
+        for i in 0..3 {
+            let focus_lost_event = FocusEvent::TargetProcessLostFocus {
+                app_id: "test_app".to_string(),
+                process_id: 1234,
+                new_focused_app: Some(format!("other_app_{}", i)),
+                timestamp: Utc::now(),
+            };
+            
+            controller.handle_focus_event(focus_lost_event).unwrap();
+        }
+        
+        // Verify multiple warnings were logged
+        let warnings = controller.get_session_warnings();
+        assert_eq!(warnings.len(), 3, "Should have three warnings logged");
+        
+        // Verify session is still running
+        let session = controller.get_playback_status().unwrap();
+        assert_eq!(session.state, PlaybackState::Running, "Should still be running after multiple focus losses");
+        
+        // Test clearing warnings
+        let session_id = session.id.clone();
+        controller.clear_session_warnings(&session_id);
+        
+        let warnings_after_clear = controller.get_session_warnings();
+        assert_eq!(warnings_after_clear.len(), 0, "Should have no warnings after clearing");
+    }
+}

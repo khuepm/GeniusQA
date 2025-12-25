@@ -70,7 +70,8 @@
         "exceptionDomain": "",
         "frameworks": [],
         "providerShortName": null,
-        "signingIdentity": null
+        "signingIdentity": null,
+        "license": null
       },
       "resources": [],
       "shortDescription": "GeniusQA Desktop",
