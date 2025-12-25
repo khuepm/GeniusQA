@@ -1,0 +1,217 @@
+.focus-indicator {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.indicator-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.indicator-header h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.refresh-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.refresh-button:hover {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.focus-status {
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.focus-status.focused {
+  background-color: #dcfce7;
+  border: 1px solid #bbf7d0;
+}
+
+.focus-status.not-focused {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.focus-status.unknown {
+  background-color: #f3f4f6;
+  border: 1px solid #e5e7eb;
+}
+
+.status-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.status-icon {
+  font-size: 1.5rem;
+}
+
+.status-text {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.focus-status.focused .status-text {
+  color: #166534;
+}
+
+.focus-status.not-focused .status-text {
+  color: #dc2626;
+}
+
+.focus-status.unknown .status-text {
+  color: #6b7280;
+}
+
+.status-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.detail-item .label {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.detail-item .value {
+  font-size: 0.85rem;
+  color: #374151;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.target-application {
+  margin-bottom: 20px;
+}
+
+.target-application h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 12px 0;
+}
+
+.app-info {
+  padding: 12px;
+  background-color: #f9fafb;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.app-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 4px;
+}
+
+.app-details {
+  display: flex;
+  gap: 16px;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.process-name {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.process-id {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.bring-to-focus-button {
+  padding: 8px 16px;
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bring-to-focus-button:hover {
+  background-color: #2563eb;
+}
+
+.no-target {
+  text-align: center;
+  padding: 20px;
+  color: #6b7280;
+}
+
+.no-target p {
+  margin: 0 0 8px 0;
+}
+
+.hint {
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.focus-tips {
+  border-top: 1px solid #f3f4f6;
+  padding-top: 16px;
+}
+
+.focus-tips h4 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 8px 0;
+}
+
+.focus-tips ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.focus-tips li {
+  margin-bottom: 4px;
+}
+
+@media (max-width: 768px) {
+  .app-details {
+    flex-direction: column;
+    gap: 4px;
+  }
+}

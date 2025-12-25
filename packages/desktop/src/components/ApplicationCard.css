@@ -1,0 +1,157 @@
+.application-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  padding: 20px;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.application-card:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.app-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 4px 0;
+  word-break: break-word;
+}
+
+.app-process {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: 0;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.status-active {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.status-inactive {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.status-error {
+  background-color: #fef2f2;
+  color: #dc2626;
+}
+
+.status-warning {
+  background-color: #fef3c7;
+  color: #d97706;
+}
+
+.status-unknown {
+  background-color: #f3f4f6;
+  color: #6b7280;
+}
+
+.status-icon {
+  font-size: 0.9rem;
+}
+
+.card-body {
+  margin-bottom: 16px;
+}
+
+.app-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 20px;
+}
+
+.detail-label {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: 500;
+  flex-shrink: 0;
+  min-width: 100px;
+}
+
+.detail-value {
+  font-size: 0.85rem;
+  color: #374151;
+  text-align: right;
+  word-break: break-all;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.focus-strategy {
+  font-family: inherit;
+  font-weight: 500;
+  color: #3b82f6;
+}
+
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.action-button {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+}
+
+.action-button:hover {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.action-button.refresh:hover {
+  background-color: #eff6ff;
+  border-color: #3b82f6;
+}
+
+.action-button.remove:hover {
+  background-color: #fef2f2;
+  border-color: #dc2626;
+}
