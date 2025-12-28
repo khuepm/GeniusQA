@@ -50,6 +50,8 @@ export interface PlaybackSession {
   current_step: number;
   started_at: string; // ISO date string
   paused_at?: string; // ISO date string
+  resumed_at?: string; // ISO date string
+  total_pause_duration?: number; // seconds
 }
 
 export enum PlaybackState {

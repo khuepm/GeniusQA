@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/tauri';
 import { ApplicationList } from '../components/ApplicationList';
 import { AddApplicationModal } from '../components/AddApplicationModal';
 import { RegisteredApplication, ApplicationInfo } from '../types/applicationFocusedAutomation.types';
@@ -18,12 +19,8 @@ export const ApplicationManagementScreen: React.FC = () => {
     try {
       setIsLoading(true);
       setError(null);
-      // TODO: Replace with actual Tauri command call
-      // const apps = await invoke('get_registered_applications');
-      // setRegisteredApps(apps);
-
-      // Mock data for now
-      setRegisteredApps([]);
+      const apps = await invoke<RegisteredApplication[]>('get_registered_applications');
+      setRegisteredApps(apps);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load applications');
     } finally {
@@ -34,11 +31,13 @@ export const ApplicationManagementScreen: React.FC = () => {
   const handleAddApplication = async (appInfo: ApplicationInfo) => {
     try {
       setError(null);
-      // TODO: Replace with actual Tauri command call
-      // const newApp = await invoke('register_application', { appInfo });
-      // setRegisteredApps(prev => [...prev, newApp]);
+      const appId = await invoke<string>('register_application', {
+        appInfo,
+        defaultFocusStrategy: null // Use service default
+      });
 
-      console.log('Adding application:', appInfo);
+      // Reload the applications list to get the updated data
+      await loadRegisteredApplications();
       setIsAddModalOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add application');
@@ -48,9 +47,7 @@ export const ApplicationManagementScreen: React.FC = () => {
   const handleRemoveApplication = async (appId: string) => {
     try {
       setError(null);
-      // TODO: Replace with actual Tauri command call
-      // await invoke('unregister_application', { appId });
-
+      await invoke('unregister_application', { appId });
       setRegisteredApps(prev => prev.filter(app => app.id !== appId));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove application');

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/tauri';
 import { PlaybackControls } from '../components/PlaybackControls';
 import { FocusIndicator } from '../components/FocusIndicator';
 import { ProgressDisplay } from '../components/ProgressDisplay';
 import { NotificationArea } from '../components/NotificationArea';
 import { FocusStateVisualizer } from '../components/FocusStateVisualizer';
+import { useApplicationFocusEvents } from '../hooks/useApplicationFocusEvents';
 import {
   PlaybackSession,
   PlaybackState,
@@ -15,28 +17,44 @@ import {
 import './AutomationControlPanel.css';
 
 export const AutomationControlPanel: React.FC = () => {
-  const [currentSession, setCurrentSession] = useState<PlaybackSession | null>(null);
-  const [focusState, setFocusState] = useState<FocusState | null>(null);
   const [targetApplication, setTargetApplication] = useState<RegisteredApplication | null>(null);
-  const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+
+  // Use the real-time events hook
+  const {
+    focusState,
+    playbackSession: currentSession,
+    notifications,
+    isConnected,
+    dismissNotification
+  } = useApplicationFocusEvents(currentSessionId || undefined);
 
   useEffect(() => {
     loadCurrentSession();
-    loadFocusState();
+    loadTargetApplication();
   }, []);
+
+  // Update target application and session ID when session changes
+  useEffect(() => {
+    if (currentSession?.target_app_id) {
+      setCurrentSessionId(currentSession.target_app_id);
+      loadTargetApplication(currentSession.target_app_id);
+    } else {
+      setCurrentSessionId(null);
+    }
+  }, [currentSession?.target_app_id]);
 
   const loadCurrentSession = async () => {
     try {
       setIsLoading(true);
       setError(null);
-      // TODO: Replace with actual Tauri command call
-      // const session = await invoke('get_current_playback_session');
-      // setCurrentSession(session);
+      const sessionData = await invoke<any>('get_playback_status');
 
-      // Mock data for now
-      setCurrentSession(null);
+      // The session data will be updated via the real-time events hook
+      // This is just for initial load
+      console.log('Initial session load:', sessionData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load session');
     } finally {
@@ -44,21 +62,18 @@ export const AutomationControlPanel: React.FC = () => {
     }
   };
 
-  const loadFocusState = async () => {
-    try {
-      // TODO: Replace with actual Tauri command call
-      // const focus = await invoke('get_current_focus_state');
-      // setFocusState(focus);
+  const loadTargetApplication = async (appId?: string) => {
+    if (!appId && !currentSession?.target_app_id) return;
 
-      // Mock data for now
-      setFocusState({
-        is_target_process_focused: false,
-        focused_process_id: undefined,
-        focused_window_title: undefined,
-        last_change: new Date().toISOString(),
+    try {
+      const targetAppId = appId || currentSession?.target_app_id;
+      const app = await invoke<RegisteredApplication>('get_application', {
+        appId: targetAppId
       });
+      setTargetApplication(app);
     } catch (err) {
-      console.error('Failed to load focus state:', err);
+      console.error('Failed to load target application:', err);
+      setTargetApplication(null);
     }
   };
 
@@ -69,15 +84,15 @@ export const AutomationControlPanel: React.FC = () => {
   ) => {
     try {
       setError(null);
-      // TODO: Replace with actual Tauri command call
-      // const session = await invoke('start_playback', { 
-      //   targetAppId, 
-      //   focusStrategy, 
-      //   scriptPath 
-      // });
-      // setCurrentSession(session);
+      const sessionId = await invoke<string>('start_focused_playback', {
+        appId: targetAppId,
+        focusStrategy
+      });
 
-      console.log('Starting playback:', { targetAppId, focusStrategy, scriptPath });
+      console.log('Started playback session:', sessionId);
+
+      // Load target application info
+      await loadTargetApplication(targetAppId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start playback');
     }
@@ -86,16 +101,10 @@ export const AutomationControlPanel: React.FC = () => {
   const handlePausePlayback = async () => {
     try {
       setError(null);
-      // TODO: Replace with actual Tauri command call
-      // await invoke('pause_playback');
-
-      if (currentSession) {
-        setCurrentSession({
-          ...currentSession,
-          state: PlaybackState.Paused,
-          paused_at: new Date().toISOString(),
-        });
-      }
+      await invoke('pause_focused_playback', {
+        reason: 'UserRequested'
+      });
+      // Session state will be updated via real-time events
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to pause playback');
     }
@@ -104,16 +113,8 @@ export const AutomationControlPanel: React.FC = () => {
   const handleResumePlayback = async () => {
     try {
       setError(null);
-      // TODO: Replace with actual Tauri command call
-      // await invoke('resume_playback');
-
-      if (currentSession) {
-        setCurrentSession({
-          ...currentSession,
-          state: PlaybackState.Running,
-          paused_at: undefined,
-        });
-      }
+      await invoke('resume_focused_playback');
+      // Session state will be updated via real-time events
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to resume playback');
     }
@@ -122,21 +123,22 @@ export const AutomationControlPanel: React.FC = () => {
   const handleStopPlayback = async () => {
     try {
       setError(null);
-      // TODO: Replace with actual Tauri command call
-      // await invoke('stop_playback');
-
-      setCurrentSession(null);
+      await invoke('stop_focused_playback');
+      // Session state will be updated via real-time events
+      setTargetApplication(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to stop playback');
     }
   };
 
   const handleDismissNotification = (notificationId: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    dismissNotification(notificationId);
   };
 
   const handleRefreshFocus = async () => {
-    await loadFocusState();
+    // Focus state is now managed by real-time events
+    // This could trigger a manual refresh if needed
+    console.log('Focus refresh requested - using real-time data');
   };
 
   if (isLoading) {

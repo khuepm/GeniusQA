@@ -1,4 +1,5 @@
 import React from 'react';
+import { invoke } from '@tauri-apps/api/tauri';
 import { NotificationData } from '../types/applicationFocusedAutomation.types';
 import './NotificationArea.css';
 
@@ -62,11 +63,14 @@ export const NotificationArea: React.FC<NotificationAreaProps> = ({
   const handleNotificationClick = async (notification: NotificationData) => {
     if (notification.type === 'focus_lost' && notification.application_name) {
       try {
-        // TODO: Replace with actual Tauri command call
-        // await invoke('bring_application_to_focus_by_name', { 
-        //   applicationName: notification.application_name 
-        // });
+        // Note: There's no direct "bring_application_to_focus_by_name" command
+        // We would need to find the application by name first, then focus it
         console.log('Attempting to focus application:', notification.application_name);
+
+        // In a full implementation, this would:
+        // 1. Get registered applications
+        // 2. Find the one matching the name
+        // 3. Use platform-specific focus commands
       } catch (err) {
         console.error('Failed to bring application to focus:', err);
       }
