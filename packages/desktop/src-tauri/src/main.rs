@@ -1533,19 +1533,15 @@ async fn get_running_applications_windows() -> Result<Vec<ApplicationInfo>, Stri
 }
 
 #[cfg(target_os = "macos")]
+
+//TODO: This feature not working well, need to fix
 async fn get_running_applications_macos() -> Result<Vec<ApplicationInfo>, String> {
-    // TODO: Implement macOS-specific application enumeration
-    log::warn!("[App Focus] macOS application enumeration not yet implemented");
-    Ok(vec![
-        ApplicationInfo {
-            name: "TextEdit".to_string(),
-            executable_path: "/Applications/TextEdit.app".to_string(),
-            process_name: "TextEdit".to_string(),
-            process_id: 5678,
-            bundle_id: Some("com.apple.TextEdit".to_string()),
-            window_handle: None,
-        }
-    ])
+    use application_focused_automation::MacOSApplicationDetector;
+    use application_focused_automation::platform::PlatformApplicationDetector;
+
+    let detector = MacOSApplicationDetector::new();
+    detector.get_running_applications()
+        .map_err(|e| format!("Failed to get running applications: {:?}", e))
 }
 
 // ============================================================================
