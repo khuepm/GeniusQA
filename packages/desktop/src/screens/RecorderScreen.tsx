@@ -845,18 +845,19 @@ const RecorderScreen: React.FC = () => {
       <ClickCursorOverlay isRecording={status === 'recording'} />
 
       <div className="recorder-content">
-        {/* Back Button */}
-        <button
-          className="back-button"
-          onClick={() => navigate(-1)}
-        >
-          ← Back to Dashboard
-        </button>
-
         {/* Header Section */}
-        <div className="header">
-          <h1 className="logo">GeniusQA Recorder</h1>
-          <p className="subtitle">Record and replay desktop interactions</p>
+        <div className="header-container">
+          <button
+            className="back-button"
+            onClick={() => navigate(-1)}
+            title="Back to Dashboard"
+          >
+            ←
+          </button>
+          <div className="header">
+            <h1 className="logo">GeniusQA Recorder</h1>
+            <p className="subtitle">Record and replay desktop interactions</p>
+          </div>
         </div>
 
         {/* Status Display */}
