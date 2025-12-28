@@ -144,7 +144,39 @@ impl PlaybackController {
         Ok(session_id)
     }
 
-    /// Pause the current playback session
+    /// Update the progress (current step) of the active session
+    pub fn update_progress(&mut self, current_step: usize) -> Result<(), PlaybackError> {
+        let session = self.current_session
+            .as_mut()
+            .ok_or(PlaybackError::NoActiveSession)?;
+
+        session.current_step = current_step;
+        
+        // Emit real-time playback status update with new step
+        if let Some(ref app_handle) = self.app_handle {
+            let status_json = serde_json::json!({
+                "type": "playback_status_update",
+                "data": {
+                    "id": session.id,
+                    "target_app_id": session.target_app_id,
+                    "target_process_id": session.target_process_id,
+                    "state": session.state,
+                    "focus_strategy": session.focus_strategy,
+                    "current_step": session.current_step,
+                    "started_at": session.started_at.to_rfc3339(),
+                    "paused_at": session.paused_at.map(|t| t.to_rfc3339()),
+                    "resumed_at": session.resumed_at.map(|t| t.to_rfc3339()),
+                    "total_pause_duration": session.total_pause_duration.num_seconds()
+                }
+            });
+            
+            if let Err(e) = app_handle.emit_all("playback_status_update", status_json) {
+                log::warn!("Failed to emit real-time playback status update: {}", e);
+            }
+        }
+        
+        Ok(())
+    }
     pub fn pause_playback(&mut self, reason: PauseReason) -> Result<(), PlaybackError> {
         let session = self.current_session
             .as_mut()

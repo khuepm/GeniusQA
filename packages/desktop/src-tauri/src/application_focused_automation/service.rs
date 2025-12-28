@@ -336,19 +336,32 @@ impl ApplicationFocusedAutomationService {
             app_id
         };
 
-        // Set up focus monitoring if application has a process ID
-        let mut focus_monitor = FocusMonitor::new();
-        let _receiver = focus_monitor.start_monitoring(app_id.clone(), app_info.process_id)?;
-            
-            // Store the monitor
-            {
-                let mut monitors = self.focus_monitors.lock().map_err(|e| {
-                    ApplicationFocusedAutomationError::ServiceError(format!("Failed to lock focus monitors: {}", e))
-                })?;
-                monitors.insert(app_id.clone(), focus_monitor);
+        // Set up focus monitoring if application has a valid process ID
+        if app_info.process_id > 0 {
+            let mut focus_monitor = FocusMonitor::new();
+            // Start monitoring - if it fails, we log warning but don't fail registration
+            match focus_monitor.start_monitoring(app_id.clone(), app_info.process_id) {
+                Ok(_receiver) => {
+                    // Store the monitor
+                    {
+                        let mut monitors = self.focus_monitors.lock().map_err(|e| {
+                            ApplicationFocusedAutomationError::ServiceError(format!("Failed to lock focus monitors: {}", e))
+                        })?;
+                        monitors.insert(app_id.clone(), focus_monitor);
+                    }
+                    log::info!("[Service] Focus monitoring started for application: {}", app_id);
+                }
+                Err(e) => {
+                    log::warn!("[Service] Failed to start focus monitoring for registered app: {}", e);
+                    // We continue even if monitoring fails, as the app is validly registered
+                }
             }
+        } else {
+             log::info!("[Service] Application registered without active monitoring (PID=0): {}", app_id);
+        }
 
-            log::info!("[Service] Focus monitoring started for application: {}", app_id);
+
+
 
         // Send application status change event
         if let Err(e) = self.event_sender.send(ServiceEvent::ApplicationStatusChanged {
@@ -540,6 +553,69 @@ impl ApplicationFocusedAutomationService {
             })?;
             stats.total_playback_sessions += 1;
         }
+
+        // Spawn a task to mock/simulate the execution of the script
+        // In a real implementation, this would iterate over the Steps provided by the frontend
+        let controller_clone = self.playback_controller.clone();
+        let session_id_clone = session_id.clone();
+        
+        tokio::spawn(async move {
+            log::info!("[Execution] Starting execution loop for session {}", session_id_clone);
+            let mut step_index = 0;
+            let total_steps = 10; // Simulate a script with 10 steps
+
+            loop {
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+                let mut controller = match controller_clone.lock() {
+                    Ok(guard) => guard,
+                    Err(e) => {
+                        log::error!("[Execution] Failed to lock controller: {}", e);
+                        break;
+                    }
+                };
+
+                // Check if session is still active and running
+                let should_continue = if let Some(session) = controller.get_playback_status() {
+                    if session.id == session_id_clone && matches!(session.state, PlaybackState::Running) {
+                        // Simulate executing a step
+                        step_index += 1;
+                        if step_index > total_steps {
+                            log::info!("[Execution] Simulation complete for session {}", session_id_clone);
+                            // Script finished
+                            let _ = controller.stop_playback();
+                            false
+                        } else {
+                            // Check for error conditions (e.g. app closed/unresponsive)
+                            if let Err(e) = controller.detect_error_conditions() {
+                                log::warn!("[Execution] Error condition paused playback: {:?}", e);
+                            } else {
+                                log::info!("[Execution] Executed step {}/{}", step_index, total_steps);
+                                
+                                // Update session current_step
+                                if let Err(e) = controller.update_progress(step_index) {
+                                    log::warn!("[Execution] Failed to update progress: {:?}", e);
+                                }
+                            }
+                            true
+                        }
+                    } else if matches!(session.state, PlaybackState::Paused(_)) {
+                        // Paused, just wait
+                        true
+                    } else {
+                        // Aborted, Failed, or Completed
+                        false
+                    }
+                } else {
+                    false
+                };
+
+                if !should_continue {
+                    log::info!("[Execution] Execution loop finished for session {}", session_id_clone);
+                    break;
+                }
+            }
+        });
 
         log::info!("[Service] Integrated playback started successfully: {}", session_id);
         Ok(session_id)

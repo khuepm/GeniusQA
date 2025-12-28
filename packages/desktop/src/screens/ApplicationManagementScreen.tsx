@@ -77,7 +77,9 @@ export const ApplicationManagementScreen: React.FC = () => {
       await loadRegisteredApplications();
       setIsAddModalOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add application');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add application';
+      setError(errorMessage);
+      throw err; // Re-throw so the modal knows it failed
     }
   };
 
