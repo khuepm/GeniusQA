@@ -483,6 +483,19 @@ impl ApplicationFocusedAutomationService {
             }
         }
 
+        // Automatically activate/focus the target application window
+        #[cfg(target_os = "macos")]
+        {
+            if process_id != 0 {
+                use crate::application_focused_automation::platform::macos::MacOSApplicationDetector;
+                let detector = MacOSApplicationDetector::new();
+                log::info!("[Service] Activating target application (PID: {})", process_id);
+                if let Err(e) = detector.activate_application(process_id) {
+                    log::warn!("[Service] Failed to activate application: {:?}", e);
+                }
+            }
+        }
+
         // Start playback
         let session_id = {
             let mut controller = self.playback_controller.lock().map_err(|e| {
