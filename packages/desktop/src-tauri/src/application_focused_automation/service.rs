@@ -11,10 +11,11 @@ use serde::{Serialize, Deserialize};
 
 use crate::application_focused_automation::{
     ApplicationRegistry, FocusMonitor, PlaybackController, NotificationService,
-    ApplicationFocusConfig, FocusEvent, PlaybackState, ApplicationStatus,
-    RegisteredApplication, ApplicationInfo, FocusLossStrategy, PauseReason,
-    AutomationProgressSnapshot, ErrorRecoveryStrategy, ApplicationFocusedAutomationError,
-    NotificationConfig
+    ApplicationFocusConfig, ApplicationFocusedAutomationError,
+    NotificationConfig,
+    types::{FocusEvent, PlaybackState, ApplicationStatus,
+        RegisteredApplication, ApplicationInfo, FocusLossStrategy, PauseReason,
+        AutomationProgressSnapshot, ErrorRecoveryStrategy}
 };
 
 /// Service state enumeration

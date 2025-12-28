@@ -32,6 +32,7 @@ pub mod integration_tests;
 pub mod performance_tests;
 
 #[cfg(test)]
+#[cfg(test)]
 pub mod macos_tests;
 
 #[cfg(test)]

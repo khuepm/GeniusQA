@@ -37,7 +37,7 @@ struct MonitorState {
 
 // Application-focused automation state wrapper
 struct ApplicationFocusedAutomationState {
-    service: Arc<Mutex<ApplicationFocusedAutomationService>>,
+    service: Arc<ApplicationFocusedAutomationService>,
 }
 
 // Response types
@@ -743,10 +743,8 @@ async fn register_application(
 ) -> Result<String, String> {
     log::info!("[App Focus] Registering application: {}", app_info.name);
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    
     let strategy = default_focus_strategy.unwrap_or(FocusLossStrategy::AutoPause);
-    let app_id = service.register_application_with_monitoring(app_info, strategy).await
+    let app_id = service_state.service.register_application_with_monitoring(app_info, strategy).await
         .map_err(|e| format!("Failed to register application: {}", e))?;
     
     log::info!("[App Focus] Successfully registered application with ID: {}", app_id);
@@ -763,9 +761,7 @@ async fn unregister_application(
 ) -> Result<(), String> {
     log::info!("[App Focus] Unregistering application: {}", app_id);
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    
-    service.unregister_application_with_cleanup(&app_id).await
+    service_state.service.unregister_application_with_cleanup(&app_id).await
         .map_err(|e| format!("Failed to unregister application: {}", e))?;
     
     log::info!("[App Focus] Successfully unregistered application: {}", app_id);
@@ -781,8 +777,7 @@ async fn get_registered_applications(
 ) -> Result<Vec<RegisteredApplication>, String> {
     log::info!("[App Focus] Getting registered applications");
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    let registry = service.get_registry();
+    let registry = service_state.service.get_registry();
     let registry = registry.lock().map_err(|e| format!("Failed to lock registry: {}", e))?;
     
     let applications = registry.get_registered_applications();
@@ -801,8 +796,7 @@ async fn get_application(
 ) -> Result<Option<RegisteredApplication>, String> {
     log::info!("[App Focus] Getting application: {}", app_id);
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    let registry = service.get_registry();
+    let registry = service_state.service.get_registry();
     let registry = registry.lock().map_err(|e| format!("Failed to lock registry: {}", e))?;
     
     let application = registry.get_application(&app_id).cloned();
@@ -820,8 +814,7 @@ async fn update_application_status(
 ) -> Result<(), String> {
     log::info!("[App Focus] Updating application status: {} -> {:?}", app_id, status);
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    let registry = service.get_registry();
+    let registry = service_state.service.get_registry();
     let mut registry = registry.lock().map_err(|e| format!("Failed to lock registry: {}", e))?;
     
     registry.update_application_status(&app_id, status)
@@ -841,8 +834,7 @@ async fn validate_application_for_automation(
 ) -> Result<bool, String> {
     log::info!("[App Focus] Validating application for automation: {}", app_id);
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    let registry = service.get_registry();
+    let registry = service_state.service.get_registry();
     let registry = registry.lock().map_err(|e| format!("Failed to lock registry: {}", e))?;
     
     let is_valid = registry.validate_application_for_automation(&app_id)
@@ -863,10 +855,8 @@ async fn start_focus_monitoring(
 ) -> Result<(), String> {
     log::info!("[App Focus] Starting focus monitoring for app: {} (PID: {})", app_id, process_id);
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    
     // Check if monitoring is already active for this app
-    if let Ok(true) = service.get_focus_monitor(&app_id) {
+    if let Ok(true) = service_state.service.get_focus_monitor(&app_id) {
         log::info!("[App Focus] Focus monitoring already active for app: {}", app_id);
         return Ok(());
     }
@@ -901,10 +891,8 @@ async fn get_focus_state(
 ) -> Result<Option<serde_json::Value>, String> {
     log::debug!("[App Focus] Getting current focus state");
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    
     if let Some(app_id) = app_id {
-        if let Ok(true) = service.get_focus_monitor(&app_id) {
+        if let Ok(true) = service_state.service.get_focus_monitor(&app_id) {
             // For now, return a placeholder focus state since we changed the API
             let focus_state_json = serde_json::json!({
                 "is_target_process_focused": false,
@@ -936,9 +924,7 @@ async fn start_focused_playback(
     log::info!("[App Focus] Starting focused playback for app: {} with strategy: {:?}", 
               app_id, focus_strategy);
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    
-    let session_id = service.start_integrated_playback(app_id.clone(), focus_strategy).await
+    let session_id = service_state.service.start_integrated_playback(app_id.clone(), focus_strategy).await
         .map_err(|e| format!("Failed to start playback: {}", e))?;
     
     log::info!("[App Focus] Focused playback started with session ID: {}", session_id);
@@ -955,8 +941,7 @@ async fn pause_focused_playback(
 ) -> Result<(), String> {
     log::info!("[App Focus] Pausing focused playback due to: {:?}", reason);
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    let controller = service.get_playback_controller();
+    let controller = service_state.service.get_playback_controller();
     let mut controller = controller.lock().map_err(|e| format!("Failed to lock controller: {}", e))?;
     
     controller.pause_playback(reason)
@@ -975,8 +960,7 @@ async fn resume_focused_playback(
 ) -> Result<(), String> {
     log::info!("[App Focus] Resuming focused playback");
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    let controller = service.get_playback_controller();
+    let controller = service_state.service.get_playback_controller();
     let mut controller = controller.lock().map_err(|e| format!("Failed to lock controller: {}", e))?;
     
     controller.resume_playback()
@@ -995,8 +979,7 @@ async fn stop_focused_playback(
 ) -> Result<(), String> {
     log::info!("[App Focus] Stopping focused playback");
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    let controller = service.get_playback_controller();
+    let controller = service_state.service.get_playback_controller();
     let mut controller = controller.lock().map_err(|e| format!("Failed to lock controller: {}", e))?;
     
     controller.stop_playback()
@@ -1015,8 +998,7 @@ async fn get_playback_status(
 ) -> Result<Option<serde_json::Value>, String> {
     log::debug!("[App Focus] Getting playback status");
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    let controller = service.get_playback_controller();
+    let controller = service_state.service.get_playback_controller();
     let controller = controller.lock().map_err(|e| format!("Failed to lock controller: {}", e))?;
     
     if let Some(session) = controller.get_playback_status() {
@@ -1048,8 +1030,7 @@ async fn get_session_stats(
 ) -> Result<Option<serde_json::Value>, String> {
     log::debug!("[App Focus] Getting session statistics");
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    let controller = service.get_playback_controller();
+    let controller = service_state.service.get_playback_controller();
     let controller = controller.lock().map_err(|e| format!("Failed to lock controller: {}", e))?;
     
     if let Some(stats) = controller.get_session_stats() {
@@ -1078,8 +1059,7 @@ async fn save_automation_progress(
 ) -> Result<serde_json::Value, String> {
     log::info!("[App Focus] Saving automation progress");
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    let controller = service.get_playback_controller();
+    let controller = service_state.service.get_playback_controller();
     let controller = controller.lock().map_err(|e| format!("Failed to lock controller: {}", e))?;
     
     let snapshot = controller.save_automation_progress()
@@ -1111,8 +1091,7 @@ async fn get_recovery_options(
 ) -> Result<Vec<serde_json::Value>, String> {
     log::info!("[App Focus] Getting recovery options");
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    let controller = service.get_playback_controller();
+    let controller = service_state.service.get_playback_controller();
     let controller = controller.lock().map_err(|e| format!("Failed to lock controller: {}", e))?;
     
     let options = controller.get_recovery_options()
@@ -1147,9 +1126,7 @@ async fn subscribe_to_focus_updates(
 ) -> Result<(), String> {
     log::info!("[App Focus] Subscribing to real-time focus updates for app: {}", app_id);
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    
-    if let Ok(true) = service.get_focus_monitor(&app_id) {
+    if let Ok(true) = service_state.service.get_focus_monitor(&app_id) {
         // For now, emit a placeholder focus state since we changed the API
         let focus_state_json = serde_json::json!({
             "type": "focus_state_update",
@@ -1163,14 +1140,11 @@ async fn subscribe_to_focus_updates(
             }
         });
             
-            app_handle_clone.emit_all("focus_state_update", focus_state_json)
-                .map_err(|e| format!("Failed to emit focus state update: {}", e))?;
-            
-            log::info!("[App Focus] Successfully subscribed to focus updates");
-            Ok(())
-        } else {
-            Err("Focus monitoring is not active".to_string())
-        }
+        app_handle.emit_all("focus_state_update", focus_state_json)
+            .map_err(|e| format!("Failed to emit focus state update: {}", e))?;
+        
+        log::info!("[App Focus] Successfully subscribed to focus updates");
+        Ok(())
     } else {
         Err("Focus monitor not found for application".to_string())
     }
@@ -1199,8 +1173,7 @@ async fn subscribe_to_playback_updates(
 ) -> Result<(), String> {
     log::info!("[App Focus] Subscribing to real-time playback updates");
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    let controller = service.get_playback_controller();
+    let controller = service_state.service.get_playback_controller();
     let controller = controller.lock().map_err(|e| format!("Failed to lock controller: {}", e))?;
     
     if controller.has_active_session() {
@@ -1278,14 +1251,12 @@ async fn get_realtime_status_summary(
 ) -> Result<serde_json::Value, String> {
     log::debug!("[App Focus] Getting real-time status summary");
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    
     // Get service stats
-    let service_stats = service.get_stats().map_err(|e| format!("Failed to get service stats: {}", e))?;
+    let service_stats = service_state.service.get_stats().map_err(|e| format!("Failed to get service stats: {}", e))?;
     
     // Get registry status
     let registry_status = {
-        let registry = service.get_registry();
+        let registry = service_state.service.get_registry();
         let registry = registry.lock().map_err(|e| format!("Failed to lock registry: {}", e))?;
         let applications = registry.get_registered_applications();
         serde_json::json!({
@@ -1304,7 +1275,7 @@ async fn get_realtime_status_summary(
     
     // Get playback controller status
     let playback_status = {
-        let controller = service.get_playback_controller();
+        let controller = service_state.service.get_playback_controller();
         let controller = controller.lock().map_err(|e| format!("Failed to lock controller: {}", e))?;
         if let Some(session) = controller.get_playback_status() {
             serde_json::json!({
@@ -1353,11 +1324,9 @@ async fn get_service_health(
 ) -> Result<serde_json::Value, String> {
     log::debug!("[App Focus] Getting service health status");
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    
-    let health = service.health_check().await.map_err(|e| format!("Failed to perform health check: {}", e))?;
-    let is_healthy = service.is_healthy();
-    let state = service.get_state().map_err(|e| format!("Failed to get service state: {}", e))?;
+    let health = service_state.service.health_check().await.map_err(|e| format!("Failed to perform health check: {}", e))?;
+    let is_healthy = service_state.service.is_healthy();
+    let state = service_state.service.get_state().map_err(|e| format!("Failed to get service state: {}", e))?;
     
     let health_json = serde_json::json!({
         "is_healthy": is_healthy,
@@ -1378,9 +1347,7 @@ async fn get_service_stats(
 ) -> Result<serde_json::Value, String> {
     log::debug!("[App Focus] Getting service statistics");
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    
-    let stats = service.get_stats().map_err(|e| format!("Failed to get service stats: {}", e))?;
+    let stats = service_state.service.get_stats().map_err(|e| format!("Failed to get service stats: {}", e))?;
     
     let stats_json = serde_json::json!({
         "state": stats.state,
@@ -1405,13 +1372,11 @@ async fn restart_service(
 ) -> Result<(), String> {
     log::info!("[App Focus] Restarting Application-Focused Automation service");
     
-    let service = service_state.service.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
-    
     // Stop the service
-    service.stop().await.map_err(|e| format!("Failed to stop service: {}", e))?;
+    service_state.service.stop().await.map_err(|e| format!("Failed to stop service: {}", e))?;
     
     // Start the service
-    service.start().await.map_err(|e| format!("Failed to start service: {}", e))?;
+    service_state.service.start().await.map_err(|e| format!("Failed to start service: {}", e))?;
     
     log::info!("[App Focus] Service restarted successfully");
     Ok(())
@@ -1934,7 +1899,7 @@ fn main() {
     };
     
     let application_focused_automation_state = ApplicationFocusedAutomationState {
-        service: Arc::new(Mutex::new(application_focused_automation_service)),
+        service: Arc::new(application_focused_automation_service),
     };
 
     tauri::Builder::default()
@@ -1957,12 +1922,10 @@ fn main() {
             tauri::async_runtime::spawn(async move {
                 // Get the service from app state
                 if let Some(service_state) = app_handle_clone.try_state::<ApplicationFocusedAutomationState>() {
-                    if let Ok(service) = service_state.service.lock() {
-                        if let Err(e) = service.start().await {
-                            log::error!("Failed to start Application-Focused Automation service: {}", e);
-                        } else {
-                            log::info!("Application-Focused Automation service started successfully");
-                        }
+                    if let Err(e) = service_state.service.start().await {
+                        log::error!("Failed to start Application-Focused Automation service: {}", e);
+                    } else {
+                        log::info!("Application-Focused Automation service started successfully");
                     }
                 }
             });

@@ -2,6 +2,7 @@ use proptest::prelude::*;
 use crate::application_focused_automation::{
     types::{ApplicationInfo, ApplicationStatus, RegisteredApplication, FocusLossStrategy},
     config::ApplicationFocusConfig,
+    focus_monitor::FocusMonitor,
 };
 
 /// Property test strategies for generating test data
@@ -259,7 +260,6 @@ mod property_tests {
             app_id in "[A-Za-z0-9_-]{5,20}",
             process_id in 1u32..=65535u32
         ) {
-            use crate::application_focused_automation::focus_monitor::FocusMonitor;
             
             // Create a Tokio runtime for the test
             let rt = tokio::runtime::Runtime::new().unwrap();
@@ -319,7 +319,6 @@ mod property_tests {
         fn property_focus_monitor_rejects_invalid_process_ids(
             app_id in "[A-Za-z0-9_-]{5,20}"
         ) {
-            use crate::application_focused_automation::focus_monitor::FocusMonitor;
             
             let mut monitor = FocusMonitor::new();
             
@@ -347,7 +346,6 @@ mod property_tests {
             app_id in "[A-Za-z0-9_-]{5,20}",
             process_id in 1u32..=65535u32
         ) {
-            use crate::application_focused_automation::focus_monitor::FocusMonitor;
             
             // Create a Tokio runtime for the test
             let rt = tokio::runtime::Runtime::new().unwrap();
@@ -1255,7 +1253,6 @@ mod property_tests {
                 }
                 
                 // Test 4: Set up focus monitor and test with target application focused
-                use crate::application_focused_automation::focus_monitor::FocusMonitor;
                 let mut focus_monitor = FocusMonitor::new();
                 
                 // Start monitoring for our target application
