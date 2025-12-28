@@ -416,7 +416,7 @@ impl ApplicationFocusedAutomationService {
         log::info!("[Service] Starting integrated playback for app: {} with strategy: {:?}", app_id, focus_strategy);
 
         // Validate application exists and is active
-        let (process_id, app_name) = {
+        let (mut process_id, app_name, bundle_id, process_name) = {
             let registry = self.registry.lock().map_err(|e| {
                 ApplicationFocusedAutomationError::ServiceError(format!("Failed to lock registry: {}", e))
             })?;
@@ -428,11 +428,60 @@ impl ApplicationFocusedAutomationService {
                 return Err(ApplicationFocusedAutomationError::ApplicationNotActive(app_id));
             }
             
-            let process_id = app.process_id
-                .ok_or_else(|| ApplicationFocusedAutomationError::ServiceError("Application has no process ID".to_string()))?;
+            // Use 0 as default if None, or if safely unwrappable
+            let pid = app.process_id.unwrap_or(0);
             
-            (process_id, app.name.clone())
+            (pid, app.name.clone(), app.bundle_id.clone(), app.process_name.clone())
         };
+
+        // If process_id is 0, try to resolve it dynamically
+        if process_id == 0 {
+            log::info!("[Service] Process ID is 0, attempting to resolve for app: {}", app_name);
+            
+            #[cfg(target_os = "macos")]
+            {
+                use crate::application_focused_automation::platform::{MacOSFocusMonitor, PlatformApplicationDetector};
+                use crate::application_focused_automation::platform::macos::MacOSApplicationDetector;
+
+                // Try resolving via Bundle ID first
+                if let Some(bid) = &bundle_id {
+                    let monitor = MacOSFocusMonitor::new();
+                    if let Ok(Some(pid)) = monitor.resolve_process_id_from_bundle_id(bid) {
+                        process_id = pid;
+                        log::info!("[Service] Resolved PID {} from Bundle ID {}", pid, bid);
+                    }
+                }
+
+                // Fallback: search running apps by name/process name
+                if process_id == 0 {
+                    let detector = MacOSApplicationDetector::new();
+                    if let Ok(apps) = detector.get_running_applications() {
+                        if let Some(found_app) = apps.into_iter().find(|a| 
+                            a.name == app_name || 
+                            a.process_name == process_name ||
+                            (bundle_id.is_some() && a.bundle_id == bundle_id)
+                        ) {
+                            process_id = found_app.process_id;
+                            log::info!("[Service] Resolved PID {} from running applications list", process_id);
+                        }
+                    }
+                }
+            }
+
+            // Update registry if we found a valid PID
+            if process_id != 0 {
+                let mut registry = self.registry.lock().map_err(|e| {
+                    ApplicationFocusedAutomationError::ServiceError(format!("Failed to lock registry: {}", e))
+                })?;
+                registry.update_process_id(&app_id, process_id)
+                    .map_err(|e| ApplicationFocusedAutomationError::ServiceError(e.to_string()))?;
+                log::info!("[Service] Updated registry with resolved PID: {}", process_id);
+            } else {
+                return Err(ApplicationFocusedAutomationError::ServiceError(
+                    format!("Could not find running process for '{}'. Please ensure the application is running.", app_name)
+                ));
+            }
+        }
 
         // Start playback
         let session_id = {

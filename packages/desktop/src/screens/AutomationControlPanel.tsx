@@ -111,7 +111,10 @@ export const AutomationControlPanel: React.FC = () => {
       // Load target application info
       await loadTargetApplication(targetAppId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start playback');
+      console.error('Failed to start playback:', err);
+      // Handle both Error objects and string errors from Tauri
+      const errorMessage = typeof err === 'string' ? err : (err instanceof Error ? err.message : 'Failed to start playback');
+      setError(errorMessage);
     }
   };
 
