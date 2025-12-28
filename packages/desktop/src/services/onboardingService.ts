@@ -126,7 +126,8 @@ class OnboardingService {
       if (stored) {
         const state = JSON.parse(stored) as OnboardingState;
         // Check if platform has changed since last onboarding
-        if (state.platformChecked && state.platformChecked !== this.currentPlatform) {
+        // Only check if currentPlatform is initialized to avoid false resets on load
+        if (this.currentPlatform && state.platformChecked && state.platformChecked !== this.currentPlatform) {
           // Reset onboarding if platform changed
           return this.getDefaultOnboardingState();
         }
@@ -179,12 +180,23 @@ class OnboardingService {
     const state = this.getOnboardingState();
     const steps = this.getOnboardingSteps();
     
+    // Try to find the stored current step
     if (state.currentStep) {
-      return steps.find(step => step.id === state.currentStep) || null;
+      const step = steps.find(step => step.id === state.currentStep);
+      // If found, return it. If not found, it means state is invalid, fall through to default logic.
+      if (step) return step;
     }
 
     // Find first incomplete step
     const incompleteStep = steps.find(step => !state.completedSteps.includes(step.id));
+    
+    // If all are complete but we are here, return null? Or should we show the last step?
+    // If onboarding is marked incomplete but all steps are done, return complete step
+    if (!incompleteStep) {
+       // Return the last step (Complete) if no incomplete steps found
+       return steps[steps.length - 1] || null;
+    }
+
     return incompleteStep || null;
   }
 

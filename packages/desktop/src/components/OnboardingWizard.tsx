@@ -74,8 +74,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       const nextStep = onboardingService.getCurrentStep();
       setCurrentStep(nextStep);
 
-      // If no more steps, complete onboarding
-      if (!nextStep) {
+      // If no valid next step is returned, it means we are truly done.
+      // However, check if we just finished the 'complete' step.
+      if (!nextStep || stepId === 'complete') {
         onComplete();
         return;
       }
