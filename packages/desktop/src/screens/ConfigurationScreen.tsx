@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/tauri';
 import { ApplicationFocusConfig, FocusLossStrategy } from '../types/applicationFocusedAutomation.types';
 import './ConfigurationScreen.css';
 
 export const ConfigurationScreen: React.FC = () => {
+  const navigate = useNavigate();
   const [config, setConfig] = useState<ApplicationFocusConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -137,6 +139,9 @@ export const ConfigurationScreen: React.FC = () => {
   return (
     <div className="configuration-screen">
       <div className="header">
+        <button className="back-button" onClick={() => navigate(-1)}>
+          ← Back
+        </button>
         <h1>Application Focus Configuration</h1>
         <p>Configure focus monitoring and automation behavior</p>
       </div>
