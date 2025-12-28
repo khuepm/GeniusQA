@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/tauri';
 import { ApplicationList } from '../components/ApplicationList';
 import { AddApplicationModal } from '../components/AddApplicationModal';
@@ -13,6 +14,8 @@ export const ApplicationManagementScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     initializeScreen();
@@ -112,9 +115,18 @@ export const ApplicationManagementScreen: React.FC = () => {
         onSkip={handleOnboardingSkip}
       />
 
-      <div className="header">
-        <h1>Application Management</h1>
-        <p>Manage applications for focused automation</p>
+      <div className="header-container">
+        <button
+          className="back-button"
+          onClick={() => navigate('/dashboard')}
+          title="Back to Dashboard"
+        >
+          ←
+        </button>
+        <div className="header-content">
+          <h1>Application Management</h1>
+          <p>Manage applications for focused automation</p>
+        </div>
       </div>
 
       {error && (

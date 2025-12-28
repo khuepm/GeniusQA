@@ -426,6 +426,47 @@
   text-align: center;
 }
 
+
+.script-list-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.open-script-button {
+  background-color: #ffffff;
+  border: 1px solid #dadce0;
+  color: #1a73e8;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.open-script-button:hover {
+  background-color: #f1f3f4;
+  border-color: #1a73e8;
+}
+
+.open-script-button.placeholder-action {
+  background-color: #ffffff;
+  border: 1px solid #dadce0;
+  color: #5f6368;
+  padding: 12px 24px;
+  font-size: 14px;
+  margin-top: 12px;
+}
+
+.open-script-button.placeholder-action:hover {
+  background-color: #f8f9fa;
+  color: #1a73e8;
+  border-color: #1a73e8;
+}
+
 .go-to-list-button {
   background-color: #1a73e8;
   color: #ffffff;

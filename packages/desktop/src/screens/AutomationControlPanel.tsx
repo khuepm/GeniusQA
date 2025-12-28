@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/tauri';
 import { PlaybackControls } from '../components/PlaybackControls';
 import { FocusIndicator } from '../components/FocusIndicator';
@@ -25,6 +26,7 @@ export const AutomationControlPanel: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const navigate = useNavigate();
 
   // Check if onboarding should be shown
   useEffect(() => {
@@ -192,9 +194,18 @@ export const AutomationControlPanel: React.FC = () => {
         />
       )}
 
-      <div className="header">
-        <h1>Automation Control</h1>
-        <p>Control and monitor application-focused automation</p>
+      <div className="header-container">
+        <button
+          className="back-button"
+          onClick={() => navigate('/dashboard')}
+          title="Back to Dashboard"
+        >
+          ←
+        </button>
+        <div className="header-content">
+          <h1>Automation Control</h1>
+          <p>Control and monitor application-focused automation</p>
+        </div>
       </div>
 
       {error && (
