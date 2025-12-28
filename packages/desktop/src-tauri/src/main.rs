@@ -1455,6 +1455,29 @@ async fn open_accessibility_settings() -> Result<(), String> {
     Ok(())
 }
 
+/// Open system settings (MacOS)
+/// 
+/// Requirements: Platform-specific permission guidance
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn open_system_settings() -> Result<(), String> {
+    use std::process::Command;
+    
+    log::info!("[App Focus] Opening macOS system settings");
+    
+    // Open the main System Settings/Preferences window
+    let output = Command::new("open")
+        .arg("x-apple.systempreferences:")
+        .output()
+        .map_err(|e| format!("Failed to open system settings: {}", e))?;
+    
+    if !output.status.success() {
+        return Err("Failed to open system settings".to_string());
+    }
+    
+    Ok(())
+}
+
 /// Open system settings (Windows)
 /// 
 /// Requirements: Platform-specific permission guidance

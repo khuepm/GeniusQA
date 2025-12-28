@@ -28,7 +28,7 @@ export const AutomationControlPanel: React.FC = () => {
 
   // Check if onboarding should be shown
   useEffect(() => {
-    if (onboardingService.shouldShowOnboarding()) {
+    if (onboardingService.isOnboardingNeeded()) {
       setShowOnboarding(true);
     }
   }, []);
@@ -157,7 +157,7 @@ export const AutomationControlPanel: React.FC = () => {
   };
 
   const handleOnboardingComplete = () => {
-    onboardingService.completeOnboarding();
+    onboardingService.skipOnboarding();
     setShowOnboarding(false);
   };
 
@@ -186,6 +186,7 @@ export const AutomationControlPanel: React.FC = () => {
       {/* Onboarding Wizard */}
       {showOnboarding && (
         <OnboardingWizard
+          isOpen={true}
           onComplete={handleOnboardingComplete}
           onSkip={handleOnboardingSkip}
         />
