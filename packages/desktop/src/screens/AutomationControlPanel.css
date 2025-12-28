@@ -127,6 +127,25 @@
   background-color: rgba(0, 0, 0, 0.1);
 }
 
+.permission-button {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 8px 16px;
+  background-color: #d93025;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.permission-button:hover {
+  background-color: #b31412;
+}
+
 .connection-status {
   display: flex;
   align-items: center;

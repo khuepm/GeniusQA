@@ -209,15 +209,47 @@ export const AutomationControlPanel: React.FC = () => {
       </div>
 
       {error && (
-        <div className="error-banner">
-          <span className="error-icon">⚠️</span>
-          <span>{error}</span>
-          <button
-            className="error-dismiss"
-            onClick={() => setError(null)}
-          >
-            ×
-          </button>
+        <div className="error-wrapper" style={{ marginBottom: '16px' }}>
+          {error.includes('macOS Accessibility permissions required') ? (
+            <div className="permission-error-container error-banner" style={{ display: 'block', padding: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ⚠️ macOS Accessibility Permission Required
+                </h3>
+                <button className="error-dismiss" onClick={() => setError(null)}>×</button>
+              </div>
+
+              <p style={{ margin: '0 0 12px 0' }}>To enable automation, this app needs control over your mouse and keyboard.</p>
+
+              <ol style={{ margin: '0 0 16px 20px', paddingLeft: '0' }}>
+                <li>Open <strong>System Settings</strong></li>
+                <li>Go to <strong>Privacy & Security {'>'} Accessibility</strong></li>
+                <li>Enable the toggle next to <strong>GeniusQA Desktop</strong></li>
+              </ol>
+
+              <p className="restart-note" style={{ fontStyle: 'italic', fontSize: '13px', margin: '0 0 16px 0' }}>
+                Note: You may need to restart the application after enabling permissions.
+              </p>
+
+              <button
+                className="permission-button"
+                onClick={() => invoke('request_accessibility_permissions')}
+              >
+                Open System Settings
+              </button>
+            </div>
+          ) : (
+            <div className="error-banner">
+              <span className="error-icon">⚠️</span>
+              <span>{error}</span>
+              <button
+                className="error-dismiss"
+                onClick={() => setError(null)}
+              >
+                ×
+              </button>
+            </div>
+          )}
         </div>
       )}
 
