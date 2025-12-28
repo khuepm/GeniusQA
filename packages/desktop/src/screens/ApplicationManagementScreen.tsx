@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { ApplicationList } from '../components/ApplicationList';
 import { AddApplicationModal } from '../components/AddApplicationModal';
+import { OnboardingWizard } from '../components/OnboardingWizard';
+import { onboardingService } from '../services/onboardingService';
 import { RegisteredApplication, ApplicationInfo } from '../types/applicationFocusedAutomation.types';
 import './ApplicationManagementScreen.css';
 
@@ -10,10 +12,42 @@ export const ApplicationManagementScreen: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
-    loadRegisteredApplications();
+    initializeScreen();
   }, []);
+
+  const initializeScreen = async () => {
+    try {
+      // Initialize onboarding service
+      await onboardingService.initialize();
+
+      // Check if onboarding is needed
+      if (onboardingService.isOnboardingNeeded()) {
+        setShowOnboarding(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // Load applications if onboarding is complete
+      await loadRegisteredApplications();
+    } catch (error) {
+      console.error('Failed to initialize screen:', error);
+      setError('Failed to initialize application management');
+      setIsLoading(false);
+    }
+  };
+
+  const handleOnboardingComplete = async () => {
+    setShowOnboarding(false);
+    await loadRegisteredApplications();
+  };
+
+  const handleOnboardingSkip = async () => {
+    setShowOnboarding(false);
+    await loadRegisteredApplications();
+  };
 
   const loadRegisteredApplications = async () => {
     try {
@@ -71,6 +105,13 @@ export const ApplicationManagementScreen: React.FC = () => {
 
   return (
     <div className="application-management-screen">
+      {/* Onboarding Wizard */}
+      <OnboardingWizard
+        isOpen={showOnboarding}
+        onComplete={handleOnboardingComplete}
+        onSkip={handleOnboardingSkip}
+      />
+
       <div className="header">
         <h1>Application Management</h1>
         <p>Manage applications for focused automation</p>

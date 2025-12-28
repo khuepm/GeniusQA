@@ -13,7 +13,7 @@ use crate::application_focused_automation::{
     ApplicationRegistry, FocusMonitor, PlaybackController, NotificationService,
     ApplicationFocusConfig, ApplicationFocusedAutomationError,
     NotificationConfig,
-    types::{FocusEvent, PlaybackState, ApplicationStatus,
+    types::{FocusEvent, PlaybackState, ApplicationStatus, FocusState,
         RegisteredApplication, ApplicationInfo, FocusLossStrategy, PauseReason,
         AutomationProgressSnapshot, ErrorRecoveryStrategy}
 };
@@ -108,7 +108,34 @@ impl ApplicationFocusedAutomationService {
         })
     }
 
-    /// Start the service and all its components
+    /// Set the Tauri app handle for real-time event emission
+    /// 
+    /// Requirements: 5.5 - Enable real-time status broadcasting
+    pub fn set_app_handle(&self, app_handle: tauri::AppHandle) -> Result<(), ApplicationFocusedAutomationError> {
+        log::info!("[Service] Setting Tauri app handle for real-time events");
+        
+        // Set app handle for playback controller
+        {
+            let mut controller = self.playback_controller.lock().map_err(|e| {
+                ApplicationFocusedAutomationError::ServiceError(format!("Failed to lock playback controller: {}", e))
+            })?;
+            controller.set_app_handle(app_handle.clone());
+        }
+        
+        // Set app handle for all existing focus monitors
+        {
+            let mut monitors = self.focus_monitors.lock().map_err(|e| {
+                ApplicationFocusedAutomationError::ServiceError(format!("Failed to lock focus monitors: {}", e))
+            })?;
+            for (app_id, monitor) in monitors.iter_mut() {
+                monitor.set_app_handle(app_handle.clone());
+                log::debug!("[Service] Set app handle for focus monitor: {}", app_id);
+            }
+        }
+        
+        log::info!("[Service] Successfully set Tauri app handle for real-time events");
+        Ok(())
+    }
     pub async fn start(&self) -> Result<(), ApplicationFocusedAutomationError> {
         log::info!("[Service] Starting Application-Focused Automation Service");
         
@@ -525,6 +552,21 @@ impl ApplicationFocusedAutomationService {
             ApplicationFocusedAutomationError::ServiceError(format!("Failed to lock focus monitors: {}", e))
         })?;
         Ok(monitors.contains_key(app_id))
+    }
+
+    /// Get focus state for a specific application
+    /// 
+    /// Requirements: 5.5 - Provide focus state information for real-time updates
+    pub fn get_focus_state(&self, app_id: &str) -> Result<Option<FocusState>, ApplicationFocusedAutomationError> {
+        let monitors = self.focus_monitors.lock().map_err(|e| {
+            ApplicationFocusedAutomationError::ServiceError(format!("Failed to lock focus monitors: {}", e))
+        })?;
+        
+        if let Some(monitor) = monitors.get(app_id) {
+            Ok(Some(monitor.get_current_focus_state()))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Check if service is healthy

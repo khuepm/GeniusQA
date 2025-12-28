@@ -20,14 +20,22 @@ export const useApplicationFocusEvents = (appId?: string) => {
   const [playbackSession, setPlaybackSession] = useState<PlaybackSession | null>(null);
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+
+  const maxReconnectAttempts = 5;
+  const reconnectDelay = 1000; // Start with 1 second
 
   useEffect(() => {
     let focusUnlisten: UnlistenFn | null = null;
     let playbackUnlisten: UnlistenFn | null = null;
     let eventUnlisten: UnlistenFn | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
 
     const setupEventListeners = async () => {
       try {
+        setConnectionError(null);
+        
         // Listen for focus state updates
         focusUnlisten = await listen<FocusEventData>('focus_state_update', (event) => {
           console.log('Focus state update:', event.payload);
@@ -58,6 +66,9 @@ export const useApplicationFocusEvents = (appId?: string) => {
               resumed_at: sessionData.resumed_at,
               total_pause_duration: sessionData.total_pause_duration
             });
+          } else {
+            // No active session
+            setPlaybackSession(null);
           }
         });
 
@@ -67,12 +78,12 @@ export const useApplicationFocusEvents = (appId?: string) => {
           
           // Convert focus events to notifications
           const eventType = event.payload.type;
-          if (eventType === 'focus_lost' || eventType === 'focus_gained') {
+          if (eventType === 'target_process_lost_focus' || eventType === 'target_process_gained_focus') {
             const notification: NotificationData = {
               id: `${Date.now()}-${Math.random()}`,
-              type: eventType as 'focus_lost' | 'focus_gained',
-              title: eventType === 'focus_lost' ? 'Focus Lost' : 'Focus Gained',
-              message: eventType === 'focus_lost' 
+              type: eventType === 'target_process_lost_focus' ? 'focus_lost' : 'focus_gained',
+              title: eventType === 'target_process_lost_focus' ? 'Focus Lost' : 'Focus Gained',
+              message: eventType === 'target_process_lost_focus' 
                 ? 'Target application lost focus - automation paused'
                 : 'Target application gained focus - automation resumed',
               timestamp: event.payload.timestamp || new Date().toISOString(),
@@ -80,6 +91,18 @@ export const useApplicationFocusEvents = (appId?: string) => {
             };
             
             setNotifications(prev => [notification, ...prev.slice(0, 9)]); // Keep last 10
+          } else if (eventType === 'focus_error') {
+            // Handle focus errors
+            const notification: NotificationData = {
+              id: `${Date.now()}-${Math.random()}`,
+              type: 'focus_lost', // Treat errors as focus lost
+              title: 'Focus Monitoring Error',
+              message: `Focus monitoring error: ${event.payload.data?.error || 'Unknown error'}`,
+              timestamp: event.payload.timestamp || new Date().toISOString(),
+              application_name: undefined
+            };
+            
+            setNotifications(prev => [notification, ...prev.slice(0, 9)]);
           }
         });
 
@@ -92,10 +115,26 @@ export const useApplicationFocusEvents = (appId?: string) => {
         await invoke('subscribe_to_playback_updates');
 
         setIsConnected(true);
+        setReconnectAttempts(0);
         console.log('Event listeners setup complete');
       } catch (error) {
         console.error('Failed to setup event listeners:', error);
         setIsConnected(false);
+        setConnectionError(error instanceof Error ? error.message : 'Connection failed');
+        
+        // Attempt reconnection if we haven't exceeded max attempts
+        if (reconnectAttempts < maxReconnectAttempts) {
+          const delay = reconnectDelay * Math.pow(2, reconnectAttempts); // Exponential backoff
+          console.log(`Attempting reconnection in ${delay}ms (attempt ${reconnectAttempts + 1}/${maxReconnectAttempts})`);
+          
+          reconnectTimeout = setTimeout(() => {
+            setReconnectAttempts(prev => prev + 1);
+            setupEventListeners();
+          }, delay);
+        } else {
+          console.error('Max reconnection attempts reached');
+          setConnectionError('Connection failed after multiple attempts');
+        }
       }
     };
 
@@ -105,6 +144,10 @@ export const useApplicationFocusEvents = (appId?: string) => {
     return () => {
       const cleanup = async () => {
         try {
+          if (reconnectTimeout) {
+            clearTimeout(reconnectTimeout);
+          }
+          
           if (focusUnlisten) await focusUnlisten();
           if (playbackUnlisten) await playbackUnlisten();
           if (eventUnlisten) await eventUnlisten();
@@ -118,7 +161,7 @@ export const useApplicationFocusEvents = (appId?: string) => {
       };
       cleanup();
     };
-  }, [appId]);
+  }, [appId, reconnectAttempts]);
 
   const dismissNotification = (notificationId: string) => {
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
@@ -128,12 +171,22 @@ export const useApplicationFocusEvents = (appId?: string) => {
     setNotifications([]);
   };
 
+  const reconnect = () => {
+    setReconnectAttempts(0);
+    setConnectionError(null);
+    setIsConnected(false);
+  };
+
   return {
     focusState,
     playbackSession,
     notifications,
     isConnected,
+    connectionError,
+    reconnectAttempts,
+    maxReconnectAttempts,
     dismissNotification,
-    clearAllNotifications
+    clearAllNotifications,
+    reconnect
   };
 };

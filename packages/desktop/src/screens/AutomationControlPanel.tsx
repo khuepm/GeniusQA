@@ -5,7 +5,10 @@ import { FocusIndicator } from '../components/FocusIndicator';
 import { ProgressDisplay } from '../components/ProgressDisplay';
 import { NotificationArea } from '../components/NotificationArea';
 import { FocusStateVisualizer } from '../components/FocusStateVisualizer';
+import { OnboardingWizard } from '../components/OnboardingWizard';
+import { EnhancedStatusDisplay } from '../components/EnhancedStatusDisplay';
 import { useApplicationFocusEvents } from '../hooks/useApplicationFocusEvents';
+import { onboardingService } from '../services/onboardingService';
 import {
   PlaybackSession,
   PlaybackState,
@@ -21,6 +24,14 @@ export const AutomationControlPanel: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  // Check if onboarding should be shown
+  useEffect(() => {
+    if (onboardingService.shouldShowOnboarding()) {
+      setShowOnboarding(true);
+    }
+  }, []);
 
   // Use the real-time events hook
   const {
@@ -28,7 +39,11 @@ export const AutomationControlPanel: React.FC = () => {
     playbackSession: currentSession,
     notifications,
     isConnected,
-    dismissNotification
+    connectionError,
+    reconnectAttempts,
+    maxReconnectAttempts,
+    dismissNotification,
+    reconnect
   } = useApplicationFocusEvents(currentSessionId || undefined);
 
   useEffect(() => {
@@ -141,6 +156,20 @@ export const AutomationControlPanel: React.FC = () => {
     console.log('Focus refresh requested - using real-time data');
   };
 
+  const handleOnboardingComplete = () => {
+    onboardingService.completeOnboarding();
+    setShowOnboarding(false);
+  };
+
+  const handleOnboardingSkip = () => {
+    onboardingService.skipOnboarding();
+    setShowOnboarding(false);
+  };
+
+  const handleRetryConnection = () => {
+    reconnect();
+  };
+
   if (isLoading) {
     return (
       <div className="automation-control-panel">
@@ -154,6 +183,14 @@ export const AutomationControlPanel: React.FC = () => {
 
   return (
     <div className="automation-control-panel">
+      {/* Onboarding Wizard */}
+      {showOnboarding && (
+        <OnboardingWizard
+          onComplete={handleOnboardingComplete}
+          onSkip={handleOnboardingSkip}
+        />
+      )}
+
       <div className="header">
         <h1>Automation Control</h1>
         <p>Control and monitor application-focused automation</p>
@@ -171,6 +208,18 @@ export const AutomationControlPanel: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* Enhanced Status Display */}
+      <EnhancedStatusDisplay
+        focusState={focusState}
+        playbackSession={currentSession}
+        targetApplication={targetApplication}
+        notifications={notifications}
+        isConnected={isConnected}
+        connectionError={connectionError}
+        onRetryConnection={handleRetryConnection}
+        onDismissNotification={handleDismissNotification}
+      />
 
       <div className="control-sections">
         <div className="main-controls">

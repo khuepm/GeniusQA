@@ -9,6 +9,7 @@ use crate::application_focused_automation::{
 use chrono::{DateTime, Utc};
 use tokio::sync::mpsc;
 use uuid::Uuid;
+use tauri::Manager;
 
 /// Manages automation script execution with focus-aware pause/resume functionality
 pub struct PlaybackController {
@@ -17,6 +18,8 @@ pub struct PlaybackController {
     action_validator: ActionValidator,
     warning_log: Vec<WarningEntry>,
     focus_monitor: Option<FocusMonitor>,
+    // Optional Tauri app handle for real-time event emission
+    app_handle: Option<tauri::AppHandle>,
 }
 
 /// Represents an active playback session with focus strategy support
@@ -43,7 +46,29 @@ impl PlaybackController {
             action_validator: ActionValidator::new(),
             warning_log: Vec::new(),
             focus_monitor: None,
+            app_handle: None,
         }
+    }
+
+    /// Create a new playback controller with Tauri app handle for real-time events
+    /// 
+    /// Requirements: 5.5 - Real-time event streaming
+    pub fn new_with_app_handle(app_handle: tauri::AppHandle) -> Self {
+        Self {
+            current_session: None,
+            focus_event_receiver: None,
+            action_validator: ActionValidator::new(),
+            warning_log: Vec::new(),
+            focus_monitor: None,
+            app_handle: Some(app_handle),
+        }
+    }
+
+    /// Set the Tauri app handle for real-time event emission
+    /// 
+    /// Requirements: 5.5 - Enable real-time status broadcasting
+    pub fn set_app_handle(&mut self, app_handle: tauri::AppHandle) {
+        self.app_handle = Some(app_handle);
     }
 
     /// Set the focus event receiver for monitoring focus changes
@@ -89,8 +114,33 @@ impl PlaybackController {
             total_pause_duration: chrono::Duration::zero(),
         };
 
-        self.current_session = Some(session);
+        self.current_session = Some(session.clone());
         log::info!("Started playback session {} with focus strategy {:?}", session_id, focus_strategy);
+        
+        // Emit real-time playback status update
+        // Requirements: 5.5 - Real-time event streaming
+        if let Some(ref app_handle) = self.app_handle {
+            let status_json = serde_json::json!({
+                "type": "playback_status_update",
+                "data": {
+                    "id": session.id,
+                    "target_app_id": session.target_app_id,
+                    "target_process_id": session.target_process_id,
+                    "state": session.state,
+                    "focus_strategy": session.focus_strategy,
+                    "current_step": session.current_step,
+                    "started_at": session.started_at.to_rfc3339(),
+                    "paused_at": session.paused_at.map(|t| t.to_rfc3339()),
+                    "resumed_at": session.resumed_at.map(|t| t.to_rfc3339()),
+                    "total_pause_duration": session.total_pause_duration.num_seconds()
+                }
+            });
+            
+            if let Err(e) = app_handle.emit_all("playback_status_update", status_json) {
+                log::warn!("Failed to emit real-time playback status update: {}", e);
+            }
+        }
+        
         Ok(session_id)
     }
 
@@ -107,6 +157,31 @@ impl PlaybackController {
         session.state = PlaybackState::Paused(reason.clone());
         session.paused_at = Some(Utc::now());
         log::info!("Paused playback session {} due to {:?}", session.id, reason);
+        
+        // Emit real-time playback status update
+        // Requirements: 5.5 - Real-time event streaming
+        if let Some(ref app_handle) = self.app_handle {
+            let status_json = serde_json::json!({
+                "type": "playback_status_update",
+                "data": {
+                    "id": session.id,
+                    "target_app_id": session.target_app_id,
+                    "target_process_id": session.target_process_id,
+                    "state": session.state,
+                    "focus_strategy": session.focus_strategy,
+                    "current_step": session.current_step,
+                    "started_at": session.started_at.to_rfc3339(),
+                    "paused_at": session.paused_at.map(|t| t.to_rfc3339()),
+                    "resumed_at": session.resumed_at.map(|t| t.to_rfc3339()),
+                    "total_pause_duration": session.total_pause_duration.num_seconds()
+                }
+            });
+            
+            if let Err(e) = app_handle.emit_all("playback_status_update", status_json) {
+                log::warn!("Failed to emit real-time playback status update: {}", e);
+            }
+        }
+        
         Ok(())
     }
 
@@ -130,6 +205,31 @@ impl PlaybackController {
         session.paused_at = None;
         session.resumed_at = Some(Utc::now());
         log::info!("Resumed playback session {}", session.id);
+        
+        // Emit real-time playback status update
+        // Requirements: 5.5 - Real-time event streaming
+        if let Some(ref app_handle) = self.app_handle {
+            let status_json = serde_json::json!({
+                "type": "playback_status_update",
+                "data": {
+                    "id": session.id,
+                    "target_app_id": session.target_app_id,
+                    "target_process_id": session.target_process_id,
+                    "state": session.state,
+                    "focus_strategy": session.focus_strategy,
+                    "current_step": session.current_step,
+                    "started_at": session.started_at.to_rfc3339(),
+                    "paused_at": session.paused_at.map(|t| t.to_rfc3339()),
+                    "resumed_at": session.resumed_at.map(|t| t.to_rfc3339()),
+                    "total_pause_duration": session.total_pause_duration.num_seconds()
+                }
+            });
+            
+            if let Err(e) = app_handle.emit_all("playback_status_update", status_json) {
+                log::warn!("Failed to emit real-time playback status update: {}", e);
+            }
+        }
+        
         Ok(())
     }
 
@@ -141,6 +241,31 @@ impl PlaybackController {
 
         session.state = PlaybackState::Aborted(reason.clone());
         log::warn!("Aborted playback session {}: {}", session.id, reason);
+        
+        // Emit real-time playback status update
+        // Requirements: 5.5 - Real-time event streaming
+        if let Some(ref app_handle) = self.app_handle {
+            let status_json = serde_json::json!({
+                "type": "playback_status_update",
+                "data": {
+                    "id": session.id,
+                    "target_app_id": session.target_app_id,
+                    "target_process_id": session.target_process_id,
+                    "state": session.state,
+                    "focus_strategy": session.focus_strategy,
+                    "current_step": session.current_step,
+                    "started_at": session.started_at.to_rfc3339(),
+                    "paused_at": session.paused_at.map(|t| t.to_rfc3339()),
+                    "resumed_at": session.resumed_at.map(|t| t.to_rfc3339()),
+                    "total_pause_duration": session.total_pause_duration.num_seconds()
+                }
+            });
+            
+            if let Err(e) = app_handle.emit_all("playback_status_update", status_json) {
+                log::warn!("Failed to emit real-time playback status update: {}", e);
+            }
+        }
+        
         Ok(())
     }
 
@@ -151,8 +276,33 @@ impl PlaybackController {
         }
 
         let session_id = self.current_session.as_ref().unwrap().id.clone();
-        self.current_session = None;
+        let session = self.current_session.take().unwrap();
         log::info!("Stopped playback session {}", session_id);
+        
+        // Emit real-time playback status update (session stopped)
+        // Requirements: 5.5 - Real-time event streaming
+        if let Some(ref app_handle) = self.app_handle {
+            let status_json = serde_json::json!({
+                "type": "playback_status_update",
+                "data": {
+                    "id": session.id,
+                    "target_app_id": session.target_app_id,
+                    "target_process_id": session.target_process_id,
+                    "state": PlaybackState::Completed,
+                    "focus_strategy": session.focus_strategy,
+                    "current_step": session.current_step,
+                    "started_at": session.started_at.to_rfc3339(),
+                    "paused_at": session.paused_at.map(|t| t.to_rfc3339()),
+                    "resumed_at": session.resumed_at.map(|t| t.to_rfc3339()),
+                    "total_pause_duration": session.total_pause_duration.num_seconds()
+                }
+            });
+            
+            if let Err(e) = app_handle.emit_all("playback_status_update", status_json) {
+                log::warn!("Failed to emit real-time playback status update: {}", e);
+            }
+        }
+        
         Ok(())
     }
 
