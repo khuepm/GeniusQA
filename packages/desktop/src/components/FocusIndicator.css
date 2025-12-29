@@ -20,6 +20,45 @@
   margin: 0;
 }
 
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.connection-health {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.connection-health.good {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.connection-health.warning {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.connection-health.error {
+  background-color: #fef2f2;
+  color: #dc2626;
+}
+
+.health-icon {
+  font-size: 0.8rem;
+}
+
+.health-text {
+  white-space: nowrap;
+}
+
 .refresh-button {
   width: 32px;
   height: 32px;
@@ -34,9 +73,18 @@
   transition: all 0.2s ease;
 }
 
-.refresh-button:hover {
+.refresh-button:hover:not(:disabled) {
   background-color: #f9fafb;
   border-color: #d1d5db;
+}
+
+.refresh-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.refresh-button.refreshing {
+  animation: spin 1s linear infinite;
 }
 
 .focus-status {
@@ -74,6 +122,37 @@
 .status-text {
   font-size: 1.1rem;
   font-weight: 600;
+  flex: 1;
+}
+
+.real-time-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  background-color: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #166534;
+}
+
+.live-dot {
+  width: 6px;
+  height: 6px;
+  background-color: #10b981;
+  border-radius: 50%;
+  animation: pulse-live 2s infinite;
+}
+
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.live-text {
+  letter-spacing: 0.05em;
 }
 
 .focus-status.focused .status-text {
@@ -130,11 +209,59 @@
   margin-bottom: 12px;
 }
 
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
 .app-name {
   font-size: 1rem;
   font-weight: 600;
   color: #1a1a1a;
-  margin-bottom: 4px;
+  flex: 1;
+}
+
+.app-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.app-status.active {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.app-status.inactive {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.app-status.notfound {
+  background-color: #fef2f2;
+  color: #dc2626;
+}
+
+.app-status.error {
+  background-color: #fef2f2;
+  color: #dc2626;
+}
+
+.app-status.permissiondenied {
+  background-color: #f3f4f6;
+  color: #6b7280;
+}
+
+.app-status.secureinputblocked {
+  background-color: #ede9fe;
+  color: #7c3aed;
 }
 
 .app-details {
@@ -152,6 +279,51 @@
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
 }
 
+.recovery-section {
+  margin-top: 12px;
+  padding: 12px;
+  background-color: #fef3c7;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+}
+
+.recovery-section h5 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #92400e;
+  margin: 0 0 8px 0;
+}
+
+.recovery-actions {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.recovery-action {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 0.85rem;
+  color: #92400e;
+}
+
+.recovery-action:last-child {
+  margin-bottom: 0;
+}
+
+.action-bullet {
+  color: #f59e0b;
+  font-weight: bold;
+  margin-top: 1px;
+}
+
+.action-text {
+  flex: 1;
+  line-height: 1.4;
+}
+
 .bring-to-focus-button {
   padding: 8px 16px;
   background-color: #3b82f6;
@@ -165,16 +337,32 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  width: 100%;
+  justify-content: center;
 }
 
-.bring-to-focus-button:hover {
+.bring-to-focus-button:hover:not(:disabled) {
   background-color: #2563eb;
+}
+
+.bring-to-focus-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.bring-to-focus-button.loading {
+  background-color: #6b7280;
 }
 
 .no-target {
   text-align: center;
   padding: 20px;
   color: #6b7280;
+}
+
+.no-target-icon {
+  font-size: 2.5rem;
+  margin-bottom: 12px;
 }
 
 .no-target p {
@@ -213,5 +401,32 @@
   .app-details {
     flex-direction: column;
     gap: 4px;
+  }
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@media (max-width: 768px) {
+  .app-details {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .header-controls {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  
+  .connection-health {
+    font-size: 0.7rem;
+  }
+  
+  .app-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
   }
 }

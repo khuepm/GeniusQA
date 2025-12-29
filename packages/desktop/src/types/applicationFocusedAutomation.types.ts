@@ -48,8 +48,13 @@ export interface PlaybackSession {
   state: PlaybackState;
   focus_strategy: FocusLossStrategy;
   current_step: number;
+  total_steps?: number;
   started_at: string; // ISO date string
   paused_at?: string; // ISO date string
+  resumed_at?: string; // ISO date string
+  total_pause_duration?: number; // seconds
+  paused_reason?: string;
+  error_message?: string;
 }
 
 export enum PlaybackState {

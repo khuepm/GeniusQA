@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/tauri';
+import { open } from '@tauri-apps/api/dialog';
 import {
   PlaybackSession,
   PlaybackState,
@@ -35,14 +37,11 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({
   const loadRegisteredApplications = async () => {
     try {
       setIsLoading(true);
-      // TODO: Replace with actual Tauri command call
-      // const apps = await invoke('get_registered_applications');
-      // setRegisteredApps(apps);
-
-      // Mock data for now
-      setRegisteredApps([]);
+      const apps = await invoke<RegisteredApplication[]>('get_registered_applications');
+      setRegisteredApps(apps);
     } catch (err) {
       console.error('Failed to load registered applications:', err);
+      setRegisteredApps([]);
     } finally {
       setIsLoading(false);
     }
@@ -70,20 +69,17 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({
 
   const handleBrowseScript = async () => {
     try {
-      // TODO: Replace with actual Tauri file dialog
-      // const selected = await open({
-      //   multiple: false,
-      //   filters: [{
-      //     name: 'Script Files',
-      //     extensions: ['json', 'js', 'py']
-      //   }]
-      // });
+      const selected = await open({
+        multiple: false,
+        filters: [{
+          name: 'Script Files',
+          extensions: ['json', 'js', 'py']
+        }]
+      });
 
-      // if (selected && typeof selected === 'string') {
-      //   setSelectedScriptPath(selected);
-      // }
-
-      console.log('Browse script clicked - TODO: implement file dialog');
+      if (selected && typeof selected === 'string') {
+        setSelectedScriptPath(selected);
+      }
     } catch (err) {
       console.error('Failed to browse for script:', err);
     }

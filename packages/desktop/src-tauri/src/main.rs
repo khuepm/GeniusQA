@@ -920,11 +920,12 @@ async fn start_focused_playback(
     service_state: State<'_, ApplicationFocusedAutomationState>,
     app_id: String,
     focus_strategy: FocusLossStrategy,
+    script_path: Option<String>,
 ) -> Result<String, String> {
-    log::info!("[App Focus] Starting focused playback for app: {} with strategy: {:?}", 
-              app_id, focus_strategy);
+    log::info!("[App Focus] Starting focused playback for app: {} with strategy: {:?} script: {:?}", 
+              app_id, focus_strategy, script_path);
     
-    let session_id = service_state.service.start_integrated_playback(app_id.clone(), focus_strategy).await
+    let session_id = service_state.service.start_integrated_playback(app_id.clone(), focus_strategy, script_path).await
         .map_err(|e| format!("Failed to start playback: {}", e))?;
     
     log::info!("[App Focus] Focused playback started with session ID: {}", session_id);
@@ -1126,8 +1127,31 @@ async fn subscribe_to_focus_updates(
 ) -> Result<(), String> {
     log::info!("[App Focus] Subscribing to real-time focus updates for app: {}", app_id);
     
-    if let Ok(true) = service_state.service.get_focus_monitor(&app_id) {
-        // For now, emit a placeholder focus state since we changed the API
+    // Get the current focus state from the service
+    let focus_state = service_state.service.get_focus_state(&app_id)
+        .map_err(|e| format!("Failed to get focus state: {}", e))?;
+    
+    if let Some(focus_state) = focus_state {
+        // Emit initial focus state
+        let focus_state_json = serde_json::json!({
+            "type": "focus_state_update",
+            "data": {
+                "is_target_process_focused": focus_state.is_target_process_focused,
+                "focused_process_id": focus_state.focused_process_id,
+                "focused_window_title": focus_state.focused_window_title,
+                "last_change": focus_state.last_change.to_rfc3339(),
+                "target_app_id": app_id,
+                "target_process_id": focus_state.focused_process_id
+            }
+        });
+            
+        app_handle.emit_all("focus_state_update", focus_state_json)
+            .map_err(|e| format!("Failed to emit focus state update: {}", e))?;
+        
+        log::info!("[App Focus] Successfully subscribed to focus updates and emitted initial state");
+        Ok(())
+    } else {
+        // Emit a default focus state if no monitor is active
         let focus_state_json = serde_json::json!({
             "type": "focus_state_update",
             "data": {
@@ -1143,10 +1167,8 @@ async fn subscribe_to_focus_updates(
         app_handle.emit_all("focus_state_update", focus_state_json)
             .map_err(|e| format!("Failed to emit focus state update: {}", e))?;
         
-        log::info!("[App Focus] Successfully subscribed to focus updates");
+        log::info!("[App Focus] Successfully subscribed to focus updates with default state");
         Ok(())
-    } else {
-        Err("Focus monitor not found for application".to_string())
     }
 }
 
@@ -1199,10 +1221,20 @@ async fn subscribe_to_playback_updates(
                 .map_err(|e| format!("Failed to emit playback status update: {}", e))?;
         }
         
-        log::info!("[App Focus] Successfully subscribed to playback updates");
+        log::info!("[App Focus] Successfully subscribed to playback updates with active session");
         Ok(())
     } else {
-        Err("No active playback session".to_string())
+        // Emit a null status to indicate no active session
+        let status_json = serde_json::json!({
+            "type": "playback_status_update",
+            "data": null
+        });
+        
+        app_handle.emit_all("playback_status_update", status_json)
+            .map_err(|e| format!("Failed to emit playback status update: {}", e))?;
+        
+        log::info!("[App Focus] Successfully subscribed to playback updates with no active session");
+        Ok(())
     }
 }
 
@@ -1382,6 +1414,107 @@ async fn restart_service(
     Ok(())
 }
 
+/// Update application focus configuration
+/// 
+/// Requirements: Configuration management for onboarding
+#[tauri::command]
+async fn update_application_focus_config(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+    config: serde_json::Value,
+) -> Result<(), String> {
+    log::info!("[App Focus] Updating application focus configuration");
+    
+    // For now, just log the configuration update
+    // In a full implementation, this would update the service configuration
+    log::info!("[App Focus] Configuration update: {:?}", config);
+    
+    // TODO: Implement actual configuration update
+    // This would involve updating the ApplicationFocusConfig and persisting it
+    
+    Ok(())
+}
+
+/// Open system settings for accessibility permissions (macOS)
+/// 
+/// Requirements: Platform-specific permission guidance
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn open_accessibility_settings() -> Result<(), String> {
+    use std::process::Command;
+    
+    log::info!("[App Focus] Opening macOS accessibility settings");
+    
+    let output = Command::new("open")
+        .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+        .output()
+        .map_err(|e| format!("Failed to open accessibility settings: {}", e))?;
+    
+    if !output.status.success() {
+        return Err("Failed to open accessibility settings".to_string());
+    }
+    
+    Ok(())
+}
+
+/// Open system settings (MacOS)
+/// 
+/// Requirements: Platform-specific permission guidance
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn open_system_settings() -> Result<(), String> {
+    use std::process::Command;
+    
+    log::info!("[App Focus] Opening macOS system settings");
+    
+    // Open the main System Settings/Preferences window
+    let output = Command::new("open")
+        .arg("x-apple.systempreferences:")
+        .output()
+        .map_err(|e| format!("Failed to open system settings: {}", e))?;
+    
+    if !output.status.success() {
+        return Err("Failed to open system settings".to_string());
+    }
+    
+    Ok(())
+}
+
+/// Open system settings (Windows)
+/// 
+/// Requirements: Platform-specific permission guidance
+#[cfg(target_os = "windows")]
+#[tauri::command]
+async fn open_system_settings() -> Result<(), String> {
+    use std::process::Command;
+    
+    log::info!("[App Focus] Opening Windows system settings");
+    
+    let output = Command::new("ms-settings:")
+        .output()
+        .map_err(|e| format!("Failed to open system settings: {}", e))?;
+    
+    if !output.status.success() {
+        return Err("Failed to open system settings".to_string());
+    }
+    
+    Ok(())
+}
+
+/// Fallback for other platforms
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[tauri::command]
+async fn open_accessibility_settings() -> Result<(), String> {
+    log::warn!("[App Focus] Opening accessibility settings not supported on this platform");
+    Err("Opening accessibility settings not supported on this platform".to_string())
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[tauri::command]
+async fn open_system_settings() -> Result<(), String> {
+    log::warn!("[App Focus] Opening system settings not supported on this platform");
+    Err("Opening system settings not supported on this platform".to_string())
+}
+
 // Platform-specific helper functions (placeholders for now)
 
 #[cfg(target_os = "windows")]
@@ -1401,19 +1534,15 @@ async fn get_running_applications_windows() -> Result<Vec<ApplicationInfo>, Stri
 }
 
 #[cfg(target_os = "macos")]
+
+//TODO: This feature not working well, need to fix
 async fn get_running_applications_macos() -> Result<Vec<ApplicationInfo>, String> {
-    // TODO: Implement macOS-specific application enumeration
-    log::warn!("[App Focus] macOS application enumeration not yet implemented");
-    Ok(vec![
-        ApplicationInfo {
-            name: "TextEdit".to_string(),
-            executable_path: "/Applications/TextEdit.app".to_string(),
-            process_name: "TextEdit".to_string(),
-            process_id: 5678,
-            bundle_id: Some("com.apple.TextEdit".to_string()),
-            window_handle: None,
-        }
-    ])
+    use application_focused_automation::MacOSApplicationDetector;
+    use application_focused_automation::platform::PlatformApplicationDetector;
+
+    let detector = MacOSApplicationDetector::new();
+    detector.get_running_applications()
+        .map_err(|e| format!("Failed to get running applications: {:?}", e))
 }
 
 // ============================================================================
@@ -1855,6 +1984,55 @@ async fn show_click_cursor(app_handle: tauri::AppHandle, x: i32, y: i32, button:
     Ok(())
 }
 
+// Platform and permission commands
+#[tauri::command]
+async fn get_platform_info() -> Result<String, String> {
+    Ok(std::env::consts::OS.to_string())
+}
+
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn check_accessibility_permissions() -> Result<bool, String> {
+    use std::process::Command;
+    
+    // Check if accessibility permissions are granted using AppleScript
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg("tell application \"System Events\" to return true")
+        .output()
+        .map_err(|e| format!("Failed to check accessibility permissions: {}", e))?;
+    
+    Ok(output.status.success())
+}
+
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+async fn check_accessibility_permissions() -> Result<bool, String> {
+    // On non-macOS platforms, assume permissions are available
+    Ok(true)
+}
+
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn request_accessibility_permissions() -> Result<(), String> {
+    use std::process::Command;
+    
+    // Open System Settings to Privacy & Security > Accessibility
+    let _ = Command::new("open")
+        .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+        .spawn()
+        .map_err(|e| format!("Failed to open system settings: {}", e))?;
+    
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+async fn request_accessibility_permissions() -> Result<(), String> {
+    // On non-macOS platforms, no action needed
+    Ok(())
+}
+
 fn main() {
     // Initialize logging system
     if let Err(e) = init_logging() {
@@ -1922,6 +2100,11 @@ fn main() {
             tauri::async_runtime::spawn(async move {
                 // Get the service from app state
                 if let Some(service_state) = app_handle_clone.try_state::<ApplicationFocusedAutomationState>() {
+                    // Set the app handle for real-time events
+                    if let Err(e) = service_state.service.set_app_handle(app_handle_clone.clone()) {
+                        log::error!("Failed to set app handle for Application-Focused Automation service: {}", e);
+                    }
+                    
                     if let Err(e) = service_state.service.start().await {
                         log::error!("Failed to start Application-Focused Automation service: {}", e);
                     } else {
@@ -1996,6 +2179,9 @@ fn main() {
             get_service_health,
             get_service_stats,
             restart_service,
+            update_application_focus_config,
+            open_accessibility_settings,
+            open_system_settings,
             // AI Vision Capture commands
             capture_vision_marker,
             analyze_vision,
@@ -2026,6 +2212,10 @@ fn main() {
             ai_test_case::commands::get_usage_patterns,
             ai_test_case::commands::calculate_cost_estimation,
             ai_test_case::commands::get_recent_errors,
+            // Platform and permission commands
+            get_platform_info,
+            check_accessibility_permissions,
+            request_accessibility_permissions,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

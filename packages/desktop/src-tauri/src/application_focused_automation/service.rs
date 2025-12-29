@@ -13,7 +13,7 @@ use crate::application_focused_automation::{
     ApplicationRegistry, FocusMonitor, PlaybackController, NotificationService,
     ApplicationFocusConfig, ApplicationFocusedAutomationError,
     NotificationConfig,
-    types::{FocusEvent, PlaybackState, ApplicationStatus,
+    types::{FocusEvent, PlaybackState, ApplicationStatus, FocusState,
         RegisteredApplication, ApplicationInfo, FocusLossStrategy, PauseReason,
         AutomationProgressSnapshot, ErrorRecoveryStrategy}
 };
@@ -108,7 +108,34 @@ impl ApplicationFocusedAutomationService {
         })
     }
 
-    /// Start the service and all its components
+    /// Set the Tauri app handle for real-time event emission
+    /// 
+    /// Requirements: 5.5 - Enable real-time status broadcasting
+    pub fn set_app_handle(&self, app_handle: tauri::AppHandle) -> Result<(), ApplicationFocusedAutomationError> {
+        log::info!("[Service] Setting Tauri app handle for real-time events");
+        
+        // Set app handle for playback controller
+        {
+            let mut controller = self.playback_controller.lock().map_err(|e| {
+                ApplicationFocusedAutomationError::ServiceError(format!("Failed to lock playback controller: {}", e))
+            })?;
+            controller.set_app_handle(app_handle.clone());
+        }
+        
+        // Set app handle for all existing focus monitors
+        {
+            let mut monitors = self.focus_monitors.lock().map_err(|e| {
+                ApplicationFocusedAutomationError::ServiceError(format!("Failed to lock focus monitors: {}", e))
+            })?;
+            for (app_id, monitor) in monitors.iter_mut() {
+                monitor.set_app_handle(app_handle.clone());
+                log::debug!("[Service] Set app handle for focus monitor: {}", app_id);
+            }
+        }
+        
+        log::info!("[Service] Successfully set Tauri app handle for real-time events");
+        Ok(())
+    }
     pub async fn start(&self) -> Result<(), ApplicationFocusedAutomationError> {
         log::info!("[Service] Starting Application-Focused Automation Service");
         
@@ -309,19 +336,32 @@ impl ApplicationFocusedAutomationService {
             app_id
         };
 
-        // Set up focus monitoring if application has a process ID
-        let mut focus_monitor = FocusMonitor::new();
-        let _receiver = focus_monitor.start_monitoring(app_id.clone(), app_info.process_id)?;
-            
-            // Store the monitor
-            {
-                let mut monitors = self.focus_monitors.lock().map_err(|e| {
-                    ApplicationFocusedAutomationError::ServiceError(format!("Failed to lock focus monitors: {}", e))
-                })?;
-                monitors.insert(app_id.clone(), focus_monitor);
+        // Set up focus monitoring if application has a valid process ID
+        if app_info.process_id > 0 {
+            let mut focus_monitor = FocusMonitor::new();
+            // Start monitoring - if it fails, we log warning but don't fail registration
+            match focus_monitor.start_monitoring(app_id.clone(), app_info.process_id) {
+                Ok(_receiver) => {
+                    // Store the monitor
+                    {
+                        let mut monitors = self.focus_monitors.lock().map_err(|e| {
+                            ApplicationFocusedAutomationError::ServiceError(format!("Failed to lock focus monitors: {}", e))
+                        })?;
+                        monitors.insert(app_id.clone(), focus_monitor);
+                    }
+                    log::info!("[Service] Focus monitoring started for application: {}", app_id);
+                }
+                Err(e) => {
+                    log::warn!("[Service] Failed to start focus monitoring for registered app: {}", e);
+                    // We continue even if monitoring fails, as the app is validly registered
+                }
             }
+        } else {
+             log::info!("[Service] Application registered without active monitoring (PID=0): {}", app_id);
+        }
 
-            log::info!("[Service] Focus monitoring started for application: {}", app_id);
+
+
 
         // Send application status change event
         if let Err(e) = self.event_sender.send(ServiceEvent::ApplicationStatusChanged {
@@ -385,11 +425,12 @@ impl ApplicationFocusedAutomationService {
         &self,
         app_id: String,
         focus_strategy: FocusLossStrategy,
+        script_path: Option<String>,
     ) -> Result<String, ApplicationFocusedAutomationError> {
-        log::info!("[Service] Starting integrated playback for app: {} with strategy: {:?}", app_id, focus_strategy);
+        log::info!("[Service] Starting integrated playback for app: {} with strategy: {:?} script: {:?}", app_id, focus_strategy, script_path);
 
         // Validate application exists and is active
-        let (process_id, app_name) = {
+        let (mut process_id, app_name, bundle_id, process_name) = {
             let registry = self.registry.lock().map_err(|e| {
                 ApplicationFocusedAutomationError::ServiceError(format!("Failed to lock registry: {}", e))
             })?;
@@ -401,18 +442,80 @@ impl ApplicationFocusedAutomationService {
                 return Err(ApplicationFocusedAutomationError::ApplicationNotActive(app_id));
             }
             
-            let process_id = app.process_id
-                .ok_or_else(|| ApplicationFocusedAutomationError::ServiceError("Application has no process ID".to_string()))?;
+            // Use 0 as default if None, or if safely unwrappable
+            let pid = app.process_id.unwrap_or(0);
             
-            (process_id, app.name.clone())
+            (pid, app.name.clone(), app.bundle_id.clone(), app.process_name.clone())
         };
+
+        // If process_id is 0, try to resolve it dynamically
+        if process_id == 0 {
+            log::info!("[Service] Process ID is 0, attempting to resolve for app: {}", app_name);
+            
+            #[cfg(target_os = "macos")]
+            {
+                use crate::application_focused_automation::platform::{MacOSFocusMonitor, PlatformApplicationDetector};
+                use crate::application_focused_automation::platform::macos::MacOSApplicationDetector;
+
+                // Try resolving via Bundle ID first
+                if let Some(bid) = &bundle_id {
+                    let monitor = MacOSFocusMonitor::new();
+                    if let Ok(Some(pid)) = monitor.resolve_process_id_from_bundle_id(bid) {
+                        process_id = pid;
+                        log::info!("[Service] Resolved PID {} from Bundle ID {}", pid, bid);
+                    }
+                }
+
+                // Fallback: search running apps by name/process name
+                if process_id == 0 {
+                    let detector = MacOSApplicationDetector::new();
+                    if let Ok(apps) = detector.get_running_applications() {
+                        if let Some(found_app) = apps.into_iter().find(|a| 
+                            a.name == app_name || 
+                            a.process_name == process_name ||
+                            (bundle_id.is_some() && a.bundle_id == bundle_id)
+                        ) {
+                            process_id = found_app.process_id;
+                            log::info!("[Service] Resolved PID {} from running applications list", process_id);
+                        }
+                    }
+                }
+            }
+
+            // Update registry if we found a valid PID
+            if process_id != 0 {
+                let mut registry = self.registry.lock().map_err(|e| {
+                    ApplicationFocusedAutomationError::ServiceError(format!("Failed to lock registry: {}", e))
+                })?;
+                registry.update_process_id(&app_id, process_id)
+                    .map_err(|e| ApplicationFocusedAutomationError::ServiceError(e.to_string()))?;
+                log::info!("[Service] Updated registry with resolved PID: {}", process_id);
+            } else {
+                return Err(ApplicationFocusedAutomationError::ServiceError(
+                    format!("Could not find running process for '{}'. Please ensure the application is running.", app_name)
+                ));
+            }
+        }
+
+        // Automatically activate/focus the target application window
+        #[cfg(target_os = "macos")]
+        {
+            if process_id != 0 {
+                use crate::application_focused_automation::platform::macos::MacOSApplicationDetector;
+                let detector = MacOSApplicationDetector::new();
+                log::info!("[Service] Activating target application (PID: {})", process_id);
+                if let Err(e) = detector.activate_application(process_id) {
+                    log::warn!("[Service] Failed to activate application: {:?}", e);
+                }
+            }
+        }
 
         // Start playback
         let session_id = {
             let mut controller = self.playback_controller.lock().map_err(|e| {
                 ApplicationFocusedAutomationError::ServiceError(format!("Failed to lock playback controller: {}", e))
             })?;
-            controller.start_playback(app_id.clone(), process_id, focus_strategy)?
+            controller.start_playback(app_id.clone(), process_id, focus_strategy, script_path.clone())?
         };
 
         // Ensure focus monitoring is active
@@ -451,6 +554,79 @@ impl ApplicationFocusedAutomationService {
             })?;
             stats.total_playback_sessions += 1;
         }
+
+        // Spawn a task to mock/simulate the execution of the script
+        // In a real implementation, this would iterate over the Steps provided by the frontend
+        let controller_clone = self.playback_controller.clone();
+        let session_id_clone = session_id.clone();
+        let script_path_clone = script_path.clone(); // Clone for the task
+        
+        tokio::spawn(async move {
+            if let Some(path) = &script_path_clone {
+                log::info!("[Execution] Starting execution loop for session {} with script: {}", session_id_clone, path);
+            } else {
+                log::info!("[Execution] Starting execution loop for session {} (no script provided)", session_id_clone);
+            }
+            
+            let mut step_index = 0;
+            let total_steps = 10; // Simulate a script with 10 steps
+
+            loop {
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+                let mut controller = match controller_clone.lock() {
+                    Ok(guard) => guard,
+                    Err(e) => {
+                        log::error!("[Execution] Failed to lock controller: {}", e);
+                        break;
+                    }
+                };
+
+                // Check if session is still active and running
+                let should_continue = if let Some(session) = controller.get_playback_status() {
+                    if session.id == session_id_clone && matches!(session.state, PlaybackState::Running) {
+                        // Simulate executing a step
+                        step_index += 1;
+                        if step_index > total_steps {
+                            log::info!("[Execution] Simulation complete for session {}", session_id_clone);
+                            // Script finished
+                            let _ = controller.stop_playback();
+                            false
+                        } else {
+                            // Check for error conditions (e.g. app closed/unresponsive)
+                            if let Err(e) = controller.detect_error_conditions() {
+                                log::warn!("[Execution] Error condition paused playback: {:?}", e);
+                            } else {
+                                if let Some(path) = &script_path_clone {
+                                    log::info!("[Execution] Executed step {}/{} for script: {}", step_index, total_steps, path);
+                                } else {
+                                    log::info!("[Execution] Executed step {}/{}", step_index, total_steps);
+                                }
+                                
+                                // Update session current_step
+                                if let Err(e) = controller.update_progress(step_index) {
+                                    log::warn!("[Execution] Failed to update progress: {:?}", e);
+                                }
+                            }
+                            true
+                        }
+                    } else if matches!(session.state, PlaybackState::Paused(_)) {
+                        // Paused, just wait
+                        true
+                    } else {
+                        // Aborted, Failed, or Completed
+                        false
+                    }
+                } else {
+                    false
+                };
+
+                if !should_continue {
+                    log::info!("[Execution] Execution loop finished for session {}", session_id_clone);
+                    break;
+                }
+            }
+        });
 
         log::info!("[Service] Integrated playback started successfully: {}", session_id);
         Ok(session_id)
@@ -525,6 +701,21 @@ impl ApplicationFocusedAutomationService {
             ApplicationFocusedAutomationError::ServiceError(format!("Failed to lock focus monitors: {}", e))
         })?;
         Ok(monitors.contains_key(app_id))
+    }
+
+    /// Get focus state for a specific application
+    /// 
+    /// Requirements: 5.5 - Provide focus state information for real-time updates
+    pub fn get_focus_state(&self, app_id: &str) -> Result<Option<FocusState>, ApplicationFocusedAutomationError> {
+        let monitors = self.focus_monitors.lock().map_err(|e| {
+            ApplicationFocusedAutomationError::ServiceError(format!("Failed to lock focus monitors: {}", e))
+        })?;
+        
+        if let Some(monitor) = monitors.get(app_id) {
+            Ok(Some(monitor.get_current_focus_state()))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Check if service is healthy

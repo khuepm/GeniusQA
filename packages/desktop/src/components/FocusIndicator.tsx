@@ -1,5 +1,6 @@
-import React from 'react';
-import { FocusState, RegisteredApplication } from '../types/applicationFocusedAutomation.types';
+import React, { useState, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/tauri';
+import { FocusState, RegisteredApplication, ApplicationStatus } from '../types/applicationFocusedAutomation.types';
 import './FocusIndicator.css';
 
 interface FocusIndicatorProps {
@@ -13,6 +14,36 @@ export const FocusIndicator: React.FC<FocusIndicatorProps> = ({
   targetApplication,
   onRefresh,
 }) => {
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [connectionHealth, setConnectionHealth] = useState<'good' | 'warning' | 'error'>('good');
+
+  // Update last update time when focus state changes
+  useEffect(() => {
+    if (focusState) {
+      setLastUpdateTime(new Date());
+      setConnectionHealth('good');
+    }
+  }, [focusState]);
+
+  // Check connection health based on last update
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+      const timeSinceUpdate = now.getTime() - lastUpdateTime.getTime();
+
+      if (timeSinceUpdate > 30000) { // 30 seconds
+        setConnectionHealth('error');
+      } else if (timeSinceUpdate > 10000) { // 10 seconds
+        setConnectionHealth('warning');
+      } else {
+        setConnectionHealth('good');
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [lastUpdateTime]);
+
   const getFocusStatusIcon = (): string => {
     if (!focusState) return '❓';
     return focusState.is_target_process_focused ? '🟢' : '🔴';
@@ -47,18 +78,116 @@ export const FocusIndicator: React.FC<FocusIndicatorProps> = ({
     }
   };
 
+  const getApplicationStatusIcon = (status: ApplicationStatus): string => {
+    switch (status) {
+      case ApplicationStatus.Active:
+        return '🟢';
+      case ApplicationStatus.Inactive:
+        return '🟡';
+      case ApplicationStatus.NotFound:
+        return '🔴';
+      case ApplicationStatus.Error:
+        return '❌';
+      case ApplicationStatus.PermissionDenied:
+        return '🔒';
+      case ApplicationStatus.SecureInputBlocked:
+        return '🛡️';
+      default:
+        return '❓';
+    }
+  };
+
+  const getApplicationStatusText = (status: ApplicationStatus): string => {
+    switch (status) {
+      case ApplicationStatus.Active:
+        return 'Running';
+      case ApplicationStatus.Inactive:
+        return 'Not Running';
+      case ApplicationStatus.NotFound:
+        return 'Not Found';
+      case ApplicationStatus.Error:
+        return 'Error';
+      case ApplicationStatus.PermissionDenied:
+        return 'Permission Denied';
+      case ApplicationStatus.SecureInputBlocked:
+        return 'Secure Input Active';
+      default:
+        return 'Unknown';
+    }
+  };
+
+  const getRecoveryActions = (status: ApplicationStatus): string[] => {
+    switch (status) {
+      case ApplicationStatus.Inactive:
+        return ['Launch the application', 'Refresh status'];
+      case ApplicationStatus.NotFound:
+        return ['Check if application is installed', 'Re-register application'];
+      case ApplicationStatus.PermissionDenied:
+        return ['Grant accessibility permissions in System Preferences', 'Restart GeniusQA'];
+      case ApplicationStatus.SecureInputBlocked:
+        return ['Close password dialogs or secure input fields', 'Wait for secure input to end'];
+      case ApplicationStatus.Error:
+        return ['Check application logs', 'Restart application', 'Contact support'];
+      default:
+        return [];
+    }
+  };
+
   const handleBringToFocus = async () => {
     if (!targetApplication) return;
 
     try {
-      // TODO: Replace with actual Tauri command call
-      // await invoke('bring_application_to_focus', { appId: targetApplication.id });
+      setIsRefreshing(true);
       console.log('Bringing application to focus:', targetApplication.id);
 
-      // Refresh focus state after attempting to bring to focus
-      setTimeout(onRefresh, 500);
+      // Attempt to bring application to focus using Tauri command
+      await invoke('bring_application_to_focus', {
+        appId: targetApplication.id
+      });
+
+      // Refresh focus state after a short delay
+      setTimeout(() => {
+        onRefresh();
+        setIsRefreshing(false);
+      }, 1000);
     } catch (err) {
       console.error('Failed to bring application to focus:', err);
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
+
+  const getConnectionHealthIcon = (): string => {
+    switch (connectionHealth) {
+      case 'good':
+        return '🟢';
+      case 'warning':
+        return '🟡';
+      case 'error':
+        return '🔴';
+      default:
+        return '❓';
+    }
+  };
+
+  const getConnectionHealthText = (): string => {
+    switch (connectionHealth) {
+      case 'good':
+        return 'Real-time updates active';
+      case 'warning':
+        return 'Updates may be delayed';
+      case 'error':
+        return 'Connection lost - data may be stale';
+      default:
+        return 'Unknown connection status';
     }
   };
 
@@ -66,19 +195,30 @@ export const FocusIndicator: React.FC<FocusIndicatorProps> = ({
     <div className="focus-indicator">
       <div className="indicator-header">
         <h3>Focus Status</h3>
-        <button
-          className="refresh-button"
-          onClick={onRefresh}
-          title="Refresh focus status"
-        >
-          🔄
-        </button>
+        <div className="header-controls">
+          <div className={`connection-health ${connectionHealth}`}>
+            <span className="health-icon">{getConnectionHealthIcon()}</span>
+            <span className="health-text">{getConnectionHealthText()}</span>
+          </div>
+          <button
+            className={`refresh-button ${isRefreshing ? 'refreshing' : ''}`}
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            title="Refresh focus status"
+          >
+            🔄
+          </button>
+        </div>
       </div>
 
       <div className={`focus-status ${getFocusStatusClass()}`}>
         <div className="status-main">
           <span className="status-icon">{getFocusStatusIcon()}</span>
           <span className="status-text">{getFocusStatusText()}</span>
+          <div className="real-time-indicator">
+            <span className="live-dot"></span>
+            <span className="live-text">LIVE</span>
+          </div>
         </div>
 
         {focusState && (
@@ -114,7 +254,13 @@ export const FocusIndicator: React.FC<FocusIndicatorProps> = ({
         <div className="target-application">
           <h4>Target Application</h4>
           <div className="app-info">
-            <div className="app-name">{targetApplication.name}</div>
+            <div className="app-header">
+              <div className="app-name">{targetApplication.name}</div>
+              <div className={`app-status ${targetApplication.status.toLowerCase()}`}>
+                <span className="status-icon">{getApplicationStatusIcon(targetApplication.status)}</span>
+                <span className="status-text">{getApplicationStatusText(targetApplication.status)}</span>
+              </div>
+            </div>
             <div className="app-details">
               <span className="process-name">{targetApplication.process_name}</span>
               {targetApplication.process_id && (
@@ -123,13 +269,29 @@ export const FocusIndicator: React.FC<FocusIndicatorProps> = ({
             </div>
           </div>
 
-          {!focusState?.is_target_process_focused && (
+          {/* Recovery Actions for problematic statuses */}
+          {targetApplication.status !== ApplicationStatus.Active && (
+            <div className="recovery-section">
+              <h5>Recovery Actions</h5>
+              <ul className="recovery-actions">
+                {getRecoveryActions(targetApplication.status).map((action, index) => (
+                  <li key={index} className="recovery-action">
+                    <span className="action-bullet">•</span>
+                    <span className="action-text">{action}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {!focusState?.is_target_process_focused && targetApplication.status === ApplicationStatus.Active && (
             <button
-              className="bring-to-focus-button"
+              className={`bring-to-focus-button ${isRefreshing ? 'loading' : ''}`}
               onClick={handleBringToFocus}
+              disabled={isRefreshing}
               title="Attempt to bring target application to focus"
             >
-              🎯 Bring to Focus
+              {isRefreshing ? '⏳ Focusing...' : '🎯 Bring to Focus'}
             </button>
           )}
         </div>
@@ -137,6 +299,7 @@ export const FocusIndicator: React.FC<FocusIndicatorProps> = ({
 
       {!targetApplication && (
         <div className="no-target">
+          <div className="no-target-icon">🎯</div>
           <p>No target application selected</p>
           <p className="hint">Start a playback session to monitor focus</p>
         </div>
@@ -148,6 +311,7 @@ export const FocusIndicator: React.FC<FocusIndicatorProps> = ({
           <li>Keep the target application window visible and active</li>
           <li>Avoid switching to other applications during automation</li>
           <li>Use Alt+Tab (Windows) or Cmd+Tab (macOS) to switch back quickly</li>
+          <li>Real-time updates show focus changes immediately</li>
         </ul>
       </div>
     </div>

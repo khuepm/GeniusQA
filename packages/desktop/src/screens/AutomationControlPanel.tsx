@@ -1,9 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { invoke } from '@tauri-apps/api/tauri';
 import { PlaybackControls } from '../components/PlaybackControls';
 import { FocusIndicator } from '../components/FocusIndicator';
 import { ProgressDisplay } from '../components/ProgressDisplay';
 import { NotificationArea } from '../components/NotificationArea';
 import { FocusStateVisualizer } from '../components/FocusStateVisualizer';
+import { OnboardingWizard } from '../components/OnboardingWizard';
+import { EnhancedStatusDisplay } from '../components/EnhancedStatusDisplay';
+import { useApplicationFocusEvents } from '../hooks/useApplicationFocusEvents';
+import { onboardingService } from '../services/onboardingService';
 import {
   PlaybackSession,
   PlaybackState,
@@ -15,28 +21,57 @@ import {
 import './AutomationControlPanel.css';
 
 export const AutomationControlPanel: React.FC = () => {
-  const [currentSession, setCurrentSession] = useState<PlaybackSession | null>(null);
-  const [focusState, setFocusState] = useState<FocusState | null>(null);
   const [targetApplication, setTargetApplication] = useState<RegisteredApplication | null>(null);
-  const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const navigate = useNavigate();
+
+  // Check if onboarding should be shown
+  useEffect(() => {
+    if (onboardingService.isOnboardingNeeded()) {
+      setShowOnboarding(true);
+    }
+  }, []);
+
+  // Use the real-time events hook
+  const {
+    focusState,
+    playbackSession: currentSession,
+    notifications,
+    isConnected,
+    connectionError,
+    reconnectAttempts,
+    maxReconnectAttempts,
+    dismissNotification,
+    reconnect
+  } = useApplicationFocusEvents(currentSessionId || undefined);
 
   useEffect(() => {
     loadCurrentSession();
-    loadFocusState();
+    loadTargetApplication();
   }, []);
+
+  // Update target application and session ID when session changes
+  useEffect(() => {
+    if (currentSession?.target_app_id) {
+      setCurrentSessionId(currentSession.target_app_id);
+      loadTargetApplication(currentSession.target_app_id);
+    } else {
+      setCurrentSessionId(null);
+    }
+  }, [currentSession?.target_app_id]);
 
   const loadCurrentSession = async () => {
     try {
       setIsLoading(true);
       setError(null);
-      // TODO: Replace with actual Tauri command call
-      // const session = await invoke('get_current_playback_session');
-      // setCurrentSession(session);
+      const sessionData = await invoke<any>('get_playback_status');
 
-      // Mock data for now
-      setCurrentSession(null);
+      // The session data will be updated via the real-time events hook
+      // This is just for initial load
+      console.log('Initial session load:', sessionData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load session');
     } finally {
@@ -44,21 +79,18 @@ export const AutomationControlPanel: React.FC = () => {
     }
   };
 
-  const loadFocusState = async () => {
-    try {
-      // TODO: Replace with actual Tauri command call
-      // const focus = await invoke('get_current_focus_state');
-      // setFocusState(focus);
+  const loadTargetApplication = async (appId?: string) => {
+    if (!appId && !currentSession?.target_app_id) return;
 
-      // Mock data for now
-      setFocusState({
-        is_target_process_focused: false,
-        focused_process_id: undefined,
-        focused_window_title: undefined,
-        last_change: new Date().toISOString(),
+    try {
+      const targetAppId = appId || currentSession?.target_app_id;
+      const app = await invoke<RegisteredApplication>('get_application', {
+        appId: targetAppId
       });
+      setTargetApplication(app);
     } catch (err) {
-      console.error('Failed to load focus state:', err);
+      console.error('Failed to load target application:', err);
+      setTargetApplication(null);
     }
   };
 
@@ -69,33 +101,31 @@ export const AutomationControlPanel: React.FC = () => {
   ) => {
     try {
       setError(null);
-      // TODO: Replace with actual Tauri command call
-      // const session = await invoke('start_playback', { 
-      //   targetAppId, 
-      //   focusStrategy, 
-      //   scriptPath 
-      // });
-      // setCurrentSession(session);
+      const sessionId = await invoke<string>('start_focused_playback', {
+        appId: targetAppId,
+        focusStrategy,
+        scriptPath
+      });
 
-      console.log('Starting playback:', { targetAppId, focusStrategy, scriptPath });
+      console.log('Started playback session:', sessionId);
+
+      // Load target application info
+      await loadTargetApplication(targetAppId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start playback');
+      console.error('Failed to start playback:', err);
+      // Handle both Error objects and string errors from Tauri
+      const errorMessage = typeof err === 'string' ? err : (err instanceof Error ? err.message : 'Failed to start playback');
+      setError(errorMessage);
     }
   };
 
   const handlePausePlayback = async () => {
     try {
       setError(null);
-      // TODO: Replace with actual Tauri command call
-      // await invoke('pause_playback');
-
-      if (currentSession) {
-        setCurrentSession({
-          ...currentSession,
-          state: PlaybackState.Paused,
-          paused_at: new Date().toISOString(),
-        });
-      }
+      await invoke('pause_focused_playback', {
+        reason: 'UserRequested'
+      });
+      // Session state will be updated via real-time events
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to pause playback');
     }
@@ -104,16 +134,8 @@ export const AutomationControlPanel: React.FC = () => {
   const handleResumePlayback = async () => {
     try {
       setError(null);
-      // TODO: Replace with actual Tauri command call
-      // await invoke('resume_playback');
-
-      if (currentSession) {
-        setCurrentSession({
-          ...currentSession,
-          state: PlaybackState.Running,
-          paused_at: undefined,
-        });
-      }
+      await invoke('resume_focused_playback');
+      // Session state will be updated via real-time events
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to resume playback');
     }
@@ -122,21 +144,36 @@ export const AutomationControlPanel: React.FC = () => {
   const handleStopPlayback = async () => {
     try {
       setError(null);
-      // TODO: Replace with actual Tauri command call
-      // await invoke('stop_playback');
-
-      setCurrentSession(null);
+      await invoke('stop_focused_playback');
+      // Session state will be updated via real-time events
+      setTargetApplication(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to stop playback');
     }
   };
 
   const handleDismissNotification = (notificationId: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    dismissNotification(notificationId);
   };
 
   const handleRefreshFocus = async () => {
-    await loadFocusState();
+    // Focus state is now managed by real-time events
+    // This could trigger a manual refresh if needed
+    console.log('Focus refresh requested - using real-time data');
+  };
+
+  const handleOnboardingComplete = () => {
+    onboardingService.skipOnboarding();
+    setShowOnboarding(false);
+  };
+
+  const handleOnboardingSkip = () => {
+    onboardingService.skipOnboarding();
+    setShowOnboarding(false);
+  };
+
+  const handleRetryConnection = () => {
+    reconnect();
   };
 
   if (isLoading) {
@@ -152,23 +189,85 @@ export const AutomationControlPanel: React.FC = () => {
 
   return (
     <div className="automation-control-panel">
-      <div className="header">
-        <h1>Automation Control</h1>
-        <p>Control and monitor application-focused automation</p>
+      {/* Onboarding Wizard */}
+      {showOnboarding && (
+        <OnboardingWizard
+          isOpen={true}
+          onComplete={handleOnboardingComplete}
+          onSkip={handleOnboardingSkip}
+        />
+      )}
+
+      <div className="header-container">
+        <button
+          className="back-button"
+          onClick={() => navigate('/dashboard')}
+          title="Back to Dashboard"
+        >
+          ←
+        </button>
+        <div className="header-content">
+          <h1>Automation Control</h1>
+          <p>Control and monitor application-focused automation</p>
+        </div>
       </div>
 
       {error && (
-        <div className="error-banner">
-          <span className="error-icon">⚠️</span>
-          <span>{error}</span>
-          <button
-            className="error-dismiss"
-            onClick={() => setError(null)}
-          >
-            ×
-          </button>
+        <div className="error-wrapper" style={{ marginBottom: '16px' }}>
+          {error.includes('macOS Accessibility permissions required') ? (
+            <div className="permission-error-container error-banner" style={{ display: 'block', padding: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ⚠️ macOS Accessibility Permission Required
+                </h3>
+                <button className="error-dismiss" onClick={() => setError(null)}>×</button>
+              </div>
+
+              <p style={{ margin: '0 0 12px 0' }}>To enable automation, this app needs control over your mouse and keyboard.</p>
+
+              <ol style={{ margin: '0 0 16px 20px', paddingLeft: '0' }}>
+                <li>Open <strong>System Settings</strong></li>
+                <li>Go to <strong>Privacy & Security {'>'} Accessibility</strong></li>
+                <li>Enable the toggle next to <strong>GeniusQA Desktop</strong></li>
+              </ol>
+
+              <p className="restart-note" style={{ fontStyle: 'italic', fontSize: '13px', margin: '0 0 16px 0' }}>
+                Note: You may need to restart the application after enabling permissions.
+              </p>
+
+              <button
+                className="permission-button"
+                onClick={() => invoke('request_accessibility_permissions')}
+              >
+                Open System Settings
+              </button>
+            </div>
+          ) : (
+            <div className="error-banner">
+              <span className="error-icon">⚠️</span>
+              <span>{error}</span>
+              <button
+                className="error-dismiss"
+                onClick={() => setError(null)}
+              >
+                ×
+              </button>
+            </div>
+          )}
         </div>
       )}
+
+      {/* Enhanced Status Display */}
+      <EnhancedStatusDisplay
+        focusState={focusState}
+        playbackSession={currentSession}
+        targetApplication={targetApplication}
+        notifications={notifications}
+        isConnected={isConnected}
+        connectionError={connectionError}
+        onRetryConnection={handleRetryConnection}
+        onDismissNotification={handleDismissNotification}
+      />
 
       <div className="control-sections">
         <div className="main-controls">

@@ -210,6 +210,35 @@ impl MacOSApplicationDetector {
             activation_policy == 0
         }
     }
+
+    /// Activate application with the given process ID
+    pub fn activate_application(&self, process_id: u32) -> Result<bool, RegistryError> {
+        unsafe {
+            let running_apps: id = msg_send![self.workspace, runningApplications];
+            let count: usize = msg_send![running_apps, count];
+            
+            for i in 0..count {
+                let app: id = msg_send![running_apps, objectAtIndex: i];
+                let app_process_id: pid_t = msg_send![app, processIdentifier];
+                
+                if app_process_id as u32 == process_id {
+                    // Activate application ignoring other apps (NSApplicationActivateIgnoringOtherApps = 1 << 1)
+                    // value 2 corresponds to NSApplicationActivateIgnoringOtherApps
+                    let options: u64 = 2; 
+                    let success: bool = msg_send![app, activateWithOptions: options];
+                    if success {
+                        log::info!("Successfully activated application with PID {}", process_id);
+                    } else {
+                        log::warn!("Failed to activate application with PID {}", process_id);
+                    }
+                    return Ok(success);
+                }
+            }
+            
+            log::warn!("Application with PID {} not found for activation", process_id);
+            Ok(false) // Application not found
+        }
+    }
 }
 
 impl PlatformApplicationDetector for MacOSApplicationDetector {

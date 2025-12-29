@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/tauri';
+import { open } from '@tauri-apps/api/dialog';
 import { ApplicationInfo, FocusLossStrategy } from '../types/applicationFocusedAutomation.types';
 import './AddApplicationModal.css';
 
@@ -22,6 +24,8 @@ export const AddApplicationModal: React.FC<AddApplicationModalProps> = ({
   });
   const [focusStrategy, setFocusStrategy] = useState<FocusLossStrategy>(FocusLossStrategy.AutoPause);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isBrowsing, setIsBrowsing] = useState(false);
+  const [isDetecting, setIsDetecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -77,42 +81,63 @@ export const AddApplicationModal: React.FC<AddApplicationModalProps> = ({
 
   const handleBrowseExecutable = async () => {
     try {
-      // TODO: Replace with actual Tauri file dialog
-      // const selected = await open({
-      //   multiple: false,
-      //   filters: [{
-      //     name: 'Executable',
-      //     extensions: ['exe', 'app']
-      //   }]
-      // });
+      setIsBrowsing(true);
+      setError(null);
 
-      // if (selected && typeof selected === 'string') {
-      //   handleInputChange('executable_path', selected);
-      //   // Auto-fill process name from executable
-      //   const fileName = selected.split('/').pop()?.replace(/\.(exe|app)$/, '') || '';
-      //   if (fileName) {
-      //     handleInputChange('process_name', fileName);
-      //     if (!formData.name) {
-      //       handleInputChange('name', fileName);
-      //     }
-      //   }
-      // }
+      const selected = await open({
+        multiple: false,
+        filters: [{
+          name: 'Executable',
+          extensions: ['exe', 'app']
+        }]
+      });
 
-      console.log('Browse executable clicked - TODO: implement file dialog');
+      if (selected && typeof selected === 'string') {
+        handleInputChange('executable_path', selected);
+
+        // Auto-fill process name from executable
+        const fileName = selected.split('/').pop()?.replace(/\.(exe|app)$/, '') || '';
+        if (fileName) {
+          handleInputChange('process_name', fileName);
+          if (!formData.name) {
+            handleInputChange('name', fileName);
+          }
+        }
+      }
     } catch (err) {
-      setError('Failed to browse for executable');
+      setError(err instanceof Error ? err.message : 'Failed to browse for executable');
+    } finally {
+      setIsBrowsing(false);
     }
   };
 
   const detectRunningApplications = async () => {
     try {
-      // TODO: Replace with actual Tauri command
-      // const runningApps = await invoke('get_running_applications');
-      // console.log('Running applications:', runningApps);
+      setIsDetecting(true);
+      setError(null);
 
-      console.log('Detect running applications clicked - TODO: implement detection');
+      const runningApps = await invoke<ApplicationInfo[]>('get_running_applications');
+
+      if (runningApps && runningApps.length > 0) {
+        // For now, auto-fill with the first detected application
+        // In a full implementation, this could show a selection dialog
+        const firstApp = runningApps[0];
+        setFormData({
+          name: firstApp.name,
+          executable_path: firstApp.executable_path,
+          process_name: firstApp.process_name,
+          bundle_id: firstApp.bundle_id || '',
+          process_id: firstApp.process_id,
+        });
+
+        console.log(`Detected ${runningApps.length} running applications. Auto-filled with: ${firstApp.name}`);
+      } else {
+        setError('No running applications detected');
+      }
     } catch (err) {
-      setError('Failed to detect running applications');
+      setError(err instanceof Error ? err.message : 'Failed to detect running applications');
+    } finally {
+      setIsDetecting(false);
     }
   };
 
@@ -161,8 +186,9 @@ export const AddApplicationModal: React.FC<AddApplicationModalProps> = ({
                 type="button"
                 className="browse-button"
                 onClick={handleBrowseExecutable}
+                disabled={isBrowsing}
               >
-                Browse
+                {isBrowsing ? 'Browsing...' : 'Browse'}
               </button>
             </div>
           </div>
@@ -208,8 +234,9 @@ export const AddApplicationModal: React.FC<AddApplicationModalProps> = ({
               type="button"
               className="detect-button secondary"
               onClick={detectRunningApplications}
+              disabled={isDetecting}
             >
-              🔍 Detect Running Apps
+              {isDetecting ? '🔍 Detecting...' : '🔍 Detect Running Apps'}
             </button>
           </div>
 

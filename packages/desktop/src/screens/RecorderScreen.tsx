@@ -20,6 +20,7 @@ import {
   ActionData,
   ActionPreviewData,
 } from '../types/recorder.types';
+import { invoke } from '@tauri-apps/api/tauri';
 import { TestScript, TestStep } from '../types/testCaseDriven.types';
 import './RecorderScreen.css';
 
@@ -844,18 +845,19 @@ const RecorderScreen: React.FC = () => {
       <ClickCursorOverlay isRecording={status === 'recording'} />
 
       <div className="recorder-content">
-        {/* Back Button */}
-        <button
-          className="back-button"
-          onClick={() => navigate(-1)}
-        >
-          ← Back to Dashboard
-        </button>
-
         {/* Header Section */}
-        <div className="header">
-          <h1 className="logo">GeniusQA Recorder</h1>
-          <p className="subtitle">Record and replay desktop interactions</p>
+        <div className="header-container">
+          <button
+            className="back-button"
+            onClick={() => navigate(-1)}
+            title="Back to Dashboard"
+          >
+            ←
+          </button>
+          <div className="header">
+            <h1 className="logo">GeniusQA Recorder</h1>
+            <p className="subtitle">Record and replay desktop interactions</p>
+          </div>
         </div>
 
         {/* Status Display */}
@@ -887,9 +889,33 @@ const RecorderScreen: React.FC = () => {
         )}
 
         {/* Error Message */}
+        {/* Error Message */}
         {error && (
-          <div className="error-container">
-            <p className="error-text">{error}</p>
+          <div className="error-container" style={{ padding: error.includes('macOS Accessibility permissions required') ? '0' : '12px' }}>
+            {error.includes('macOS Accessibility permissions required') ? (
+              <div className="permission-error-content" style={{ padding: '16px' }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: '#c5221f' }}>
+                  ⚠️ macOS Accessibility Permission Required
+                </h3>
+                <p style={{ margin: '0 0 12px 0', color: '#202124' }}>To record or play automations, this app needs control over your mouse and keyboard.</p>
+                <ol style={{ margin: '0 0 16px 20px', paddingLeft: '0', color: '#202124' }}>
+                  <li>Open <strong>System Settings</strong></li>
+                  <li>Go to <strong>Privacy & Security {'>'} Accessibility</strong></li>
+                  <li>Enable the toggle next to <strong>GeniusQA Desktop</strong></li>
+                </ol>
+                <p className="restart-note" style={{ fontStyle: 'italic', fontSize: '13px', margin: '0 0 16px 0', color: '#5f6368' }}>
+                  Note: You may need to restart the application after enabling permissions.
+                </p>
+                <button
+                  className="permission-button"
+                  onClick={() => invoke('request_accessibility_permissions')}
+                >
+                  Open System Settings
+                </button>
+              </div>
+            ) : (
+              <p className="error-text">{error}</p>
+            )}
           </div>
         )}
 
