@@ -17,6 +17,9 @@
         "all": false,
         "open": true
       },
+      "dialog": {
+        "open": true
+      },
       "http": {
         "all": false,
         "request": true,
@@ -70,7 +73,8 @@
         "exceptionDomain": "",
         "frameworks": [],
         "providerShortName": null,
-        "signingIdentity": null
+        "signingIdentity": null,
+        "license": null
       },
       "resources": [],
       "shortDescription": "GeniusQA Desktop",

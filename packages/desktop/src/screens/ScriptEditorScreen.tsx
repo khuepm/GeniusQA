@@ -141,6 +141,17 @@ const ScriptEditorScreen: React.FC = () => {
     }
   };
 
+  const revealStoredScript = async (script: StoredScriptInfo) => {
+    try {
+      await ipcBridge.revealInFinder(script.path);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to reveal script in Finder';
+      setError(errorMessage);
+      alert(`Error: ${errorMessage}`);
+      console.error('Reveal script error:', err);
+    }
+  };
+
   /**
    * Handle filter change
    * Requirements: 9.4
@@ -438,6 +449,7 @@ const ScriptEditorScreen: React.FC = () => {
             script={script}
             selected={selectedStoredScript?.path === script.path}
             onClick={loadStoredScript}
+            onReveal={revealStoredScript}
             onDelete={deleteStoredScript}
             showDelete={true}
           />

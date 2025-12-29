@@ -44,6 +44,21 @@ const DashboardScreen: React.FC = () => {
     navigate('/scripts/builder');
   };
 
+  /**
+   * Navigate to Application-Focused Automation
+   */
+  const handleNavigateToAutomation = () => {
+    navigate('/automation');
+  };
+
+  const handleNavigateToApplicationManagement = () => {
+    navigate('/automation/applications');
+  };
+
+  const handleNavigateToAutomationSettings = () => {
+    navigate('/automation/settings');
+  };
+
   return (
     <div className="dashboard-container">
       <div className="dashboard-content">
@@ -112,6 +127,40 @@ const DashboardScreen: React.FC = () => {
                 title="Go directly to AI Script Builder"
               >
                 🤖 AI Builder
+              </button>
+            </div>
+          </div>
+
+          {/* Application-Focused Automation Feature Card */}
+          <div className="dashboard-feature-card">
+            <h3 className="dashboard-feature-title">Application-Focused Automation</h3>
+            <p className="dashboard-feature-description">
+              Register applications and run automation scripts constrained to specific applications with focus monitoring
+            </p>
+            <div className="dashboard-feature-button-container">
+              <AuthButton
+                title="Open Automation Control"
+                onPress={handleNavigateToAutomation}
+                loading={false}
+                disabled={false}
+                variant="primary"
+              />
+            </div>
+            {/* Quick access buttons for specific features */}
+            <div className="dashboard-quick-access">
+              <button
+                className="dashboard-quick-button"
+                onClick={handleNavigateToApplicationManagement}
+                title="Manage registered applications"
+              >
+                📱 Applications
+              </button>
+              <button
+                className="dashboard-quick-button"
+                onClick={handleNavigateToAutomationSettings}
+                title="Configure automation settings"
+              >
+                ⚙️ Settings
               </button>
             </div>
           </div>

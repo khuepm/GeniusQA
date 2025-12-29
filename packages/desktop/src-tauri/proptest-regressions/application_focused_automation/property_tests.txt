@@ -1,0 +1,12 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 72f5624db22b1be0720736ec49595267b6905be0d0c8a2ae62475cec37392520 # shrinks to app_id = "_A-A_", process_id = 1
+cc cc1855078c4fff9fcdb51a17ab9cbb717609a2af6732eb726aad185404a3cad6 # shrinks to app_id = "__a-0", process_id = 1
+cc a33aa48a5a4443edbf4e77a72967303210814dea11a7eed9f49b552105fb6f07 # shrinks to app_ids = ["aAa0a"], process_ids = [1]
+cc f172744e7849bbf8c0e52366817ee8f171e6230a5addb7c01db6a78bea2a7406 # shrinks to app_id = "V-Iq_-3l-v6F_--67_", process_id = 52042
+cc b8877f77eeb913f4edfe024998760dd783720c6723eab135c7ad99353541a7a9 # shrinks to app_id = "eqdx5W2FtUN", process_id = 51548
+cc 6458c6a5da56f7bb1297c5b1e273dfd686f9e7e9f0a6d0d0a94b2ed990520c02 # shrinks to app_id = "-pEV_q_h4", process_id = 45681

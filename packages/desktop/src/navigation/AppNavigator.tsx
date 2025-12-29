@@ -17,6 +17,11 @@ import DashboardScreen from '../screens/DashboardScreen';
 import RecorderScreen from '../screens/RecorderScreen';
 import UnifiedScriptManager from '../screens/UnifiedScriptManager';
 
+// Application-Focused Automation screens
+import { ApplicationManagementScreen } from '../screens/ApplicationManagementScreen';
+import { AutomationControlPanel } from '../screens/AutomationControlPanel';
+import { ConfigurationScreen } from '../screens/ConfigurationScreen';
+
 // Legacy imports - kept for backward compatibility redirects
 // import ScriptEditorScreen from '../screens/ScriptEditorScreen';
 // import AIScriptBuilderScreen from '../screens/AIScriptBuilderScreen';
@@ -132,6 +137,40 @@ const AppNavigator: React.FC = () => {
         <Route
           path="/ai-script-builder"
           element={<Navigate to="/scripts/builder" replace />}
+        />
+
+        {/* Application-Focused Automation routes */}
+        <Route
+          path="/automation"
+          element={
+            <ProtectedRoute>
+              <AutomationControlPanel />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/automation/applications"
+          element={
+            <ProtectedRoute>
+              <ApplicationManagementScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/automation/control"
+          element={
+            <ProtectedRoute>
+              <AutomationControlPanel />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/automation/settings"
+          element={
+            <ProtectedRoute>
+              <ConfigurationScreen />
+            </ProtectedRoute>
+          }
         />
 
         {/* Default redirect */}

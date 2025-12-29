@@ -622,6 +622,14 @@ export class IPCBridgeService {
     }
   }
 
+  public async revealInFinder(scriptPath: string): Promise<void> {
+    try {
+      await invoke('reveal_in_finder', { scriptPath });
+    } catch (error) {
+      throw new Error(this.formatErrorMessage(error as Error));
+    }
+  }
+
   /**
    * Select automation core (Python or Rust)
    * 

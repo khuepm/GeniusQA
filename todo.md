@@ -1,6 +1,12 @@
 # TODO
 
-- [ ] AI Builder: không hỏi lại Operating System (đã chọn target OS trên UI) và thêm nút Record để lấy tọa độ (x,y) cho username/password/login button.  
+- [ ] Script list: thêm nút Reveal in Finder (mở folder chứa file script) gần nút Delete.  
+  - Status: pending
+
+- [x] AI Builder: không hỏi lại Operating System (đã chọn target OS trên UI) và thêm nút Record để lấy tọa độ (x,y) cho username/password/login button.  
+  - Status: completed
+
+- [ ] AI Builder: thêm nút New chat (reset hội thoại) và nút Finish/Save để lưu script hiện tại và dẫn tới màn hình playback để test script AI build.  
   - Status: pending
 
 - [x] Fix lỗi "Failed to generate script: API key not valid. Please pass a valid API key."  

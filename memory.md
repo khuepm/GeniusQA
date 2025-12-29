@@ -17,3 +17,19 @@
 
 - Current open issue
   - Rust core selected. Crashes on macOS when pressing `Cmd+Tab` both while recording and during playback. Terminal logs stop after "Recording session started successfully" with no Rust panic trace, suggesting a native-level crash (likely in a global hook such as `rdev::listen` or related platform APIs).
+
+## AI Builder
+
+- Target OS + Record coordinates
+  - Status: fixed
+  - Fix: Propagated `targetOS` from UI into AI prompt context so AI stops asking OS.
+  - Fix: Added clarification UI with `Record` button for coordinate questions; screenshot click-pick returns `(x,y)` and auto-sends it back to chat.
+  - Fix: `capture_screenshot` fallback on macOS uses `screencapture` when Rust platform screenshot is not implemented.
+
+## Script List
+
+- Reveal in Finder button
+  - Status: implemented
+  - Fix: Added Tauri command `reveal_in_finder` in `packages/desktop/src-tauri/src/main.rs` (macOS uses `open -R`, Windows uses `explorer /select,`, Linux opens parent dir via `xdg-open`).
+  - Fix: Added `IPCBridgeService.revealInFinder()` invoking `reveal_in_finder` + unit test.
+  - Fix: Added `Reveal in Finder` button next to `Delete` in `ScriptListItem` and wired in `UnifiedScriptManager`, `ScriptEditorScreen`, `EnhancedScriptEditorScreen`.

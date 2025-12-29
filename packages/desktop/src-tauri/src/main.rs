@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod ai_test_case;
+mod application_focused_automation;
 mod core_router;
 mod python_process;
 
@@ -9,9 +10,20 @@ use core_router::{AutomationCommand, CoreRouter, CoreStatus, CoreType, Performan
 use python_process::PythonProcessManager;
 use rust_automation_core::preferences::UserSettings;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::path::Path;
 use tauri::{State, Manager, WindowBuilder, WindowUrl};
+
+// Application-focused automation imports
+use application_focused_automation::{
+    ApplicationFocusedAutomationService, ServiceState,
+    ApplicationRegistry, FocusMonitor, PlaybackController,
+};
+use application_focused_automation::types::{
+    RegisteredApplication, ApplicationInfo, FocusLossStrategy, ApplicationStatus, 
+    FocusEvent, PlaybackState, PauseReason, AutomationProgressSnapshot, 
+    ErrorRecoveryStrategy, WarningEntry, FocusErrorReport
+};
 
 // Core router state wrapper
 struct CoreRouterState {
@@ -21,6 +33,11 @@ struct CoreRouterState {
 // Monitor state wrapper
 struct MonitorState {
     monitor: rust_automation_core::CoreMonitor,
+}
+
+// Application-focused automation state wrapper
+struct ApplicationFocusedAutomationState {
+    service: Arc<ApplicationFocusedAutomationService>,
 }
 
 // Response types
@@ -583,6 +600,59 @@ async fn delete_script(
     }
 }
 
+#[tauri::command]
+async fn reveal_in_finder(script_path: String) -> Result<(), String> {
+    let path = Path::new(&script_path);
+    if !path.exists() {
+        return Err(format!("File not found: {}", script_path));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        let status = Command::new("open")
+            .args(["-R", &script_path])
+            .status()
+            .map_err(|e| format!("Failed to run open: {}", e))?;
+
+        if status.success() {
+            return Ok(());
+        }
+        return Err(format!("Failed to reveal file in Finder: exit code {:?}", status.code()));
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        let status = Command::new("explorer")
+            .args(["/select,", &script_path])
+            .status()
+            .map_err(|e| format!("Failed to run explorer: {}", e))?;
+
+        if status.success() {
+            return Ok(());
+        }
+        return Err(format!("Failed to reveal file in Explorer: exit code {:?}", status.code()));
+    }
+
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    {
+        use std::process::Command;
+        let folder = path
+            .parent()
+            .ok_or_else(|| format!("Failed to get parent folder for: {}", script_path))?;
+        let status = Command::new("xdg-open")
+            .arg(folder)
+            .status()
+            .map_err(|e| format!("Failed to run xdg-open: {}", e))?;
+
+        if status.success() {
+            return Ok(());
+        }
+        return Err(format!("Failed to open folder: exit code {:?}", status.code()));
+    }
+}
+
 // Monitoring commands
 #[tauri::command]
 async fn get_health_status(
@@ -632,6 +702,847 @@ async fn get_monitoring_stats(
     monitor: State<'_, MonitorState>,
 ) -> Result<rust_automation_core::monitoring::MonitoringStats, String> {
     Ok(monitor.monitor.get_monitoring_stats().await)
+}
+
+// ============================================================================
+// Application-Focused Automation Commands
+// Requirements: 1.1, 1.2, 2.1, 2.2, 4.1, 5.5
+// ============================================================================
+
+/// Get list of currently running applications available for registration
+/// 
+/// Requirements: 1.1 - Display list of currently running applications
+#[tauri::command]
+async fn get_running_applications() -> Result<Vec<ApplicationInfo>, String> {
+    log::info!("[App Focus] Getting list of running applications");
+    
+    // TODO: This will be implemented with platform-specific code
+    // For now, return a placeholder implementation
+    #[cfg(target_os = "windows")]
+    {
+        get_running_applications_windows().await
+    }
+    #[cfg(target_os = "macos")]
+    {
+        get_running_applications_macos().await
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        Err("Unsupported platform for application detection".to_string())
+    }
+}
+
+/// Register an application for focused automation
+/// 
+/// Requirements: 1.2, 1.3, 1.6 - Register application with process information and default focus strategy
+#[tauri::command]
+async fn register_application(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+    app_info: ApplicationInfo,
+    default_focus_strategy: Option<FocusLossStrategy>,
+) -> Result<String, String> {
+    log::info!("[App Focus] Registering application: {}", app_info.name);
+    
+    let strategy = default_focus_strategy.unwrap_or(FocusLossStrategy::AutoPause);
+    let app_id = service_state.service.register_application_with_monitoring(app_info, strategy).await
+        .map_err(|e| format!("Failed to register application: {}", e))?;
+    
+    log::info!("[App Focus] Successfully registered application with ID: {}", app_id);
+    Ok(app_id)
+}
+
+/// Unregister an application from focused automation
+/// 
+/// Requirements: 2.2 - Remove application from registry
+#[tauri::command]
+async fn unregister_application(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+    app_id: String,
+) -> Result<(), String> {
+    log::info!("[App Focus] Unregistering application: {}", app_id);
+    
+    service_state.service.unregister_application_with_cleanup(&app_id).await
+        .map_err(|e| format!("Failed to unregister application: {}", e))?;
+    
+    log::info!("[App Focus] Successfully unregistered application: {}", app_id);
+    Ok(())
+}
+
+/// Get all registered applications
+/// 
+/// Requirements: 2.1 - Show all registered applications with status
+#[tauri::command]
+async fn get_registered_applications(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+) -> Result<Vec<RegisteredApplication>, String> {
+    log::info!("[App Focus] Getting registered applications");
+    
+    let registry = service_state.service.get_registry();
+    let registry = registry.lock().map_err(|e| format!("Failed to lock registry: {}", e))?;
+    
+    let applications = registry.get_registered_applications();
+    log::info!("[App Focus] Found {} registered applications", applications.len());
+    
+    Ok(applications)
+}
+
+/// Get a specific registered application by ID
+/// 
+/// Requirements: 2.1 - Get application details
+#[tauri::command]
+async fn get_application(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+    app_id: String,
+) -> Result<Option<RegisteredApplication>, String> {
+    log::info!("[App Focus] Getting application: {}", app_id);
+    
+    let registry = service_state.service.get_registry();
+    let registry = registry.lock().map_err(|e| format!("Failed to lock registry: {}", e))?;
+    
+    let application = registry.get_application(&app_id).cloned();
+    Ok(application)
+}
+
+/// Update application status
+/// 
+/// Requirements: 2.3, 2.4 - Update application status and detect inactive applications
+#[tauri::command]
+async fn update_application_status(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+    app_id: String,
+    status: ApplicationStatus,
+) -> Result<(), String> {
+    log::info!("[App Focus] Updating application status: {} -> {:?}", app_id, status);
+    
+    let registry = service_state.service.get_registry();
+    let mut registry = registry.lock().map_err(|e| format!("Failed to lock registry: {}", e))?;
+    
+    registry.update_application_status(&app_id, status)
+        .map_err(|e| format!("Failed to update application status: {}", e))?;
+    
+    log::info!("[App Focus] Successfully updated application status");
+    Ok(())
+}
+
+/// Validate application for automation
+/// 
+/// Requirements: 2.5 - Validate that registered applications still exist before allowing automation
+#[tauri::command]
+async fn validate_application_for_automation(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+    app_id: String,
+) -> Result<bool, String> {
+    log::info!("[App Focus] Validating application for automation: {}", app_id);
+    
+    let registry = service_state.service.get_registry();
+    let registry = registry.lock().map_err(|e| format!("Failed to lock registry: {}", e))?;
+    
+    let is_valid = registry.validate_application_for_automation(&app_id)
+        .map_err(|e| format!("Failed to validate application: {}", e))?;
+    
+    log::info!("[App Focus] Application validation result: {}", is_valid);
+    Ok(is_valid)
+}
+
+/// Start focus monitoring for a specific application
+/// 
+/// Requirements: 3.1, 3.2, 3.3 - Monitor application focus and notify on changes
+#[tauri::command]
+async fn start_focus_monitoring(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+    app_id: String,
+    process_id: u32,
+) -> Result<(), String> {
+    log::info!("[App Focus] Starting focus monitoring for app: {} (PID: {})", app_id, process_id);
+    
+    // Check if monitoring is already active for this app
+    if let Ok(true) = service_state.service.get_focus_monitor(&app_id) {
+        log::info!("[App Focus] Focus monitoring already active for app: {}", app_id);
+        return Ok(());
+    }
+    
+    // Start monitoring through the service (this will be handled by register_application_with_monitoring)
+    log::info!("[App Focus] Focus monitoring managed by service for app: {}", app_id);
+    Ok(())
+}
+
+/// Stop focus monitoring
+/// 
+/// Requirements: 3.1 - Stop monitoring when no longer needed
+#[tauri::command]
+async fn stop_focus_monitoring(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+) -> Result<(), String> {
+    log::info!("[App Focus] Stopping focus monitoring");
+    
+    // Focus monitoring is managed by the service and will be stopped
+    // when applications are unregistered or service is stopped
+    log::info!("[App Focus] Focus monitoring managed by service");
+    Ok(())
+}
+
+/// Get current focus state
+/// 
+/// Requirements: 3.5 - Get current focus state information
+#[tauri::command]
+async fn get_focus_state(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+    app_id: Option<String>,
+) -> Result<Option<serde_json::Value>, String> {
+    log::debug!("[App Focus] Getting current focus state");
+    
+    if let Some(app_id) = app_id {
+        if let Ok(true) = service_state.service.get_focus_monitor(&app_id) {
+            // For now, return a placeholder focus state since we changed the API
+            let focus_state_json = serde_json::json!({
+                "is_target_process_focused": false,
+                "focused_process_id": null,
+                "focused_window_title": null,
+                "last_change": chrono::Utc::now().to_rfc3339(),
+                "target_app_id": app_id,
+                "target_process_id": null
+            });
+            
+            Ok(Some(focus_state_json))
+        } else {
+            Ok(None)
+        }
+    } else {
+        Ok(None)
+    }
+}
+
+/// Start focused automation playback
+/// 
+/// Requirements: 4.1, 4.2, 4.3, 4.4 - Start playback with configurable focus strategy
+#[tauri::command]
+async fn start_focused_playback(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+    app_id: String,
+    focus_strategy: FocusLossStrategy,
+    script_path: Option<String>,
+) -> Result<String, String> {
+    log::info!("[App Focus] Starting focused playback for app: {} with strategy: {:?} script: {:?}", 
+              app_id, focus_strategy, script_path);
+    
+    let session_id = service_state.service.start_integrated_playback(app_id.clone(), focus_strategy, script_path).await
+        .map_err(|e| format!("Failed to start playback: {}", e))?;
+    
+    log::info!("[App Focus] Focused playback started with session ID: {}", session_id);
+    Ok(session_id)
+}
+
+/// Pause focused automation playback
+/// 
+/// Requirements: 4.2, 4.5 - Pause automation and display notification
+#[tauri::command]
+async fn pause_focused_playback(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+    reason: PauseReason,
+) -> Result<(), String> {
+    log::info!("[App Focus] Pausing focused playback due to: {:?}", reason);
+    
+    let controller = service_state.service.get_playback_controller();
+    let mut controller = controller.lock().map_err(|e| format!("Failed to lock controller: {}", e))?;
+    
+    controller.pause_playback(reason)
+        .map_err(|e| format!("Failed to pause playback: {}", e))?;
+    
+    log::info!("[App Focus] Focused playback paused successfully");
+    Ok(())
+}
+
+/// Resume focused automation playback
+/// 
+/// Requirements: 4.6, 4.7, 4.8 - Resume automation when focus returns
+#[tauri::command]
+async fn resume_focused_playback(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+) -> Result<(), String> {
+    log::info!("[App Focus] Resuming focused playback");
+    
+    let controller = service_state.service.get_playback_controller();
+    let mut controller = controller.lock().map_err(|e| format!("Failed to lock controller: {}", e))?;
+    
+    controller.resume_playback()
+        .map_err(|e| format!("Failed to resume playback: {}", e))?;
+    
+    log::info!("[App Focus] Focused playback resumed successfully");
+    Ok(())
+}
+
+/// Stop focused automation playback
+/// 
+/// Requirements: 4.1 - Stop automation session
+#[tauri::command]
+async fn stop_focused_playback(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+) -> Result<(), String> {
+    log::info!("[App Focus] Stopping focused playback");
+    
+    let controller = service_state.service.get_playback_controller();
+    let mut controller = controller.lock().map_err(|e| format!("Failed to lock controller: {}", e))?;
+    
+    controller.stop_playback()
+        .map_err(|e| format!("Failed to stop playback: {}", e))?;
+    
+    log::info!("[App Focus] Focused playback stopped successfully");
+    Ok(())
+}
+
+/// Get playback session status
+/// 
+/// Requirements: 4.8 - Maintain automation state during focus transitions
+#[tauri::command]
+async fn get_playback_status(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+) -> Result<Option<serde_json::Value>, String> {
+    log::debug!("[App Focus] Getting playback status");
+    
+    let controller = service_state.service.get_playback_controller();
+    let controller = controller.lock().map_err(|e| format!("Failed to lock controller: {}", e))?;
+    
+    if let Some(session) = controller.get_playback_status() {
+        let status_json = serde_json::json!({
+            "id": session.id,
+            "target_app_id": session.target_app_id,
+            "target_process_id": session.target_process_id,
+            "state": session.state,
+            "focus_strategy": session.focus_strategy,
+            "current_step": session.current_step,
+            "started_at": session.started_at.to_rfc3339(),
+            "paused_at": session.paused_at.map(|t| t.to_rfc3339()),
+            "resumed_at": session.resumed_at.map(|t| t.to_rfc3339()),
+            "total_pause_duration": session.total_pause_duration.num_seconds()
+        });
+        
+        Ok(Some(status_json))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Get session statistics
+/// 
+/// Requirements: 4.8 - Provide session information
+#[tauri::command]
+async fn get_session_stats(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+) -> Result<Option<serde_json::Value>, String> {
+    log::debug!("[App Focus] Getting session statistics");
+    
+    let controller = service_state.service.get_playback_controller();
+    let controller = controller.lock().map_err(|e| format!("Failed to lock controller: {}", e))?;
+    
+    if let Some(stats) = controller.get_session_stats() {
+        let stats_json = serde_json::json!({
+            "session_id": stats.session_id,
+            "total_duration": stats.total_duration.num_seconds(),
+            "active_duration": stats.active_duration.num_seconds(),
+            "pause_duration": stats.pause_duration.num_seconds(),
+            "current_step": stats.current_step,
+            "focus_strategy": stats.focus_strategy,
+            "state": stats.state
+        });
+        
+        Ok(Some(stats_json))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Save automation progress for recovery
+/// 
+/// Requirements: 8.5 - Save current progress and state
+#[tauri::command]
+async fn save_automation_progress(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+) -> Result<serde_json::Value, String> {
+    log::info!("[App Focus] Saving automation progress");
+    
+    let controller = service_state.service.get_playback_controller();
+    let controller = controller.lock().map_err(|e| format!("Failed to lock controller: {}", e))?;
+    
+    let snapshot = controller.save_automation_progress()
+        .map_err(|e| format!("Failed to save progress: {}", e))?;
+    
+    let snapshot_json = serde_json::json!({
+        "snapshot_id": snapshot.snapshot_id,
+        "session_id": snapshot.session_id,
+        "target_app_id": snapshot.target_app_id,
+        "target_process_id": snapshot.target_process_id,
+        "current_step": snapshot.current_step,
+        "session_state": snapshot.session_state,
+        "focus_strategy": snapshot.focus_strategy,
+        "started_at": snapshot.started_at.to_rfc3339(),
+        "saved_at": snapshot.saved_at.to_rfc3339(),
+        "error_context": snapshot.error_context
+    });
+    
+    log::info!("[App Focus] Automation progress saved with snapshot ID: {}", snapshot.snapshot_id);
+    Ok(snapshot_json)
+}
+
+/// Get available recovery options
+/// 
+/// Requirements: 8.5 - Provide recovery options during errors
+#[tauri::command]
+async fn get_recovery_options(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+) -> Result<Vec<serde_json::Value>, String> {
+    log::info!("[App Focus] Getting recovery options");
+    
+    let controller = service_state.service.get_playback_controller();
+    let controller = controller.lock().map_err(|e| format!("Failed to lock controller: {}", e))?;
+    
+    let options = controller.get_recovery_options()
+        .map_err(|e| format!("Failed to get recovery options: {}", e))?;
+    
+    let options_json: Vec<serde_json::Value> = options.into_iter().map(|option| {
+        serde_json::json!({
+            "strategy": option,
+            "description": option.description(),
+            "requires_user_interaction": option.requires_user_interaction(),
+            "preserves_progress": option.preserves_progress()
+        })
+    }).collect();
+    
+    log::info!("[App Focus] Found {} recovery options", options_json.len());
+    Ok(options_json)
+}
+
+// ============================================================================
+// Real-Time Status Updates Commands
+// Requirements: 5.5 - Event streaming for focus state changes
+// ============================================================================
+
+/// Subscribe to real-time focus state updates
+/// 
+/// Requirements: 5.5 - Implement status broadcasting to frontend
+#[tauri::command]
+async fn subscribe_to_focus_updates(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+    app_handle: tauri::AppHandle,
+    app_id: String,
+) -> Result<(), String> {
+    log::info!("[App Focus] Subscribing to real-time focus updates for app: {}", app_id);
+    
+    // Get the current focus state from the service
+    let focus_state = service_state.service.get_focus_state(&app_id)
+        .map_err(|e| format!("Failed to get focus state: {}", e))?;
+    
+    if let Some(focus_state) = focus_state {
+        // Emit initial focus state
+        let focus_state_json = serde_json::json!({
+            "type": "focus_state_update",
+            "data": {
+                "is_target_process_focused": focus_state.is_target_process_focused,
+                "focused_process_id": focus_state.focused_process_id,
+                "focused_window_title": focus_state.focused_window_title,
+                "last_change": focus_state.last_change.to_rfc3339(),
+                "target_app_id": app_id,
+                "target_process_id": focus_state.focused_process_id
+            }
+        });
+            
+        app_handle.emit_all("focus_state_update", focus_state_json)
+            .map_err(|e| format!("Failed to emit focus state update: {}", e))?;
+        
+        log::info!("[App Focus] Successfully subscribed to focus updates and emitted initial state");
+        Ok(())
+    } else {
+        // Emit a default focus state if no monitor is active
+        let focus_state_json = serde_json::json!({
+            "type": "focus_state_update",
+            "data": {
+                "is_target_process_focused": false,
+                "focused_process_id": null,
+                "focused_window_title": null,
+                "last_change": chrono::Utc::now().to_rfc3339(),
+                "target_app_id": app_id,
+                "target_process_id": null
+            }
+        });
+            
+        app_handle.emit_all("focus_state_update", focus_state_json)
+            .map_err(|e| format!("Failed to emit focus state update: {}", e))?;
+        
+        log::info!("[App Focus] Successfully subscribed to focus updates with default state");
+        Ok(())
+    }
+}
+
+/// Unsubscribe from real-time focus state updates
+/// 
+/// Requirements: 5.5 - Allow unsubscribing from updates
+#[tauri::command]
+async fn unsubscribe_from_focus_updates() -> Result<(), String> {
+    log::info!("[App Focus] Unsubscribing from real-time focus updates");
+    
+    // In a full implementation, we would stop the event broadcasting
+    // For now, we just log the unsubscription
+    log::info!("[App Focus] Successfully unsubscribed from focus updates");
+    Ok(())
+}
+
+/// Subscribe to real-time playback status updates
+/// 
+/// Requirements: 5.5 - Implement status broadcasting for playback state
+#[tauri::command]
+async fn subscribe_to_playback_updates(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    log::info!("[App Focus] Subscribing to real-time playback updates");
+    
+    let controller = service_state.service.get_playback_controller();
+    let controller = controller.lock().map_err(|e| format!("Failed to lock controller: {}", e))?;
+    
+    if controller.has_active_session() {
+        // Emit initial playback status
+        if let Some(session) = controller.get_playback_status() {
+            let status_json = serde_json::json!({
+                "type": "playback_status_update",
+                "data": {
+                    "id": session.id,
+                    "target_app_id": session.target_app_id,
+                    "target_process_id": session.target_process_id,
+                    "state": session.state,
+                    "focus_strategy": session.focus_strategy,
+                    "current_step": session.current_step,
+                    "started_at": session.started_at.to_rfc3339(),
+                    "paused_at": session.paused_at.map(|t| t.to_rfc3339()),
+                    "resumed_at": session.resumed_at.map(|t| t.to_rfc3339()),
+                    "total_pause_duration": session.total_pause_duration.num_seconds()
+                }
+            });
+            
+            app_handle.emit_all("playback_status_update", status_json)
+                .map_err(|e| format!("Failed to emit playback status update: {}", e))?;
+        }
+        
+        log::info!("[App Focus] Successfully subscribed to playback updates with active session");
+        Ok(())
+    } else {
+        // Emit a null status to indicate no active session
+        let status_json = serde_json::json!({
+            "type": "playback_status_update",
+            "data": null
+        });
+        
+        app_handle.emit_all("playback_status_update", status_json)
+            .map_err(|e| format!("Failed to emit playback status update: {}", e))?;
+        
+        log::info!("[App Focus] Successfully subscribed to playback updates with no active session");
+        Ok(())
+    }
+}
+
+/// Unsubscribe from real-time playback status updates
+/// 
+/// Requirements: 5.5 - Allow unsubscribing from playback updates
+#[tauri::command]
+async fn unsubscribe_from_playback_updates() -> Result<(), String> {
+    log::info!("[App Focus] Unsubscribing from real-time playback updates");
+    
+    // In a full implementation, we would stop the event broadcasting
+    // For now, we just log the unsubscription
+    log::info!("[App Focus] Successfully unsubscribed from playback updates");
+    Ok(())
+}
+
+/// Broadcast focus event to frontend
+/// 
+/// Requirements: 5.5 - Real-time event streaming
+#[tauri::command]
+async fn broadcast_focus_event(
+    app_handle: tauri::AppHandle,
+    event_type: String,
+    event_data: serde_json::Value,
+) -> Result<(), String> {
+    log::debug!("[App Focus] Broadcasting focus event: {}", event_type);
+    
+    let event_payload = serde_json::json!({
+        "type": event_type,
+        "data": event_data,
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    });
+    
+    app_handle.emit_all("focus_event", event_payload)
+        .map_err(|e| format!("Failed to broadcast focus event: {}", e))?;
+    
+    Ok(())
+}
+
+/// Get real-time status summary
+/// 
+/// Requirements: 5.5 - Provide comprehensive status information
+#[tauri::command]
+async fn get_realtime_status_summary(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+) -> Result<serde_json::Value, String> {
+    log::debug!("[App Focus] Getting real-time status summary");
+    
+    // Get service stats
+    let service_stats = service_state.service.get_stats().map_err(|e| format!("Failed to get service stats: {}", e))?;
+    
+    // Get registry status
+    let registry_status = {
+        let registry = service_state.service.get_registry();
+        let registry = registry.lock().map_err(|e| format!("Failed to lock registry: {}", e))?;
+        let applications = registry.get_registered_applications();
+        serde_json::json!({
+            "total_applications": applications.len(),
+            "active_applications": applications.iter().filter(|app| app.status == ApplicationStatus::Active).count(),
+            "inactive_applications": applications.iter().filter(|app| app.status == ApplicationStatus::Inactive).count()
+        })
+    };
+    
+    // Get focus monitor status (aggregate from all monitors)
+    let focus_status = serde_json::json!({
+        "is_monitoring": service_stats.registered_applications > 0,
+        "total_monitors": service_stats.registered_applications,
+        "service_state": service_stats.state
+    });
+    
+    // Get playback controller status
+    let playback_status = {
+        let controller = service_state.service.get_playback_controller();
+        let controller = controller.lock().map_err(|e| format!("Failed to lock controller: {}", e))?;
+        if let Some(session) = controller.get_playback_status() {
+            serde_json::json!({
+                "has_active_session": true,
+                "session_id": session.id,
+                "target_app_id": session.target_app_id,
+                "state": session.state,
+                "focus_strategy": session.focus_strategy,
+                "current_step": session.current_step
+            })
+        } else {
+            serde_json::json!({
+                "has_active_session": false,
+                "session_id": null,
+                "target_app_id": null,
+                "state": null,
+                "focus_strategy": null,
+                "current_step": null
+            })
+        }
+    };
+    
+    let summary = serde_json::json!({
+        "service": {
+            "state": service_stats.state,
+            "uptime_seconds": service_stats.uptime_seconds,
+            "total_focus_events": service_stats.total_focus_events,
+            "total_playback_sessions": service_stats.total_playback_sessions,
+            "last_error": service_stats.last_error
+        },
+        "registry": registry_status,
+        "focus_monitor": focus_status,
+        "playback_controller": playback_status,
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    });
+    
+    Ok(summary)
+}
+
+/// Get service health status
+/// 
+/// Requirements: Service lifecycle management
+#[tauri::command]
+async fn get_service_health(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+) -> Result<serde_json::Value, String> {
+    log::debug!("[App Focus] Getting service health status");
+    
+    let health = service_state.service.health_check().await.map_err(|e| format!("Failed to perform health check: {}", e))?;
+    let is_healthy = service_state.service.is_healthy();
+    let state = service_state.service.get_state().map_err(|e| format!("Failed to get service state: {}", e))?;
+    
+    let health_json = serde_json::json!({
+        "is_healthy": is_healthy,
+        "state": state,
+        "components": health,
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    });
+    
+    Ok(health_json)
+}
+
+/// Get service statistics
+/// 
+/// Requirements: Service lifecycle management
+#[tauri::command]
+async fn get_service_stats(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+) -> Result<serde_json::Value, String> {
+    log::debug!("[App Focus] Getting service statistics");
+    
+    let stats = service_state.service.get_stats().map_err(|e| format!("Failed to get service stats: {}", e))?;
+    
+    let stats_json = serde_json::json!({
+        "state": stats.state,
+        "uptime_seconds": stats.uptime_seconds,
+        "registered_applications": stats.registered_applications,
+        "active_sessions": stats.active_sessions,
+        "total_focus_events": stats.total_focus_events,
+        "total_playback_sessions": stats.total_playback_sessions,
+        "last_error": stats.last_error,
+        "started_at": stats.started_at.map(|t| t.to_rfc3339())
+    });
+    
+    Ok(stats_json)
+}
+
+/// Restart the service
+/// 
+/// Requirements: Service lifecycle management
+#[tauri::command]
+async fn restart_service(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+) -> Result<(), String> {
+    log::info!("[App Focus] Restarting Application-Focused Automation service");
+    
+    // Stop the service
+    service_state.service.stop().await.map_err(|e| format!("Failed to stop service: {}", e))?;
+    
+    // Start the service
+    service_state.service.start().await.map_err(|e| format!("Failed to start service: {}", e))?;
+    
+    log::info!("[App Focus] Service restarted successfully");
+    Ok(())
+}
+
+/// Update application focus configuration
+/// 
+/// Requirements: Configuration management for onboarding
+#[tauri::command]
+async fn update_application_focus_config(
+    service_state: State<'_, ApplicationFocusedAutomationState>,
+    config: serde_json::Value,
+) -> Result<(), String> {
+    log::info!("[App Focus] Updating application focus configuration");
+    
+    // For now, just log the configuration update
+    // In a full implementation, this would update the service configuration
+    log::info!("[App Focus] Configuration update: {:?}", config);
+    
+    // TODO: Implement actual configuration update
+    // This would involve updating the ApplicationFocusConfig and persisting it
+    
+    Ok(())
+}
+
+/// Open system settings for accessibility permissions (macOS)
+/// 
+/// Requirements: Platform-specific permission guidance
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn open_accessibility_settings() -> Result<(), String> {
+    use std::process::Command;
+    
+    log::info!("[App Focus] Opening macOS accessibility settings");
+    
+    let output = Command::new("open")
+        .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+        .output()
+        .map_err(|e| format!("Failed to open accessibility settings: {}", e))?;
+    
+    if !output.status.success() {
+        return Err("Failed to open accessibility settings".to_string());
+    }
+    
+    Ok(())
+}
+
+/// Open system settings (MacOS)
+/// 
+/// Requirements: Platform-specific permission guidance
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn open_system_settings() -> Result<(), String> {
+    use std::process::Command;
+    
+    log::info!("[App Focus] Opening macOS system settings");
+    
+    // Open the main System Settings/Preferences window
+    let output = Command::new("open")
+        .arg("x-apple.systempreferences:")
+        .output()
+        .map_err(|e| format!("Failed to open system settings: {}", e))?;
+    
+    if !output.status.success() {
+        return Err("Failed to open system settings".to_string());
+    }
+    
+    Ok(())
+}
+
+/// Open system settings (Windows)
+/// 
+/// Requirements: Platform-specific permission guidance
+#[cfg(target_os = "windows")]
+#[tauri::command]
+async fn open_system_settings() -> Result<(), String> {
+    use std::process::Command;
+    
+    log::info!("[App Focus] Opening Windows system settings");
+    
+    let output = Command::new("ms-settings:")
+        .output()
+        .map_err(|e| format!("Failed to open system settings: {}", e))?;
+    
+    if !output.status.success() {
+        return Err("Failed to open system settings".to_string());
+    }
+    
+    Ok(())
+}
+
+/// Fallback for other platforms
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[tauri::command]
+async fn open_accessibility_settings() -> Result<(), String> {
+    log::warn!("[App Focus] Opening accessibility settings not supported on this platform");
+    Err("Opening accessibility settings not supported on this platform".to_string())
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[tauri::command]
+async fn open_system_settings() -> Result<(), String> {
+    log::warn!("[App Focus] Opening system settings not supported on this platform");
+    Err("Opening system settings not supported on this platform".to_string())
+}
+
+// Platform-specific helper functions (placeholders for now)
+
+#[cfg(target_os = "windows")]
+async fn get_running_applications_windows() -> Result<Vec<ApplicationInfo>, String> {
+    // TODO: Implement Windows-specific application enumeration
+    log::warn!("[App Focus] Windows application enumeration not yet implemented");
+    Ok(vec![
+        ApplicationInfo {
+            name: "Notepad".to_string(),
+            executable_path: "C:\\Windows\\System32\\notepad.exe".to_string(),
+            process_name: "notepad.exe".to_string(),
+            process_id: 1234,
+            bundle_id: None,
+            window_handle: None,
+        }
+    ])
+}
+
+#[cfg(target_os = "macos")]
+
+//TODO: This feature not working well, need to fix
+async fn get_running_applications_macos() -> Result<Vec<ApplicationInfo>, String> {
+    use application_focused_automation::MacOSApplicationDetector;
+    use application_focused_automation::platform::PlatformApplicationDetector;
+
+    let detector = MacOSApplicationDetector::new();
+    detector.get_running_applications()
+        .map_err(|e| format!("Failed to get running applications: {:?}", e))
 }
 
 // ============================================================================
@@ -1073,6 +1984,55 @@ async fn show_click_cursor(app_handle: tauri::AppHandle, x: i32, y: i32, button:
     Ok(())
 }
 
+// Platform and permission commands
+#[tauri::command]
+async fn get_platform_info() -> Result<String, String> {
+    Ok(std::env::consts::OS.to_string())
+}
+
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn check_accessibility_permissions() -> Result<bool, String> {
+    use std::process::Command;
+    
+    // Check if accessibility permissions are granted using AppleScript
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg("tell application \"System Events\" to return true")
+        .output()
+        .map_err(|e| format!("Failed to check accessibility permissions: {}", e))?;
+    
+    Ok(output.status.success())
+}
+
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+async fn check_accessibility_permissions() -> Result<bool, String> {
+    // On non-macOS platforms, assume permissions are available
+    Ok(true)
+}
+
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn request_accessibility_permissions() -> Result<(), String> {
+    use std::process::Command;
+    
+    // Open System Settings to Privacy & Security > Accessibility
+    let _ = Command::new("open")
+        .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+        .spawn()
+        .map_err(|e| format!("Failed to open system settings: {}", e))?;
+    
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+async fn request_accessibility_permissions() -> Result<(), String> {
+    // On non-macOS platforms, no action needed
+    Ok(())
+}
+
 fn main() {
     // Initialize logging system
     if let Err(e) = init_logging() {
@@ -1106,17 +2066,53 @@ fn main() {
         }
     };
 
+    // Initialize Application-Focused Automation service
+    let application_focused_automation_service = match ApplicationFocusedAutomationService::new() {
+        Ok(service) => service,
+        Err(e) => {
+            eprintln!("Warning: Failed to initialize Application-Focused Automation service: {}", e);
+            // Create a default service that will return errors for operations
+            ApplicationFocusedAutomationService::default()
+        }
+    };
+    
+    let application_focused_automation_state = ApplicationFocusedAutomationState {
+        service: Arc::new(application_focused_automation_service),
+    };
+
     tauri::Builder::default()
         .manage(core_router_state)
         .manage(monitor_state)
         .manage(ai_service_state)
-        .setup(move |_app| {
+        .manage(application_focused_automation_state)
+        .setup(move |app| {
+            let app_handle = app.handle();
+            
             // Start monitoring in background after Tauri runtime is initialized
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = core_monitor.start_monitoring().await {
                     log::error!("Failed to start core monitoring: {}", e);
                 }
             });
+            
+            // Start Application-Focused Automation service
+            let app_handle_clone = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                // Get the service from app state
+                if let Some(service_state) = app_handle_clone.try_state::<ApplicationFocusedAutomationState>() {
+                    // Set the app handle for real-time events
+                    if let Err(e) = service_state.service.set_app_handle(app_handle_clone.clone()) {
+                        log::error!("Failed to set app handle for Application-Focused Automation service: {}", e);
+                    }
+                    
+                    if let Err(e) = service_state.service.start().await {
+                        log::error!("Failed to start Application-Focused Automation service: {}", e);
+                    } else {
+                        log::info!("Application-Focused Automation service started successfully");
+                    }
+                }
+            });
+            
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1152,6 +2148,40 @@ fn main() {
             load_script,
             save_script,
             delete_script,
+            reveal_in_finder,
+            // Application-Focused Automation commands
+            get_running_applications,
+            register_application,
+            unregister_application,
+            get_registered_applications,
+            get_application,
+            update_application_status,
+            validate_application_for_automation,
+            start_focus_monitoring,
+            stop_focus_monitoring,
+            get_focus_state,
+            start_focused_playback,
+            pause_focused_playback,
+            resume_focused_playback,
+            stop_focused_playback,
+            get_playback_status,
+            get_session_stats,
+            save_automation_progress,
+            get_recovery_options,
+            // Real-time status update commands
+            subscribe_to_focus_updates,
+            unsubscribe_from_focus_updates,
+            subscribe_to_playback_updates,
+            unsubscribe_from_playback_updates,
+            broadcast_focus_event,
+            get_realtime_status_summary,
+            // Service management commands
+            get_service_health,
+            get_service_stats,
+            restart_service,
+            update_application_focus_config,
+            open_accessibility_settings,
+            open_system_settings,
             // AI Vision Capture commands
             capture_vision_marker,
             analyze_vision,
@@ -1182,6 +2212,10 @@ fn main() {
             ai_test_case::commands::get_usage_patterns,
             ai_test_case::commands::calculate_cost_estimation,
             ai_test_case::commands::get_recent_errors,
+            // Platform and permission commands
+            get_platform_info,
+            check_accessibility_permissions,
+            request_accessibility_permissions,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

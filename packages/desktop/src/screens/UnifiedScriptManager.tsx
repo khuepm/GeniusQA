@@ -33,7 +33,7 @@ import { getIPCBridge } from '../services/ipcBridgeService';
 // Types
 import { ScriptData, ValidationResult, Action } from '../types/aiScriptBuilder.types';
 import { AIProvider, ProviderInfo, ProviderModel, SessionStatistics } from '../types/providerAdapter.types';
-import { save } from '@tauri-apps/api/dialog';
+import { save, open } from '@tauri-apps/api/dialog';
 
 import './UnifiedScriptManager.css';
 
@@ -106,6 +106,8 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
     warnings: [],
   });
   const [targetOS, setTargetOS] = useState<TargetOS>('universal');
+  const [aiChatInstanceKey, setAiChatInstanceKey] = useState<number>(0);
+  const [postSaveAction, setPostSaveAction] = useState<'none' | 'test'>('none');
 
   // Provider state
   const [providersConfigured, setProvidersConfigured] = useState<boolean>(false);
@@ -278,6 +280,16 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
     }
   }, [ipcBridge, selectedScript]);
 
+  const handleScriptReveal = useCallback(async (script: StoredScriptInfo) => {
+    try {
+      await ipcBridge.revealInFinder(script.path);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to reveal script in Finder';
+      setError(errorMessage);
+      console.error('Reveal script error:', err);
+    }
+  }, [ipcBridge]);
+
   /**
    * Handle tab change
    * Requirements: 10.1
@@ -310,9 +322,30 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
    * Handle save button click - opens naming dialog
    */
   const handleScriptSave = useCallback(async (_script: ScriptData) => {
+    setPostSaveAction('none');
     setSaveError(null);
     setShowSaveDialog(true);
   }, []);
+
+  const handleNewChat = useCallback(() => {
+    setAiChatInstanceKey((k) => k + 1);
+    setGeneratedScript(null);
+    setValidationResult({
+      valid: true,
+      errors: [],
+      warnings: [],
+    });
+    setSaveError(null);
+    setShowSaveDialog(false);
+    setPostSaveAction('none');
+  }, []);
+
+  const handleSaveAndTest = useCallback(() => {
+    if (!generatedScript) return;
+    setPostSaveAction('test');
+    setSaveError(null);
+    setShowSaveDialog(true);
+  }, [generatedScript]);
 
   /**
    * Handle actual script save with name
@@ -333,6 +366,18 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
       if (result.success) {
         console.log('[UnifiedScriptManager] Script saved successfully:', result.scriptPath);
         setShowSaveDialog(false);
+
+        if (postSaveAction === 'test' && result.scriptPath) {
+          setGeneratedScript(null);
+          setValidationResult({
+            valid: true,
+            errors: [],
+            warnings: [],
+          });
+          setPostSaveAction('none');
+          navigate('/recorder', { state: { scriptPath: result.scriptPath } });
+          return;
+        }
 
         // Refresh script list
         await loadScripts();
@@ -364,7 +409,7 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
     } finally {
       setSavingScript(false);
     }
-  }, [generatedScript, targetOS, ipcBridge]);
+  }, [generatedScript, targetOS, ipcBridge, navigate, postSaveAction]);
 
   /**
    * Handle script discard
@@ -611,6 +656,48 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
   }, [allScripts]);
 
   /**
+   * Handle opening a script file
+   */
+  const handleOpenScript = useCallback(async () => {
+    try {
+      const selected = await open({
+        filters: [{
+          name: 'Script Files',
+          extensions: ['json']
+        }]
+      });
+
+      if (selected && typeof selected === 'string') {
+        const data = await ipcBridge.loadScript(selected) as ScriptData;
+
+        // Create script info for the list/selection
+        const scriptInfo: StoredScriptInfo = {
+          filename: selected.split(/[\\/]/).pop() || 'script.json',
+          path: selected,
+          createdAt: data.metadata?.created_at || new Date().toISOString(),
+          duration: data.metadata?.duration || 0,
+          actionCount: data.actions?.length || 0,
+          source: (data.metadata?.core_type as any) === 'ai_generated' ? 'ai_generated' : 'recorded',
+        };
+
+        // Add to list if not present
+        setAllScripts(prev => {
+          if (prev.some(s => s.path === selected)) return prev;
+          return [...prev, scriptInfo];
+        });
+
+        // Select and switch to editor
+        setSelectedScript(scriptInfo);
+        setScriptData(data);
+        setActiveTab('editor');
+      }
+    } catch (err) {
+      console.error('Failed to open script:', err);
+      setError(err instanceof Error ? err.message : 'Failed to open script');
+    }
+  }, [ipcBridge]);
+
+  /**
    * Render Script List Tab
    * Requirements: 10.2
    */
@@ -618,9 +705,14 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
     <div className="unified-tab-content script-list-tab">
       <div className="script-list-header">
         <h2 className="tab-section-title">All Scripts</h2>
-        <button className="refresh-button" onClick={loadScripts}>
-          🔄 Refresh
-        </button>
+        <div className="script-list-actions">
+          <button className="open-script-button" onClick={handleOpenScript}>
+            📂 Open Script
+          </button>
+          <button className="refresh-button" onClick={loadScripts}>
+            🔄 Refresh
+          </button>
+        </div>
       </div>
 
       <ScriptFilter
@@ -662,6 +754,7 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
                 script={script}
                 selected={selectedScript?.path === script.path}
                 onClick={handleScriptSelect}
+                onReveal={handleScriptReveal}
                 onDelete={handleScriptDelete}
                 showDelete={true}
               />
@@ -683,10 +776,29 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
         <div className="ai-builder-chat-panel">
           <div className="ai-builder-chat-header">
             <OSSelector selectedOS={targetOS} onOSChange={handleOSChange} />
-            <UsageStatistics statistics={sessionStats} variant="tooltip" />
+            <div className="ai-builder-chat-header-right">
+              <UsageStatistics statistics={sessionStats} variant="tooltip" />
+              <button
+                type="button"
+                className="ai-builder-header-button"
+                onClick={handleNewChat}
+                disabled={providerLoading || savingScript}
+              >
+                New chat
+              </button>
+              <button
+                type="button"
+                className="ai-builder-header-button primary"
+                onClick={handleSaveAndTest}
+                disabled={!generatedScript || providerLoading || savingScript}
+              >
+                Save & Test
+              </button>
+            </div>
           </div>
 
           <AIChatInterface
+            key={aiChatInstanceKey}
             onScriptGenerated={handleScriptGenerated}
             apiKeyConfigured={providersConfigured}
             targetOS={targetOS}
@@ -732,6 +844,12 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
             onClick={() => setActiveTab('list')}
           >
             📋 Go to Script List
+          </button>
+          <button
+            className="open-script-button placeholder-action"
+            onClick={handleOpenScript}
+          >
+            📂 Open Script File
           </button>
         </div>
       ) : (
