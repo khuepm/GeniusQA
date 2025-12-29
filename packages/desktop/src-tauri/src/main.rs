@@ -920,11 +920,12 @@ async fn start_focused_playback(
     service_state: State<'_, ApplicationFocusedAutomationState>,
     app_id: String,
     focus_strategy: FocusLossStrategy,
+    script_path: Option<String>,
 ) -> Result<String, String> {
-    log::info!("[App Focus] Starting focused playback for app: {} with strategy: {:?}", 
-              app_id, focus_strategy);
+    log::info!("[App Focus] Starting focused playback for app: {} with strategy: {:?} script: {:?}", 
+              app_id, focus_strategy, script_path);
     
-    let session_id = service_state.service.start_integrated_playback(app_id.clone(), focus_strategy).await
+    let session_id = service_state.service.start_integrated_playback(app_id.clone(), focus_strategy, script_path).await
         .map_err(|e| format!("Failed to start playback: {}", e))?;
     
     log::info!("[App Focus] Focused playback started with session ID: {}", session_id);

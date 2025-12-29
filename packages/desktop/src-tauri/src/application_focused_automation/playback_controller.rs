@@ -35,6 +35,7 @@ pub struct PlaybackSession {
     pub paused_at: Option<DateTime<Utc>>,
     pub resumed_at: Option<DateTime<Utc>>,
     pub total_pause_duration: chrono::Duration,
+    pub script_path: Option<String>,
 }
 
 impl PlaybackController {
@@ -87,6 +88,7 @@ impl PlaybackController {
         app_id: String,
         process_id: u32,
         focus_strategy: FocusLossStrategy,
+        script_path: Option<String>,
     ) -> Result<String, PlaybackError> {
         if self.current_session.is_some() {
             return Err(PlaybackError::PlaybackAlreadyActive);
@@ -112,10 +114,11 @@ impl PlaybackController {
             paused_at: None,
             resumed_at: None,
             total_pause_duration: chrono::Duration::zero(),
+            script_path: script_path.clone(),
         };
 
         self.current_session = Some(session.clone());
-        log::info!("Started playback session {} with focus strategy {:?}", session_id, focus_strategy);
+        log::info!("Started playback session {} with focus strategy {:?} for script {:?}", session_id, focus_strategy, script_path);
         
         // Emit real-time playback status update
         // Requirements: 5.5 - Real-time event streaming
@@ -132,7 +135,8 @@ impl PlaybackController {
                     "started_at": session.started_at.to_rfc3339(),
                     "paused_at": session.paused_at.map(|t| t.to_rfc3339()),
                     "resumed_at": session.resumed_at.map(|t| t.to_rfc3339()),
-                    "total_pause_duration": session.total_pause_duration.num_seconds()
+                    "total_pause_duration": session.total_pause_duration.num_seconds(),
+                    "script_path": session.script_path
                 }
             });
             
@@ -856,6 +860,7 @@ impl PlaybackController {
             paused_at: snapshot.paused_at,
             resumed_at: snapshot.resumed_at,
             total_pause_duration: snapshot.total_pause_duration,
+            script_path: None, // Script path is not currently persisted in snapshot
         };
 
         self.current_session = Some(restored_session);

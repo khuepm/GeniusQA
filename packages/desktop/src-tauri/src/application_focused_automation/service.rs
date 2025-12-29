@@ -425,8 +425,9 @@ impl ApplicationFocusedAutomationService {
         &self,
         app_id: String,
         focus_strategy: FocusLossStrategy,
+        script_path: Option<String>,
     ) -> Result<String, ApplicationFocusedAutomationError> {
-        log::info!("[Service] Starting integrated playback for app: {} with strategy: {:?}", app_id, focus_strategy);
+        log::info!("[Service] Starting integrated playback for app: {} with strategy: {:?} script: {:?}", app_id, focus_strategy, script_path);
 
         // Validate application exists and is active
         let (mut process_id, app_name, bundle_id, process_name) = {
@@ -514,7 +515,7 @@ impl ApplicationFocusedAutomationService {
             let mut controller = self.playback_controller.lock().map_err(|e| {
                 ApplicationFocusedAutomationError::ServiceError(format!("Failed to lock playback controller: {}", e))
             })?;
-            controller.start_playback(app_id.clone(), process_id, focus_strategy)?
+            controller.start_playback(app_id.clone(), process_id, focus_strategy, script_path.clone())?
         };
 
         // Ensure focus monitoring is active
@@ -558,9 +559,15 @@ impl ApplicationFocusedAutomationService {
         // In a real implementation, this would iterate over the Steps provided by the frontend
         let controller_clone = self.playback_controller.clone();
         let session_id_clone = session_id.clone();
+        let script_path_clone = script_path.clone(); // Clone for the task
         
         tokio::spawn(async move {
-            log::info!("[Execution] Starting execution loop for session {}", session_id_clone);
+            if let Some(path) = &script_path_clone {
+                log::info!("[Execution] Starting execution loop for session {} with script: {}", session_id_clone, path);
+            } else {
+                log::info!("[Execution] Starting execution loop for session {} (no script provided)", session_id_clone);
+            }
+            
             let mut step_index = 0;
             let total_steps = 10; // Simulate a script with 10 steps
 
@@ -590,7 +597,11 @@ impl ApplicationFocusedAutomationService {
                             if let Err(e) = controller.detect_error_conditions() {
                                 log::warn!("[Execution] Error condition paused playback: {:?}", e);
                             } else {
-                                log::info!("[Execution] Executed step {}/{}", step_index, total_steps);
+                                if let Some(path) = &script_path_clone {
+                                    log::info!("[Execution] Executed step {}/{} for script: {}", step_index, total_steps, path);
+                                } else {
+                                    log::info!("[Execution] Executed step {}/{}", step_index, total_steps);
+                                }
                                 
                                 // Update session current_step
                                 if let Err(e) = controller.update_progress(step_index) {

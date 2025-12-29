@@ -103,7 +103,8 @@ export const AutomationControlPanel: React.FC = () => {
       setError(null);
       const sessionId = await invoke<string>('start_focused_playback', {
         appId: targetAppId,
-        focusStrategy
+        focusStrategy,
+        scriptPath
       });
 
       console.log('Started playback session:', sessionId);
