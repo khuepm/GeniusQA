@@ -39,7 +39,7 @@ const DashboardScreen: React.FC = () => {
           </Text>
         </View>
 
-        <View style={styles.placeholderCard}>
+        {/*<View style={styles.placeholderCard}>
           <Text style={styles.placeholderTitle}>Tính năng sắp ra mắt</Text>
           <Text style={styles.placeholderText}>
             • Quản lý API keys{'\n'}
@@ -47,7 +47,7 @@ const DashboardScreen: React.FC = () => {
             • Cài đặt hệ thống{'\n'}
             • Báo cáo và phân tích
           </Text>
-        </View>
+        </View>*/}
       </View>
 
       {/* Sign Out Button */}

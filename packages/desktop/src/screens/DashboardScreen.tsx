@@ -165,7 +165,7 @@ const DashboardScreen: React.FC = () => {
             </div>
           </div>
 
-          <div className="dashboard-placeholder-card">
+          <div className="dashboard-placeholder-card hidden">
             <h3 className="dashboard-placeholder-title">Tính năng sắp ra mắt</h3>
             <p className="dashboard-placeholder-text">
               • Quản lý API keys<br />

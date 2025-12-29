@@ -1945,12 +1945,12 @@ async fn create_click_overlay(app_handle: tauri::AppHandle) -> Result<(), String
     #[cfg(target_os = "macos")]
     {
         use cocoa::appkit::NSWindow;
-        use cocoa::base::id;
+        use cocoa::base::{id, YES};
         
         if let Ok(ns_window) = overlay_window.ns_window() {
             unsafe {
                 let ns_win: id = ns_window as id;
-                ns_win.setIgnoresMouseEvents_(true);
+                ns_win.setIgnoresMouseEvents_(YES);
             }
         }
     }
