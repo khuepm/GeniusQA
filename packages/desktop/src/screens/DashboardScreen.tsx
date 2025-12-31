@@ -65,7 +65,7 @@ const DashboardScreen: React.FC = () => {
         {/* Header Section */}
         <div className="dashboard-header">
           <h1 className="dashboard-logo">GeniusQA</h1>
-          <h2 className="dashboard-welcome-text">Chào mừng trở lại!</h2>
+          <h2 className="dashboard-welcome-text">Welcome back!</h2>
           {user?.email && (
             <p className="dashboard-email-text">{user.email}</p>
           )}
@@ -76,7 +76,7 @@ const DashboardScreen: React.FC = () => {
           <div className="dashboard-placeholder-card">
             <h3 className="dashboard-placeholder-title">Dashboard</h3>
             <p className="dashboard-placeholder-text">
-              Nội dung dashboard sẽ được thêm vào trong các phiên bản tiếp theo.
+              Dashboard content will be added in future versions.
             </p>
           </div>
 
@@ -165,21 +165,21 @@ const DashboardScreen: React.FC = () => {
             </div>
           </div>
 
-          <div className="dashboard-placeholder-card hidden">
-            <h3 className="dashboard-placeholder-title">Tính năng sắp ra mắt</h3>
+          {/*<div className="dashboard-placeholder-card hidden">
+            <h3 className="dashboard-placeholder-title">Coming soon</h3>
             <p className="dashboard-placeholder-text">
-              • Quản lý API keys<br />
-              • Lịch sử automation<br />
-              • Cài đặt hệ thống<br />
-              • Báo cáo và phân tích
+              • API Key Management<br />
+              • Automation History<br />
+              • System Settings<br />
+              • Reports and Analytics
             </p>
-          </div>
+          </div>*/}
         </div>
 
         {/* Sign Out Button */}
         <div className="dashboard-footer">
           <AuthButton
-            title="Đăng xuất"
+            title="Sign Out"
             onPress={handleSignOut}
             loading={loading}
             disabled={loading}
