@@ -1,0 +1,7 @@
+{
+  "id": "test_script_1",
+  "name": "Test Login Script",
+  "content": "[{\"id\":\"step_1\",\"action\":\"navigate\",\"target\":\"login_page\",\"value\":\"https://example.com/login\",\"delay\":1000},{\"id\":\"step_2\",\"action\":\"type\",\"target\":\"username_field\",\"value\":\"testuser@example.com\",\"delay\":300},{\"id\":\"step_3\",\"action\":\"click\",\"target\":\"login_button\",\"delay\":2000}]",
+  "createdAt": "2026-01-06T18:50:18.791Z",
+  "updatedAt": "2026-01-06T18:50:18.797Z"
+}

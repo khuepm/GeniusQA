@@ -5,13 +5,16 @@
 
 import React from 'react';
 import { AuthProvider } from './contexts/AuthContext';
+import { GuestModeProvider } from './contexts/GuestModeContext';
 import AppNavigator from './navigation/AppNavigator';
 import './App.css';
 
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      <AppNavigator />
+      <GuestModeProvider>
+        <AppNavigator />
+      </GuestModeProvider>
     </AuthProvider>
   );
 };
