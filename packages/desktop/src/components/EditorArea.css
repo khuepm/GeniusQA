@@ -1,0 +1,563 @@
+/**
+ * EditorArea Styles
+ * Styles for the integrated script editor
+ * Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 6.1, 6.2, 6.3, 6.4, 6.5
+ */
+
+/* Main editor area container - Requirements: 1.3, 6.1, 6.4 */
+.editor-area-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1; /* Takes remaining vertical space - Requirement 1.3 */
+  min-height: 200px; /* Minimum height constraint - Requirement 6.1 */
+  height: 100%;
+  background: var(--primary-bg, #ffffff);
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+  overflow: hidden; /* Ensure proper scrollable content areas */
+}
+
+.editor-area-container.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.editor-area-container.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Editor header */
+.editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--secondary-bg, #f8f9fa);
+  border-bottom: 1px solid var(--border-light, #e9ecef);
+  flex-shrink: 0;
+}
+
+.editor-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.editor-title-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #212529);
+}
+
+.editor-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary, #6c757d);
+}
+
+.editor-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* View mode selector */
+.view-mode-selector {
+  display: flex;
+  background: var(--primary-bg, #ffffff);
+  border: 1px solid var(--border-light, #e9ecef);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.view-mode-btn {
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary, #6c757d);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.view-mode-btn:hover {
+  background: var(--button-hover, rgba(25, 118, 210, 0.08));
+  color: var(--text-primary, #212529);
+}
+
+.view-mode-btn.active {
+  background: var(--accent-primary, #1976d2);
+  color: white;
+}
+
+.view-mode-btn:not(:last-child) {
+  border-right: 1px solid var(--border-light, #e9ecef);
+}
+
+/* Editor content area - Requirements: 6.1, 6.4 */
+.editor-content {
+  flex: 1; /* Takes remaining space after header and status panel */
+  min-height: 120px; /* Minimum height for content area */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Action list styles - Requirements: 6.1, 6.4 */
+.action-list {
+  flex: 1;
+  overflow-y: auto; /* Scrollable content - Requirement 6.1 */
+  overflow-x: hidden;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0; /* Allow flex shrinking */
+}
+
+.action-list-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  min-height: 120px; /* Minimum height for empty state */
+}
+
+.empty-state {
+  text-align: center;
+  max-width: 300px;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #212529);
+  margin-bottom: 8px;
+}
+
+.empty-description {
+  font-size: 14px;
+  color: var(--text-secondary, #6c757d);
+  line-height: 1.4;
+}
+
+/* Action item styles */
+.action-item {
+  padding: 12px;
+  border: 1px solid var(--border-light, #e9ecef);
+  border-radius: 6px;
+  background: var(--primary-bg, #ffffff);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.action-item:hover {
+  border-color: var(--border-medium, #dee2e6);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.action-item.selected {
+  border-color: var(--accent-primary, #1976d2);
+  background: rgba(25, 118, 210, 0.04);
+}
+
+.action-item.latest {
+  animation: actionAppear 0.3s ease;
+  border-color: var(--accent-success, #4caf50);
+}
+
+/* Action item header */
+.action-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.action-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+
+.action-index {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #6c757d);
+  min-width: 20px;
+}
+
+.action-timestamp {
+  font-size: 11px;
+  color: var(--text-muted, #adb5bd);
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
+  margin-left: auto;
+}
+
+/* Action description */
+.action-description {
+  font-size: 13px;
+  color: var(--text-primary, #212529);
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
+  line-height: 1.4;
+}
+
+/* Action controls */
+.action-controls {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-light, #e9ecef);
+}
+
+.action-edit-btn,
+.action-delete-btn {
+  padding: 4px 8px;
+  border: 1px solid var(--border-medium, #dee2e6);
+  border-radius: 3px;
+  background: var(--primary-bg, #ffffff);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.action-edit-btn {
+  color: var(--accent-primary, #1976d2);
+}
+
+.action-edit-btn:hover {
+  background: rgba(25, 118, 210, 0.08);
+  border-color: var(--accent-primary, #1976d2);
+}
+
+.action-delete-btn {
+  color: var(--accent-danger, #f44336);
+}
+
+.action-delete-btn:hover {
+  background: rgba(244, 67, 54, 0.08);
+  border-color: var(--accent-danger, #f44336);
+}
+
+/* Timeline and code view placeholders - Requirements: 6.1, 6.4 */
+.timeline-view,
+.code-view {
+  flex: 1;
+  min-height: 0; /* Allow flex shrinking */
+  overflow-y: auto; /* Scrollable content */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.timeline-placeholder,
+.code-placeholder {
+  text-align: center;
+  color: var(--text-secondary, #6c757d);
+  font-style: italic;
+}
+
+/* Status panel */
+.status-panel {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  background: var(--secondary-bg, #f8f9fa);
+  border-top: 1px solid var(--border-light, #e9ecef);
+  flex-shrink: 0;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.status-label {
+  color: var(--text-secondary, #6c757d);
+  font-weight: 500;
+}
+
+.status-value {
+  color: var(--text-primary, #212529);
+  font-weight: 600;
+}
+
+.status-value.recording {
+  color: var(--accent-danger, #f44336);
+}
+
+.status-value.idle {
+  color: var(--text-secondary, #6c757d);
+}
+
+/* Animations */
+@keyframes actionAppear {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scrollbar styling */
+.action-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.action-list::-webkit-scrollbar-track {
+  background: var(--secondary-bg, #f8f9fa);
+}
+
+.action-list::-webkit-scrollbar-thumb {
+  background: var(--border-medium, #dee2e6);
+  border-radius: 3px;
+}
+
+.action-list::-webkit-scrollbar-thumb:hover {
+  background: var(--border-dark, #adb5bd);
+}
+
+/* Responsive adjustments - Requirements: 6.4 */
+@media (max-width: 768px) {
+  .editor-header {
+    padding: 8px 12px;
+  }
+  
+  .action-list {
+    padding: 4px;
+  }
+  
+  .action-item {
+    padding: 8px;
+  }
+  
+  .status-panel {
+    padding: 6px 12px;
+    gap: 12px;
+  }
+  
+  /* Collapsible panels for small screens - Requirement 6.4 */
+  .editor-header {
+    flex-wrap: wrap;
+  }
+  
+  .editor-controls {
+    width: 100%;
+    margin-top: 8px;
+    justify-content: center;
+  }
+  
+  .view-mode-selector {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Extra small screens - enhanced collapsible behavior */
+@media (max-width: 480px) {
+  .editor-area-container {
+    min-height: 150px; /* Reduced minimum height for very small screens */
+  }
+  
+  .editor-content {
+    min-height: 80px;
+  }
+  
+  .action-list-empty {
+    min-height: 80px;
+    padding: 20px 10px;
+  }
+  
+  .empty-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+  }
+  
+  .empty-title {
+    font-size: 14px;
+  }
+  
+  .empty-description {
+    font-size: 12px;
+  }
+  
+  /* Collapsible status panel */
+  .status-panel {
+    flex-wrap: wrap;
+    padding: 4px 8px;
+  }
+  
+  .status-item {
+    font-size: 11px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .action-item {
+    transition: none;
+  }
+  
+  .action-item.latest {
+    animation: none;
+  }
+  
+  .editor-area-container {
+    transition: none;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .action-item {
+    border-width: 2px;
+  }
+  
+  .action-item.selected {
+    border-width: 3px;
+  }
+  
+  .view-mode-btn.active {
+    border: 2px solid #000000;
+  }
+}
+
+/* Collapsible panel functionality - Requirement 6.4 */
+.editor-panel-collapsible {
+  transition: height 0.3s ease, opacity 0.3s ease;
+  overflow: hidden;
+}
+
+.editor-panel-collapsed {
+  height: 0 !important;
+  opacity: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+
+.editor-panel-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 2px;
+  transition: background-color 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.editor-panel-toggle:hover {
+  background: var(--button-hover, rgba(25, 118, 210, 0.08));
+}
+
+.editor-panel-toggle-icon {
+  font-size: 12px;
+  transition: transform 0.3s ease;
+}
+
+.editor-panel-toggle-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+/* Flexible layout containers - Requirements: 1.3, 6.1, 6.4 */
+.editor-layout-flexible {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 200px;
+}
+
+.editor-layout-horizontal {
+  flex-direction: row;
+}
+
+.editor-layout-panel {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.editor-layout-panel.resizable {
+  resize: both;
+  min-height: 100px;
+  min-width: 200px;
+}
+
+.editor-layout-splitter {
+  background: var(--border-light, #e9ecef);
+  cursor: col-resize;
+  width: 4px;
+  min-width: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.editor-layout-splitter:hover {
+  background: var(--border-medium, #dee2e6);
+}
+
+.editor-layout-splitter.horizontal {
+  cursor: row-resize;
+  height: 4px;
+  width: auto;
+  min-height: 4px;
+}
+
+/* Container size constraints - Requirements: 1.3, 6.1 */
+.editor-area-container.compact {
+  min-height: 150px;
+}
+
+.editor-area-container.expanded {
+  min-height: 300px;
+}
+
+.editor-area-container.full-height {
+  height: 100vh;
+  min-height: 100vh;
+}
+
+/* Scrollable content areas - Requirement 6.1 */
+.editor-scrollable-content {
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+.editor-scrollable-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.editor-scrollable-content::-webkit-scrollbar-track {
+  background: var(--secondary-bg, #f8f9fa);
+}
+
+.editor-scrollable-content::-webkit-scrollbar-thumb {
+  background: var(--border-medium, #dee2e6);
+  border-radius: 3px;
+}
+
+.editor-scrollable-content::-webkit-scrollbar-thumb:hover {
+  background: var(--border-dark, #adb5bd);
+}

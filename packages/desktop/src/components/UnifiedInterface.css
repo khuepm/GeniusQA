@@ -1,0 +1,152 @@
+/**
+ * UnifiedInterface Styles
+ * Main layout styles for the unified interface
+ * Requirements: 1.1, 1.3, 1.4
+ */
+
+/* CSS Variables for consistent theming */
+:root {
+  /* Primary Colors */
+  --primary-bg: #ffffff;
+  --secondary-bg: #f8f9fa;
+  --toolbar-bg: #f1f3f4;
+  
+  /* Accent Colors */
+  --accent-primary: #1976d2;
+  --accent-success: #4caf50;
+  --accent-warning: #ff9800;
+  --accent-danger: #f44336;
+  
+  /* Text Colors */
+  --text-primary: #212529;
+  --text-secondary: #6c757d;
+  --text-muted: #adb5bd;
+  
+  /* Border Colors */
+  --border-light: #e9ecef;
+  --border-medium: #dee2e6;
+  --border-dark: #adb5bd;
+  
+  /* Button States */
+  --button-hover: rgba(25, 118, 210, 0.08);
+  --button-active: rgba(25, 118, 210, 0.12);
+  --button-disabled: rgba(0, 0, 0, 0.04);
+  
+  /* Layout Dimensions */
+  --toolbar-height: 48px;
+  --toolbar-padding: 16px;
+  --button-size: 32px;
+  --button-gap: 4px;
+  --group-gap: 16px;
+}
+
+/* Main unified interface container */
+.unified-interface {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background: var(--primary-bg);
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Toolbar area at the top */
+.toolbar-area {
+  height: var(--toolbar-height);
+  min-height: var(--toolbar-height);
+  background: var(--toolbar-bg);
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--toolbar-padding);
+  gap: var(--group-gap);
+  flex-shrink: 0;
+  z-index: 100;
+}
+
+/* Editor area below toolbar */
+.editor-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--primary-bg);
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.editor-area.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.editor-area.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Collapsed toolbar state */
+.unified-interface.toolbar-collapsed .toolbar-area {
+  height: 0;
+  min-height: 0;
+  padding: 0;
+  border-bottom: none;
+  overflow: hidden;
+}
+
+.unified-interface.toolbar-collapsed .editor-area {
+  /* Take full height when toolbar is collapsed */
+}
+
+/* Responsive behavior */
+@media (max-width: 768px) {
+  .toolbar-area {
+    padding: 0 8px;
+    gap: 8px;
+  }
+}
+
+@media (max-height: 600px) {
+  :root {
+    --toolbar-height: 40px;
+    --button-size: 28px;
+  }
+}
+
+/* Focus management */
+.unified-interface:focus-within {
+  /* Ensure proper focus handling */
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  .editor-area {
+    transition: none;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --border-light: #000000;
+    --border-medium: #000000;
+    --toolbar-bg: #ffffff;
+    --primary-bg: #ffffff;
+  }
+}
+
+/* Dark mode support (for future implementation) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary-bg: #1a1a1a;
+    --secondary-bg: #2d2d2d;
+    --toolbar-bg: #2d2d2d;
+    --text-primary: #ffffff;
+    --text-secondary: #b3b3b3;
+    --text-muted: #666666;
+    --border-light: #404040;
+    --border-medium: #555555;
+    --border-dark: #666666;
+  }
+}

@@ -1,0 +1,163 @@
+/**
+ * ToolbarButton Styles
+ * Styles for individual toolbar buttons with icons and tooltips
+ * Requirements: 3.1, 3.2, 3.5, 7.1, 7.2, 7.3, 7.4, 7.5, 9.1, 9.2, 9.3, 9.4, 9.5
+ */
+
+/* Base toolbar button styles */
+.toolbar-button {
+  width: var(--button-size, 32px);
+  height: var(--button-size, 32px);
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  padding: 0;
+  outline: none;
+}
+
+/* Button icon */
+.toolbar-button-icon {
+  opacity: 0.8;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+/* Hover state - Requirements: 9.1 */
+.toolbar-button:hover:not(.disabled) {
+  background: var(--button-hover, rgba(25, 118, 210, 0.08));
+}
+
+.toolbar-button.hovered:not(.disabled) .toolbar-button-icon {
+  opacity: 1;
+}
+
+/* Pressed state - Requirements: 9.2 */
+.toolbar-button:active:not(.disabled),
+.toolbar-button.pressed:not(.disabled) {
+  background: var(--button-active, rgba(25, 118, 210, 0.12));
+  transform: translateY(1px);
+}
+
+/* Active state */
+.toolbar-button.active {
+  background: var(--button-active, rgba(25, 118, 210, 0.12));
+}
+
+.toolbar-button.active .toolbar-button-icon {
+  opacity: 1;
+  color: var(--accent-primary, #1976d2);
+}
+
+/* Disabled state - Requirements: 9.5 */
+.toolbar-button.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.toolbar-button.disabled .toolbar-button-icon {
+  opacity: 0.4;
+}
+
+/* Button variants */
+.toolbar-button-primary {
+  /* Primary button styling */
+}
+
+.toolbar-button-primary:hover:not(.disabled) {
+  background: rgba(25, 118, 210, 0.12);
+}
+
+.toolbar-button-primary.active .toolbar-button-icon {
+  color: var(--accent-primary, #1976d2);
+}
+
+.toolbar-button-secondary {
+  /* Secondary button styling (default) */
+}
+
+.toolbar-button-danger {
+  /* Danger button styling */
+}
+
+.toolbar-button-danger:hover:not(.disabled) {
+  background: rgba(244, 67, 54, 0.08);
+}
+
+.toolbar-button-danger.active .toolbar-button-icon {
+  color: var(--accent-danger, #f44336);
+}
+
+/* Focus styles for accessibility */
+.toolbar-button:focus-visible {
+  outline: 2px solid var(--accent-primary, #1976d2);
+  outline-offset: 2px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .toolbar-button {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .toolbar-button-icon {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+@media (max-height: 600px) {
+  .toolbar-button {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .toolbar-button {
+    border: 1px solid transparent;
+  }
+  
+  .toolbar-button:hover:not(.disabled) {
+    border-color: #000000;
+    background: #ffffff;
+  }
+  
+  .toolbar-button:focus-visible {
+    outline: 3px solid #000000;
+  }
+  
+  .toolbar-tooltip {
+    background: #000000;
+    border: 1px solid #ffffff;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .toolbar-button {
+    transition: none;
+  }
+  
+  .toolbar-button-icon {
+    transition: none;
+  }
+  
+  .toolbar-button:active:not(.disabled),
+  .toolbar-button.pressed:not(.disabled) {
+    transform: none;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  /* Dark mode styles for buttons only - tooltips handled by Tooltip.css */
+}

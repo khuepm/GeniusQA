@@ -15,6 +15,7 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import RecorderScreen from '../screens/RecorderScreen';
+import UnifiedRecorderScreen from '../screens/UnifiedRecorderScreen';
 import UnifiedScriptManager from '../screens/UnifiedScriptManager';
 
 // Application-Focused Automation screens
@@ -94,6 +95,14 @@ const AppNavigator: React.FC = () => {
           element={
             <ProtectedRoute>
               <RecorderScreen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/unified-recorder"
+          element={
+            <ProtectedRoute>
+              <UnifiedRecorderScreen />
             </ProtectedRoute>
           }
         />

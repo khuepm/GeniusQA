@@ -1,0 +1,93 @@
+/**
+ * TopToolbar Styles
+ * Styles for the main toolbar component
+ * Requirements: 4.1, 4.2, 4.3, 4.4, 4.5
+ */
+
+.top-toolbar {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  gap: var(--group-gap, 16px);
+}
+
+/* Toolbar groups */
+.toolbar-group {
+  display: flex;
+  gap: var(--button-gap, 4px);
+  align-items: center;
+}
+
+/* Specific group styling */
+.toolbar-group-recording {
+  /* Recording controls styling */
+}
+
+.toolbar-group-playback {
+  /* Playback controls styling */
+}
+
+.toolbar-group-editor {
+  /* Editor controls styling */
+}
+
+.toolbar-group-settings {
+  /* Settings controls styling */
+}
+
+/* Spacer to push elements to the right */
+.toolbar-spacer {
+  flex: 1;
+}
+
+/* Group separators */
+.toolbar-group:not(:last-child)::after {
+  content: '';
+  width: 1px;
+  height: 24px;
+  background: var(--border-light, #e9ecef);
+  margin-left: var(--group-gap, 16px);
+}
+
+/* Remove separator after spacer */
+.toolbar-spacer + .toolbar-group::before {
+  display: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .top-toolbar {
+    gap: 8px;
+  }
+  
+  .toolbar-group {
+    gap: 2px;
+  }
+  
+  .toolbar-group:not(:last-child)::after {
+    margin-left: 8px;
+  }
+}
+
+/* Focus management within toolbar */
+.top-toolbar:focus-within {
+  /* Ensure proper focus ring visibility */
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .toolbar-group:not(:last-child)::after {
+    background: #000000;
+  }
+}
+
+/* Animation for group changes */
+.toolbar-group {
+  transition: opacity 0.2s ease;
+}
+
+.toolbar-group.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}

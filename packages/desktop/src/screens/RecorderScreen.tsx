@@ -854,10 +854,6 @@ const RecorderScreen: React.FC = () => {
           >
             ←
           </button>
-          <div className="header">
-            <h1 className="logo">GeniusQA Recorder</h1>
-            <p className="subtitle">Record and replay desktop interactions</p>
-          </div>
         </div>
 
         {/* Status Display */}
