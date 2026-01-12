@@ -474,24 +474,7 @@ export const UnifiedInterface: React.FC<UnifiedInterfaceProps> = React.memo(({ c
         role="main"
         aria-label="GeniusQA Desktop Application"
       >
-        {/* Top Toolbar Area */}
-        <div className="toolbar-area" role="toolbar" aria-label="Main toolbar">
-          {/* Toolbar component will be rendered here by children */}
-        </div>
-
-        {/* Editor Area - Requirements: 6.2, 6.3, 6.5 */}
-        <div
-          className={`editor-area ${state.editorVisible ? 'visible' : 'hidden'} ${isTransitioning ? 'transitioning' : ''}`}
-          data-testid="editor-area"
-          role="region"
-          aria-label="Script editor"
-          aria-hidden={!state.editorVisible}
-          style={transitionStyles}
-        >
-          {/* Editor component will be rendered here by children */}
-        </div>
-
-        {/* Render children components */}
+        {/* Render children components directly */}
         {children}
       </div>
     </ErrorBoundary>

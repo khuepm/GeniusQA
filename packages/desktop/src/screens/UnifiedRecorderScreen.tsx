@@ -8,10 +8,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { UnifiedInterface, UnifiedInterfaceProvider, useUnifiedInterface } from '../components/UnifiedInterface';
-import { TopToolbar } from '../components/TopToolbar';
+import { EnhancedTopToolbar } from '../components/EnhancedTopToolbar';
 import { EditorArea } from '../components/EditorArea';
 import { ClickCursorOverlay } from '../components/ClickCursorOverlay';
-import { RecorderStepSelector } from '../components/RecorderStepSelector';
 import { ScriptListItem } from '../components/ScriptListItem';
 import { ScriptFilter } from '../components/ScriptFilter';
 import { getIPCBridge } from '../services/ipcBridgeService';
@@ -24,8 +23,6 @@ import {
 } from '../types/recorder.types';
 import { TestScript, TestStep } from '../types/testCaseDriven.types';
 import './UnifiedRecorderScreen.css';
-import SimpleUnifiedInterface from '../components/SimpleUnifiedInterface';
-import '../components/SimpleUnifiedInterface.css';
 /**
  * Extended ScriptInfo interface with source and target OS
  * Requirements: 9.1, 9.2, 9.5
@@ -145,6 +142,11 @@ const UnifiedRecorderContent: React.FC = () => {
     };
 
     initialize();
+
+    // Handle custom event to open script loader for recording
+    const handleOpenScriptLoaderForRecording = () => {
+      setShowScriptLoaderForRecording(true);
+    };
 
     // Set up event listeners for playback progress - preserved from RecorderScreen
     const handleProgressEvent = (event: IPCEvent) => {
@@ -268,6 +270,9 @@ const UnifiedRecorderContent: React.FC = () => {
     ipcBridge.addEventListener('playback_stopped', handlePlaybackStoppedEvent);
     ipcBridge.addEventListener('playback_paused', handlePlaybackPausedEvent);
 
+    // Add custom event listener for opening script loader
+    window.addEventListener('open-script-loader-for-recording', handleOpenScriptLoaderForRecording);
+
     // Cleanup
     return () => {
       ipcBridge.removeEventListener('progress', handleProgressEvent);
@@ -277,6 +282,9 @@ const UnifiedRecorderContent: React.FC = () => {
       ipcBridge.removeEventListener('recording_stopped', handleRecordingStoppedEvent);
       ipcBridge.removeEventListener('playback_stopped', handlePlaybackStoppedEvent);
       ipcBridge.removeEventListener('playback_paused', handlePlaybackPausedEvent);
+
+      // Remove custom event listener
+      window.removeEventListener('open-script-loader-for-recording', handleOpenScriptLoaderForRecording);
     };
   }, [location.state, ipcBridge, setMode, setCurrentScript, setRecordingSession, setPlaybackSession, setEditorVisible]);
 
@@ -914,17 +922,6 @@ const UnifiedRecorderContent: React.FC = () => {
         </div>
       )}
 
-      {/* Step-Based Recording Selector - preserved from RecorderScreen */}
-      <RecorderStepSelector
-        script={activeRecordingScript}
-        activeStepId={activeRecordingStepId}
-        isRecording={status === 'recording'}
-        onStepSelect={handleRecordingStepSelect}
-        onCreateStep={handleCreateRecordingStep}
-        onLoadScript={handleLoadScriptForRecording}
-        hasScript={stepRecordingEnabled && activeRecordingScript !== null}
-      />
-
       {/* Step Recording Mode Toggle - preserved from RecorderScreen */}
       {stepRecordingEnabled && status === 'idle' && (
         <div className="step-recording-toggle">
@@ -937,232 +934,9 @@ const UnifiedRecorderContent: React.FC = () => {
         </div>
       )}
 
-      {/* Recording Status - preserved from RecorderScreen */}
-      {status === 'recording' && (
-        <div className="recording-status-container">
-          <div className="recording-status-header">
-            <div className="recording-status-indicator">
-              <span className="recording-status-text">
-                🔴 Recording in Progress
-              </span>
-              <div className="recording-pulse" />
-            </div>
-            <div className="recording-time-display">
-              <span className="recording-time-label">Duration</span>
-              <span className="recording-time-value">
-                {formatRecordingTime(recordingTime)}
-              </span>
-            </div>
-          </div>
-
-          {/* Active Step Info During Recording */}
-          {stepRecordingEnabled && activeRecordingStep && (
-            <div className="recording-step-target">
-              <span className="recording-step-target-label">Recording to Step:</span>
-              <span className="recording-step-target-name">
-                Step {activeRecordingStep.order}: {activeRecordingStep.description}
-              </span>
-            </div>
-          )}
-
-          <div className="recording-info-text">
-            <span>Capturing all mouse movements, clicks, and keyboard inputs</span>
-          </div>
-
-          <div className="recording-hint">
-            Press <kbd>ESC</kbd> to stop recording
-          </div>
-        </div>
-      )}
-
-      {/* Main Playback Progress - preserved from RecorderScreen */}
-      {(status === 'playing' || isPlaybackComplete) && totalActions > 0 && (
-        <div className={`main-progress-container ${isPaused ? 'paused' : ''} ${isPlaybackComplete ? 'completed' : ''}`}>
-          <div className="main-progress-header">
-            <div className="progress-status">
-              {isPlaybackComplete ? (
-                <span className="progress-status-text completed">
-                  ✅ Playback Complete!
-                </span>
-              ) : isPaused ? (
-                <span className="progress-status-text paused">
-                  ⏸ Paused
-                </span>
-              ) : (
-                <span className="progress-status-text playing">
-                  ▶ Playing
-                </span>
-              )}
-            </div>
-            <div className="progress-details">
-              <span className="progress-action-count">
-                Action {actionIndex} of {totalActions}
-              </span>
-              <span className="progress-percentage">
-                {Math.round(playbackProgress)}%
-              </span>
-            </div>
-          </div>
-
-          {/* Loop Information */}
-          {(totalLoops > 1 || totalLoops === 0) && (
-            <div className="progress-loop-info">
-              {totalLoops > 1 ? (
-                <span className="progress-loop-text">
-                  Loop {currentLoop} of {totalLoops}
-                </span>
-              ) : (
-                <span className="progress-loop-text">
-                  Loop {currentLoop} (Infinite)
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Main Progress Bar */}
-          <div className="main-progress-bar-container">
-            <div
-              className={`main-progress-bar ${isPaused ? 'paused' : ''} ${isPlaybackComplete ? 'completed' : ''}`}
-              style={{ width: `${playbackProgress}%` }}
-            />
-            <div className="progress-bar-background" />
-          </div>
-
-          {/* Progress Text */}
-          <div className="progress-text">
-            {isPlaybackComplete ? (
-              <span>All actions executed successfully</span>
-            ) : (
-              <span>
-                {actionIndex > 0 ? `${actionIndex} actions completed` : 'Starting playback...'}
-                {totalActions > actionIndex && `, ${totalActions - actionIndex} remaining`}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Playback Controls - preserved functionality */}
-      {hasRecordings && status === 'idle' && (
-        <div className="playback-controls-container">
-          {/* Script Selection */}
-          <div className="script-selection-container">
-            <span className="script-selection-label">Selected Script:</span>
-            <button
-              className="script-selection-button"
-              onClick={openScriptSelector}
-              disabled={loading}
-            >
-              <span className="script-selection-text">
-                {getSelectedScriptName()}
-              </span>
-              <span className="script-selection-icon">▼</span>
-            </button>
-          </div>
-
-          {/* Playback Speed Control */}
-          <div className="speed-control-container">
-            <span className="speed-control-label">Playback Speed: {playbackSpeed}x</span>
-            <div className="speed-buttons-container">
-              <button
-                className={`speed-button ${playbackSpeed === 0.5 ? 'active' : ''}`}
-                onClick={() => setPlaybackSpeed(0.5)}
-                disabled={loading}
-              >
-                0.5x
-              </button>
-              <button
-                className={`speed-button ${playbackSpeed === 1.0 ? 'active' : ''}`}
-                onClick={() => setPlaybackSpeed(1.0)}
-                disabled={loading}
-              >
-                1x
-              </button>
-              <button
-                className={`speed-button ${playbackSpeed === 1.5 ? 'active' : ''}`}
-                onClick={() => setPlaybackSpeed(1.5)}
-                disabled={loading}
-              >
-                1.5x
-              </button>
-              <button
-                className={`speed-button ${playbackSpeed === 2.0 ? 'active' : ''}`}
-                onClick={() => setPlaybackSpeed(2.0)}
-                disabled={loading}
-              >
-                2x
-              </button>
-              <button
-                className={`speed-button ${playbackSpeed === 5.0 ? 'active' : ''}`}
-                onClick={() => setPlaybackSpeed(5.0)}
-                disabled={loading}
-              >
-                5x
-              </button>
-            </div>
-          </div>
-
-          {/* Loop/Repeat Control */}
-          <div className="loop-control-container">
-            <span className="loop-control-label">
-              Loop Count: {loopCount === 0 ? '∞ (Infinite)' : `${loopCount}x`}
-            </span>
-            <div className="loop-buttons-container">
-              <button
-                className={`loop-button ${loopCount === 1 ? 'active' : ''}`}
-                onClick={() => setLoopCount(1)}
-                disabled={loading}
-              >
-                Once
-              </button>
-              <button
-                className={`loop-button ${loopCount === 2 ? 'active' : ''}`}
-                onClick={() => setLoopCount(2)}
-                disabled={loading}
-              >
-                2x
-              </button>
-              <button
-                className={`loop-button ${loopCount === 3 ? 'active' : ''}`}
-                onClick={() => setLoopCount(3)}
-                disabled={loading}
-              >
-                3x
-              </button>
-              <button
-                className={`loop-button ${loopCount === 5 ? 'active' : ''}`}
-                onClick={() => setLoopCount(5)}
-                disabled={loading}
-              >
-                5x
-              </button>
-              <button
-                className={`loop-button ${loopCount === 0 ? 'active' : ''}`}
-                onClick={() => setLoopCount(0)}
-                disabled={loading}
-              >
-                ∞
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Pause/Resume Button for Playing State */}
-      {status === 'playing' && (
-        <div className="playback-pause-container">
-          <button
-            className="pause-resume-button"
-            onClick={handlePauseClick}
-          >
-            {isPaused ? 'Resume' : 'Pause'}
-          </button>
-        </div>
-      )}
-
-      {/* Top Toolbar - Requirements: 4.1, 4.2, 4.3, 4.4, 4.5 */}
+      {/* Enhanced Top Toolbar with integrated controls */}
       <div className="toolbar-area">
-        <TopToolbar
+        <EnhancedTopToolbar
           hasRecordings={hasRecordings}
           onRecordStart={handleRecordStart}
           onRecordStop={handleRecordStop}
@@ -1172,11 +946,28 @@ const UnifiedRecorderContent: React.FC = () => {
           onOpen={handleOpen}
           onClear={handleClear}
           onSettings={handleSettings}
+          // Script selection props
+          selectedScriptName={getSelectedScriptName()}
+          onScriptSelect={openScriptSelector}
+          // Playback controls props
+          playbackSpeed={playbackSpeed}
+          onPlaybackSpeedChange={setPlaybackSpeed}
+          loopCount={loopCount}
+          onLoopCountChange={setLoopCount}
+          // Status props
+          status={status}
+          loading={loading}
+          recordingTime={recordingTime}
+          playbackProgress={playbackProgress}
+          actionIndex={actionIndex}
+          totalActions={totalActions}
+          isPaused={isPaused}
+          isPlaybackComplete={isPlaybackComplete}
         />
       </div>
 
-      {/* Editor Area - Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 6.1, 6.2, 6.3, 6.4, 6.5 */}
-      <div className="editor-area">
+      {/* Editor Area */}
+      <div className={`editor-area ${state.editorVisible ? 'visible' : 'hidden'}`}>
         <EditorArea
           script={state.currentScript}
           recordingSession={state.recordingSession}
@@ -1338,8 +1129,8 @@ const UnifiedRecorderScreen: React.FC = () => {
   return (
     <UnifiedInterfaceProvider>
       <div className="unified-recorder-screen">
-        {/*<UnifiedRecorderContent />*/}
-        <SimpleUnifiedInterface />
+        <UnifiedRecorderContent />
+        {/*<SimpleUnifiedInterface />*/}
       </div>
     </UnifiedInterfaceProvider>
   );

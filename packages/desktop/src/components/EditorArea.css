@@ -41,16 +41,19 @@
   align-items: center;
   justify-content: space-between;
   height: var(--editor-header-height);
-  padding: 0 var(--toolbar-padding);
+  padding: 8px var(--toolbar-padding);
   background: var(--secondary-bg);
   border-bottom: 1px solid var(--border-light);
   flex-shrink: 0;
+  min-height: 48px; /* Ensure minimum height */
 }
 
 .editor-title {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
+  min-width: 0; /* Allow text truncation */
+  flex: 1;
 }
 
 .editor-title-text {
@@ -58,12 +61,21 @@
   font-weight: var(--font-weight-semibold);
   color: var(--text-primary);
   font-family: var(--font-family-system);
+  margin: 0;
+  line-height: 1.2;
 }
 
 .editor-subtitle {
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
   font-family: var(--font-family-system);
+  margin: 0;
+  line-height: 1.2;
+  word-break: break-all; /* Allow long filenames to break */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300px; /* Limit width to prevent overflow */
 }
 
 .editor-controls {
@@ -161,6 +173,124 @@
   font-family: var(--font-family-system);
   color: var(--text-secondary);
   line-height: var(--line-height-base);
+  margin-bottom: 24px;
+}
+
+/* Load Script Interface Styles */
+.load-script-interface {
+  margin-top: 24px;
+  padding: 20px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  text-align: left;
+  max-width: 400px;
+}
+
+.load-script-section {
+  margin-bottom: 16px;
+}
+
+.load-script-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.load-script-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.load-script-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  line-height: 1.4;
+}
+
+.load-script-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #2196f3;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  justify-content: center;
+}
+
+.load-script-button:hover {
+  background: #1976d2;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+}
+
+.load-script-button:active {
+  transform: translateY(0);
+}
+
+.load-script-button-icon {
+  font-size: 16px;
+}
+
+.load-script-button-text {
+  font-weight: 500;
+}
+
+.load-script-divider {
+  display: flex;
+  align-items: center;
+  margin: 16px 0;
+  position: relative;
+}
+
+.load-script-divider::before {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #dee2e6;
+}
+
+.load-script-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #dee2e6;
+}
+
+.load-script-divider-text {
+  padding: 0 12px;
+  font-size: 12px;
+  color: #6c757d;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.record-without-script-section {
+  text-align: center;
+}
+
+.record-without-script-text {
+  font-size: 14px;
+  color: #495057;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.record-without-script-hint {
+  font-size: 12px;
+  color: #6c757d;
+  line-height: 1.4;
 }
 
 /* Action item styles */

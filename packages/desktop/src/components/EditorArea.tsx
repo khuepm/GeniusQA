@@ -175,6 +175,42 @@ const ActionList: React.FC<{
                 : 'Click Record to start capturing actions'
               }
             </div>
+
+            {/* Load Script Interface - shown when not recording */}
+            {!recordingActive && (
+              <div className="load-script-interface">
+                <div className="load-script-section">
+                  <div className="load-script-header">
+                    <div className="load-script-icon">📋</div>
+                    <div className="load-script-title">Load a test script to record actions for specific test steps</div>
+                  </div>
+                  <button
+                    className="load-script-button"
+                    onClick={() => {
+                      // Dispatch event to open script loader
+                      window.dispatchEvent(new CustomEvent('open-script-loader-for-recording'));
+                    }}
+                    aria-label="Load script for step-based recording"
+                  >
+                    <span className="load-script-button-icon">📁</span>
+                    <span className="load-script-button-text">Load Script for Recording</span>
+                  </button>
+                </div>
+
+                <div className="load-script-divider">
+                  <span className="load-script-divider-text">Or</span>
+                </div>
+
+                <div className="record-without-script-section">
+                  <div className="record-without-script-text">
+                    Record without a script - actions will be saved to a new recording
+                  </div>
+                  <div className="record-without-script-hint">
+                    Click the Record button in the toolbar to start capturing actions
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       );
@@ -518,8 +554,7 @@ const CodeView: React.FC<{
       // For now, we just update the script content
       const updatedScript: ScriptFile = {
         ...script,
-        content: codeContent,
-        lastModified: Date.now()
+        content: codeContent
       };
       onScriptChange(updatedScript);
     }
