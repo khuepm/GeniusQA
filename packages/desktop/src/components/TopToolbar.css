@@ -1,0 +1,428 @@
+/**
+ * TopToolbar Styles
+ * Styles for the main toolbar with visual hierarchy and theming
+ * Requirements: 4.1, 4.2, 4.3, 4.4, 8.1, 8.2, 8.3, 8.4, 8.5
+ */
+
+/* Import design system */
+@import '../styles/design-system.css';
+
+/* Main toolbar container - Requirements: 4.1, 4.2, 4.3, 8.1, 8.2 */
+.top-toolbar {
+  display: flex;
+  align-items: center;
+  height: var(--toolbar-height);
+  background: var(--toolbar-bg);
+  border-bottom: 1px solid var(--border-light);
+  padding: 0 var(--toolbar-padding);
+  gap: var(--button-group-gap);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10; /* Ensure toolbar is above editor content */
+  /* Performance optimization: Use transform for smooth animations */
+  will-change: transform, background-color;
+  transform: translateZ(0); /* Force hardware acceleration */
+}
+
+/* Toolbar visual hierarchy - Requirements: 8.3, 8.4, 8.5 */
+.top-toolbar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    var(--border-medium) 20%, 
+    var(--border-medium) 80%, 
+    transparent 100%
+  );
+  opacity: 0.5;
+}
+
+/* Toolbar groups - Requirements: 4.4, 8.4 */
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: var(--button-gap);
+  position: relative;
+  /* Performance optimization: Use transform for smooth group animations */
+  will-change: transform;
+  transform: translateZ(0);
+  transition: transform var(--transition-fast);
+}
+
+.toolbar-group:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  right: calc(var(--button-group-gap) / -2);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 20px;
+  background: var(--border-light);
+  opacity: 0.6;
+}
+
+/* Group labels for accessibility */
+.toolbar-group[aria-label]::before {
+  content: attr(aria-label);
+  position: absolute;
+  top: -20px;
+  left: 0;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  font-family: var(--font-family-system);
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  pointer-events: none;
+}
+
+.toolbar-group:hover[aria-label]::before {
+  opacity: 1;
+}
+
+/* Recording group - Requirements: 8.3, 8.5 */
+.toolbar-group.recording-group {
+  /* Primary action group styling */
+}
+
+.toolbar-group.recording-group .toolbar-button {
+  /* Enhanced visual prominence for recording controls */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: all var(--transition-fast), transform var(--transition-fast);
+}
+
+.toolbar-group.recording-group .toolbar-button:hover:not(.disabled) {
+  box-shadow: var(--shadow-sm);
+  /* Smooth transform animation */
+  transform: translateY(-2px) translateZ(0);
+}
+
+/* Playback group - Requirements: 8.3, 8.5 */
+.toolbar-group.playback-group {
+  /* Secondary action group styling */
+}
+
+/* Editor group - Requirements: 8.3, 8.5 */
+.toolbar-group.editor-group {
+  /* Tertiary action group styling */
+}
+
+/* Settings group - Requirements: 8.3, 8.5 */
+.toolbar-group.settings-group {
+  margin-left: auto; /* Push to right side */
+}
+
+/* Toolbar spacing and padding - Requirements: 8.4, 8.5 */
+.top-toolbar {
+  /* Comfortable interaction spacing */
+  min-height: var(--toolbar-height);
+  padding-top: calc(var(--button-padding) / 2);
+  padding-bottom: calc(var(--button-padding) / 2);
+}
+
+/* Toolbar button spacing within groups */
+.toolbar-group .toolbar-button + .toolbar-button {
+  margin-left: var(--button-gap);
+}
+
+/* Visual hierarchy indicators - Requirements: 8.1, 8.2, 8.3 */
+.top-toolbar.recording-active {
+  background: linear-gradient(135deg, 
+    var(--toolbar-bg) 0%, 
+    rgba(244, 67, 54, 0.05) 100%
+  );
+  border-bottom-color: rgba(244, 67, 54, 0.2);
+}
+
+.top-toolbar.playing-active {
+  background: linear-gradient(135deg, 
+    var(--toolbar-bg) 0%, 
+    rgba(76, 175, 80, 0.05) 100%
+  );
+  border-bottom-color: rgba(76, 175, 80, 0.2);
+}
+
+/* Toolbar state indicators */
+.toolbar-status-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: transparent;
+  transition: background var(--transition-base);
+}
+
+.toolbar-status-indicator.recording {
+  background: var(--accent-danger);
+}
+
+.toolbar-status-indicator.playing {
+  background: var(--accent-success);
+}
+
+/* Responsive toolbar adjustments - Requirements: 8.4, 8.5 */
+@media (max-width: 768px) {
+  .top-toolbar {
+    padding: 0 var(--px-md);
+    gap: var(--gap-md);
+  }
+  
+  .toolbar-group {
+    gap: var(--gap-xs);
+  }
+  
+  .toolbar-group:not(:last-child)::after {
+    display: none; /* Hide separators on small screens */
+  }
+}
+
+@media (max-width: 480px) {
+  .top-toolbar {
+    padding: 0 var(--px-sm);
+    gap: var(--gap-sm);
+  }
+  
+  .toolbar-group.settings-group {
+    margin-left: var(--gap-sm); /* Reduce auto margin on very small screens */
+  }
+}
+
+/* High contrast mode - Requirements: 8.3 */
+@media (prefers-contrast: high) {
+  .top-toolbar {
+    border-bottom-width: 2px;
+    border-bottom-color: #000000;
+  }
+  
+  .toolbar-group:not(:last-child)::after {
+    background: #000000;
+    width: 2px;
+  }
+  
+  .top-toolbar::before {
+    display: none; /* Remove subtle gradient in high contrast */
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .toolbar-group.recording-group .toolbar-button:hover:not(.disabled) {
+    transform: none;
+  }
+  
+  .toolbar-status-indicator {
+    transition: none;
+  }
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .top-toolbar.recording-active {
+    background: linear-gradient(135deg, 
+      var(--toolbar-bg) 0%, 
+      rgba(244, 67, 54, 0.1) 100%
+    );
+  }
+  
+  .top-toolbar.playing-active {
+    background: linear-gradient(135deg, 
+      var(--toolbar-bg) 0%, 
+      rgba(76, 175, 80, 0.1) 100%
+    );
+  }
+}
+
+/* Focus management for keyboard navigation */
+.top-toolbar:focus-within {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
+/* Toolbar accessibility enhancements */
+.top-toolbar[role="toolbar"] {
+  /* ARIA toolbar role styling */
+}
+
+.toolbar-group[role="group"] {
+  /* ARIA group role styling */
+}
+
+/* Visual separation between toolbar and content - Requirements: 8.1, 8.2 */
+.top-toolbar + * {
+  border-top: none; /* Ensure no double borders */
+}
+
+/* Toolbar shadow for depth - Requirements: 8.1, 8.2, 8.3 */
+.top-toolbar {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Hover effects for entire toolbar groups */
+.toolbar-group:hover {
+  /* Subtle group hover effect */
+}
+
+.toolbar-group:hover .toolbar-button:not(:hover):not(.active):not(.disabled) {
+  opacity: 0.7;
+  transition: opacity var(--transition-fast);
+}
+
+/* Active state management for toolbar */
+.top-toolbar.has-active-button {
+  /* Styling when any button is active */
+}
+
+/* Toolbar loading state */
+.top-toolbar.loading {
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.top-toolbar.loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    rgba(25, 118, 210, 0.1) 50%, 
+    transparent 100%
+  );
+  animation: toolbarLoading 2s infinite;
+}
+
+@keyframes toolbarLoading {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Toolbar error state */
+.top-toolbar.error {
+  border-bottom-color: var(--accent-danger);
+  background: linear-gradient(135deg, 
+    var(--toolbar-bg) 0%, 
+    rgba(244, 67, 54, 0.05) 100%
+  );
+}
+
+/* Toolbar success state */
+.top-toolbar.success {
+  border-bottom-color: var(--accent-success);
+  background: linear-gradient(135deg, 
+    var(--toolbar-bg) 0%, 
+    rgba(76, 175, 80, 0.05) 100%
+  );
+}
+/* Accessibility and Focus Management */
+.top-toolbar:focus-within {
+  outline: 2px solid var(--accent-primary, #1976d2);
+  outline-offset: -2px;
+}
+
+/* Keyboard navigation support */
+.toolbar-group {
+  position: relative;
+}
+
+.toolbar-group:focus-within::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border: 1px solid var(--accent-primary, #1976d2);
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* Error state styles */
+.top-toolbar.error {
+  background: var(--accent-danger-light, #ffebee);
+  border-bottom-color: var(--accent-danger, #f44336);
+}
+
+.toolbar-error-message {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--accent-danger, #f44336);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.toolbar-error-message button {
+  padding: 4px 8px;
+  background: var(--accent-danger, #f44336);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.toolbar-error-message button:hover {
+  background: var(--accent-danger-dark, #d32f2f);
+}
+
+.toolbar-error-message button:focus {
+  outline: 2px solid var(--accent-danger, #f44336);
+  outline-offset: 2px;
+}
+
+.toolbar-group.error {
+  opacity: 0.5;
+}
+
+.toolbar-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--accent-warning, #ff9800);
+  font-size: 16px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .top-toolbar {
+    border-bottom: 2px solid;
+  }
+  
+  .toolbar-group {
+    border: 1px solid transparent;
+  }
+  
+  .toolbar-group:focus-within {
+    border-color: currentColor;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .toolbar-group:focus-within::after {
+    transition: none;
+  }
+}
+
+/* Screen reader announcements */
+.toolbar-status-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

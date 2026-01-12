@@ -22,7 +22,7 @@ import './AIChatInterface.css';
  * Format timestamp for display
  */
 const formatTimestamp = (date: Date): string => {
-  return date.toLocaleTimeString('vi-VN', {
+  return date.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
   });
@@ -68,7 +68,7 @@ const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({ providerName }) => 
       <span className="chat-loading-dot"></span>
     </div>
     <span className="chat-loading-text">
-      {providerName ? `${providerName} đang xử lý...` : 'AI đang xử lý...'}
+      {providerName ? `${providerName} is processing...` : 'AI is processing...'}
     </span>
   </div>
 );
@@ -94,7 +94,7 @@ const SuggestionDropdown: React.FC<SuggestionDropdownProps> = ({
 
   return (
     <div className="chat-suggestions-dropdown" data-testid="suggestions-dropdown">
-      <div className="chat-suggestions-header">Gợi ý hành động:</div>
+      <div className="chat-suggestions-header">Action suggestions:</div>
       {suggestions.map((suggestion, index) => (
         <button
           key={`${suggestion.actionType}-${index}`}
@@ -127,7 +127,7 @@ const ExamplePromptsPanel: React.FC<ExamplePromptsPanelProps> = ({
     <div className="chat-examples-panel" data-testid="examples-panel">
       <div className="chat-examples-header">
         <span className="chat-examples-icon">💡</span>
-        <span>Ví dụ kịch bản test</span>
+        <span>Example test scenarios</span>
       </div>
       <div className="chat-examples-grid">
         {examples.map((example) => (
@@ -231,7 +231,7 @@ const ClarificationQuestions: React.FC<ClarificationQuestionsProps> = ({
 
   return (
     <div className="chat-clarification" data-testid="clarification-questions">
-      <div className="chat-clarification-header">AI cần thêm thông tin:</div>
+      <div className="chat-clarification-header">AI needs more information:</div>
       {filteredQuestions.map((question, index) => (
         <div key={index} className="chat-clarification-row">
           <button
@@ -273,16 +273,16 @@ interface ApiKeyPromptProps {
 const ApiKeyPrompt: React.FC<ApiKeyPromptProps> = ({ onConfigureKey }) => (
   <div className="chat-api-key-prompt" data-testid="api-key-prompt">
     <div className="chat-api-key-icon">🔑</div>
-    <h3 className="chat-api-key-title">Cấu hình API Key</h3>
+    <h3 className="chat-api-key-title">Configure API Key</h3>
     <p className="chat-api-key-description">
-      Để sử dụng tính năng AI Script Builder, bạn cần cấu hình Gemini API key.
+      To use the AI Script Builder feature, you need to configure a Gemini API key.
     </p>
     <button
       className="chat-api-key-button"
       onClick={onConfigureKey}
       data-testid="configure-api-key-button"
     >
-      Cấu hình API Key
+      Configure API Key
     </button>
   </div>
 );
@@ -443,7 +443,7 @@ export const AIChatInterface: React.FC<ChatInterfaceProps> = ({
   const handleConfigureApiKey = () => {
     // This will be handled by parent component
     // For now, we'll just show an alert
-    alert('Vui lòng cấu hình API key trong phần Settings');
+    alert('Please configure the API key in Settings');
   };
 
   /**
@@ -586,7 +586,7 @@ export const AIChatInterface: React.FC<ChatInterfaceProps> = ({
         <div className="chat-header-top">
           <div className="chat-header-title">
             <h2 className="chat-title">AI Script Builder</h2>
-            <p className="chat-subtitle">Mô tả kịch bản test của bạn bằng ngôn ngữ tự nhiên</p>
+            <p className="chat-subtitle">Describe your test scenario in natural language</p>
           </div>
 
           {/* Provider and Model Selectors - Requirements: 2.1, 2.5, 3.1 */}
@@ -644,10 +644,10 @@ export const AIChatInterface: React.FC<ChatInterfaceProps> = ({
           <div className="chat-empty-state">
             <div className="chat-empty-icon">💬</div>
             <p className="chat-empty-text">
-              Bắt đầu bằng cách mô tả kịch bản automation test bạn muốn tạo.
+              Start by describing the automation test scenario you want to create.
             </p>
             <p className="chat-empty-hint">
-              Ví dụ: "Click vào nút Login, nhập username và password, sau đó nhấn Enter"
+              Example: "Click the Login button, enter username and password, then press Enter"
             </p>
 
             {/* Example prompts panel (Requirements: 5.1) */}
@@ -696,7 +696,7 @@ export const AIChatInterface: React.FC<ChatInterfaceProps> = ({
             onKeyDown={handleKeyDown}
             onFocus={() => setShowSuggestions(suggestions.length > 0)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-            placeholder="Mô tả kịch bản test của bạn..."
+            placeholder="Describe your test scenario..."
             disabled={isLoading}
             rows={1}
             data-testid="chat-input"

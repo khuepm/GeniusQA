@@ -17,7 +17,7 @@ const DashboardScreen: React.FC = () => {
   };
 
   const handleNavigateToRecorder = () => {
-    navigate('/recorder');
+    navigate('/unified-recorder');
   };
 
   /**

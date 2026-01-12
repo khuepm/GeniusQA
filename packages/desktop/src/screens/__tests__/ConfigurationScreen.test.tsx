@@ -1,10 +1,20 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { ConfigurationScreen } from '../ConfigurationScreen';
 import { FocusLossStrategy } from '../../types/applicationFocusedAutomation.types';
 
 // Mock console.log to avoid noise in tests
 const mockConsoleLog = jest.spyOn(console, 'log').mockImplementation(() => { });
+
+// Helper function to render ConfigurationScreen with Router context
+const renderWithRouter = (component: React.ReactElement) => {
+  return render(
+    <MemoryRouter>
+      {component}
+    </MemoryRouter>
+  );
+};
 
 describe('ConfigurationScreen', () => {
   beforeEach(() => {
@@ -16,7 +26,7 @@ describe('ConfigurationScreen', () => {
   });
 
   it('renders loading state initially', async () => {
-    render(<ConfigurationScreen />);
+    renderWithRouter(<ConfigurationScreen />);
 
     // The loading state might resolve very quickly with mock data
     // So we check if either loading is shown or the form is already loaded
@@ -27,7 +37,7 @@ describe('ConfigurationScreen', () => {
   });
 
   it('renders configuration form after loading', async () => {
-    render(<ConfigurationScreen />);
+    renderWithRouter(<ConfigurationScreen />);
 
     // Wait for loading to complete
     await waitFor(() => {
@@ -43,7 +53,7 @@ describe('ConfigurationScreen', () => {
   });
 
   it('renders default configuration values', async () => {
-    render(<ConfigurationScreen />);
+    renderWithRouter(<ConfigurationScreen />);
 
     await waitFor(() => {
       expect(screen.queryByText('Loading configuration...')).not.toBeInTheDocument();
@@ -66,7 +76,7 @@ describe('ConfigurationScreen', () => {
   });
 
   it('updates numeric input values', async () => {
-    render(<ConfigurationScreen />);
+    renderWithRouter(<ConfigurationScreen />);
 
     await waitFor(() => {
       expect(screen.queryByText('Loading configuration...')).not.toBeInTheDocument();
@@ -80,7 +90,7 @@ describe('ConfigurationScreen', () => {
   });
 
   it('updates checkbox values', async () => {
-    render(<ConfigurationScreen />);
+    renderWithRouter(<ConfigurationScreen />);
 
     await waitFor(() => {
       expect(screen.queryByText('Loading configuration...')).not.toBeInTheDocument();
@@ -96,7 +106,7 @@ describe('ConfigurationScreen', () => {
   });
 
   it('updates select values', async () => {
-    render(<ConfigurationScreen />);
+    renderWithRouter(<ConfigurationScreen />);
 
     await waitFor(() => {
       expect(screen.queryByText('Loading configuration...')).not.toBeInTheDocument();
@@ -110,7 +120,7 @@ describe('ConfigurationScreen', () => {
   });
 
   it('validates configuration on save', async () => {
-    render(<ConfigurationScreen />);
+    renderWithRouter(<ConfigurationScreen />);
 
     await waitFor(() => {
       expect(screen.queryByText('Loading configuration...')).not.toBeInTheDocument();
@@ -129,7 +139,7 @@ describe('ConfigurationScreen', () => {
   });
 
   it('shows success message after saving valid configuration', async () => {
-    render(<ConfigurationScreen />);
+    renderWithRouter(<ConfigurationScreen />);
 
     await waitFor(() => {
       expect(screen.queryByText('Loading configuration...')).not.toBeInTheDocument();
@@ -146,7 +156,7 @@ describe('ConfigurationScreen', () => {
   });
 
   it('resets configuration to defaults', async () => {
-    render(<ConfigurationScreen />);
+    renderWithRouter(<ConfigurationScreen />);
 
     await waitFor(() => {
       expect(screen.queryByText('Loading configuration...')).not.toBeInTheDocument();
@@ -167,7 +177,7 @@ describe('ConfigurationScreen', () => {
   });
 
   it('reloads configuration', async () => {
-    render(<ConfigurationScreen />);
+    renderWithRouter(<ConfigurationScreen />);
 
     await waitFor(() => {
       expect(screen.queryByText('Loading configuration...')).not.toBeInTheDocument();
@@ -189,7 +199,7 @@ describe('ConfigurationScreen', () => {
   });
 
   it('validates all numeric field ranges', async () => {
-    render(<ConfigurationScreen />);
+    renderWithRouter(<ConfigurationScreen />);
 
     await waitFor(() => {
       expect(screen.queryByText('Loading configuration...')).not.toBeInTheDocument();
@@ -238,7 +248,7 @@ describe('ConfigurationScreen', () => {
   });
 
   it('disables buttons while saving', async () => {
-    render(<ConfigurationScreen />);
+    renderWithRouter(<ConfigurationScreen />);
 
     await waitFor(() => {
       expect(screen.queryByText('Loading configuration...')).not.toBeInTheDocument();
@@ -262,7 +272,7 @@ describe('ConfigurationScreen', () => {
   });
 
   it('clears error messages when configuration is updated', async () => {
-    render(<ConfigurationScreen />);
+    renderWithRouter(<ConfigurationScreen />);
 
     await waitFor(() => {
       expect(screen.queryByText('Loading configuration...')).not.toBeInTheDocument();
@@ -286,7 +296,7 @@ describe('ConfigurationScreen', () => {
   });
 
   it('dismisses error messages', async () => {
-    render(<ConfigurationScreen />);
+    renderWithRouter(<ConfigurationScreen />);
 
     await waitFor(() => {
       expect(screen.queryByText('Loading configuration...')).not.toBeInTheDocument();

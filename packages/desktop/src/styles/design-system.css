@@ -1,0 +1,415 @@
+/**
+ * GeniusQA Desktop UI Design System
+ * Comprehensive CSS custom properties for consistent theming
+ * Requirements: 8.3, 8.4, 8.5
+ */
+
+:root {
+  /* Primary Colors */
+  --primary-bg: #ffffff;
+  --secondary-bg: #f8f9fa;
+  --toolbar-bg: #f1f3f4;
+  
+  /* Accent Colors */
+  --accent-primary: #1976d2;
+  --accent-success: #4caf50;
+  --accent-warning: #ff9800;
+  --accent-danger: #f44336;
+  
+  /* Text Colors */
+  --text-primary: #212529;
+  --text-secondary: #6c757d;
+  --text-muted: #adb5bd;
+  
+  /* Border Colors */
+  --border-light: #e9ecef;
+  --border-medium: #dee2e6;
+  --border-dark: #adb5bd;
+  
+  /* Button States */
+  --button-hover: rgba(25, 118, 210, 0.08);
+  --button-active: rgba(25, 118, 210, 0.12);
+  --button-disabled: rgba(0, 0, 0, 0.04);
+  
+  /* Button Size */
+  --button-size: 32px;
+  --button-icon-size: 16px;
+  --button-border-radius: 4px;
+  
+  /* Spacing and Layout */
+  --toolbar-height: 48px;
+  --toolbar-padding: 16px;
+  --button-group-gap: 16px;
+  --button-gap: 4px;
+  --button-padding: 8px;
+  
+  /* Typography */
+  --font-family-system: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-family-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
+  
+  /* Font Sizes */
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-base: 13px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  
+  /* Font Weights */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  
+  /* Line Heights */
+  --line-height-tight: 1.2;
+  --line-height-base: 1.4;
+  --line-height-relaxed: 1.5;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.15);
+  
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.2s ease;
+  --transition-slow: 0.3s ease;
+  
+  /* Z-Index Scale */
+  --z-index-dropdown: 1000;
+  --z-index-tooltip: 1010;
+  --z-index-modal: 1020;
+  --z-index-overlay: 1030;
+  
+  /* Editor Specific */
+  --editor-min-height: 200px;
+  --editor-header-height: 48px;
+  --editor-status-height: 32px;
+  
+  /* Action Item Colors */
+  --action-item-bg: var(--primary-bg);
+  --action-item-border: var(--border-light);
+  --action-item-hover-border: var(--border-medium);
+  --action-item-selected-border: var(--accent-primary);
+  --action-item-selected-bg: rgba(25, 118, 210, 0.04);
+  --action-item-latest-border: var(--accent-success);
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Primary Colors - Dark Mode */
+    --primary-bg: #1a1a1a;
+    --secondary-bg: #2d2d2d;
+    --toolbar-bg: #252525;
+    
+    /* Text Colors - Dark Mode */
+    --text-primary: #ffffff;
+    --text-secondary: #b3b3b3;
+    --text-muted: #808080;
+    
+    /* Border Colors - Dark Mode */
+    --border-light: #404040;
+    --border-medium: #4d4d4d;
+    --border-dark: #666666;
+    
+    /* Button States - Dark Mode */
+    --button-hover: rgba(25, 118, 210, 0.15);
+    --button-active: rgba(25, 118, 210, 0.25);
+    --button-disabled: rgba(255, 255, 255, 0.08);
+    
+    /* Action Item Colors - Dark Mode */
+    --action-item-bg: var(--primary-bg);
+    --action-item-border: var(--border-light);
+    --action-item-hover-border: var(--border-medium);
+    --action-item-selected-bg: rgba(25, 118, 210, 0.15);
+  }
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  :root {
+    /* Enhanced contrast colors */
+    --border-light: #000000;
+    --border-medium: #000000;
+    --border-dark: #000000;
+    --button-hover: rgba(0, 0, 0, 0.1);
+    --button-active: rgba(0, 0, 0, 0.2);
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-fast: none;
+    --transition-base: none;
+    --transition-slow: none;
+  }
+}
+
+/* Typography Classes */
+.text-xs {
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-tight);
+}
+
+.text-sm {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
+}
+
+.text-base {
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+}
+
+.text-md {
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-base);
+}
+
+.text-lg {
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-relaxed);
+}
+
+.font-normal {
+  font-weight: var(--font-weight-normal);
+}
+
+.font-medium {
+  font-weight: var(--font-weight-medium);
+}
+
+.font-semibold {
+  font-weight: var(--font-weight-semibold);
+}
+
+.font-bold {
+  font-weight: var(--font-weight-bold);
+}
+
+.font-mono {
+  font-family: var(--font-family-mono);
+}
+
+.font-system {
+  font-family: var(--font-family-system);
+}
+
+/* Color Classes */
+.text-primary {
+  color: var(--text-primary);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+.text-accent {
+  color: var(--accent-primary);
+}
+
+.text-success {
+  color: var(--accent-success);
+}
+
+.text-warning {
+  color: var(--accent-warning);
+}
+
+.text-danger {
+  color: var(--accent-danger);
+}
+
+/* Background Classes */
+.bg-primary {
+  background-color: var(--primary-bg);
+}
+
+.bg-secondary {
+  background-color: var(--secondary-bg);
+}
+
+.bg-toolbar {
+  background-color: var(--toolbar-bg);
+}
+
+/* Border Classes */
+.border-light {
+  border-color: var(--border-light);
+}
+
+.border-medium {
+  border-color: var(--border-medium);
+}
+
+.border-dark {
+  border-color: var(--border-dark);
+}
+
+/* Spacing Classes */
+.p-xs {
+  padding: 4px;
+}
+
+.p-sm {
+  padding: 8px;
+}
+
+.p-md {
+  padding: 12px;
+}
+
+.p-lg {
+  padding: 16px;
+}
+
+.px-xs {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.px-sm {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.px-md {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.px-lg {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.py-xs {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.py-sm {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.py-md {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.py-lg {
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+
+.gap-xs {
+  gap: 4px;
+}
+
+.gap-sm {
+  gap: 8px;
+}
+
+.gap-md {
+  gap: 12px;
+}
+
+.gap-lg {
+  gap: 16px;
+}
+
+/* Shadow Classes */
+.shadow-sm {
+  box-shadow: var(--shadow-sm);
+}
+
+.shadow-md {
+  box-shadow: var(--shadow-md);
+}
+
+.shadow-lg {
+  box-shadow: var(--shadow-lg);
+}
+
+/* Transition Classes */
+.transition-fast {
+  transition: all var(--transition-fast);
+}
+
+.transition-base {
+  transition: all var(--transition-base);
+}
+
+.transition-slow {
+  transition: all var(--transition-slow);
+}
+
+/* Layout Classes */
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.flex-row {
+  flex-direction: row;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.flex-shrink-0 {
+  flex-shrink: 0;
+}
+
+/* Responsive Design Breakpoints */
+@media (max-width: 768px) {
+  :root {
+    --button-size: 28px;
+    --button-icon-size: 14px;
+    --toolbar-height: 44px;
+    --toolbar-padding: 12px;
+    --button-group-gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --button-size: 24px;
+    --button-icon-size: 12px;
+    --toolbar-height: 40px;
+    --toolbar-padding: 8px;
+    --button-group-gap: 8px;
+    --editor-min-height: 150px;
+  }
+}
+
+@media (max-height: 600px) {
+  :root {
+    --toolbar-height: 40px;
+    --editor-min-height: 120px;
+    --editor-header-height: 40px;
+  }
+}

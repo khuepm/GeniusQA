@@ -1,0 +1,162 @@
+/**
+ * Tooltip Component Styles
+ * Standalone tooltip with positioning logic and smooth animations
+ * Requirements: 3.2, 3.5, 9.4
+ */
+
+/* Base tooltip styles */
+.tooltip {
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  max-width: 200px;
+  word-wrap: break-word;
+  z-index: 1000;
+  pointer-events: none;
+  
+  /* Smooth show/hide animations - Requirements: 9.4 */
+  animation: tooltipFadeIn 0.15s ease;
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Tooltip arrow base */
+.tooltip::before {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
+
+/* Position-specific arrow styles */
+.tooltip-bottom::before {
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 0 4px 4px 4px;
+  border-color: transparent transparent rgba(0, 0, 0, 0.9) transparent;
+}
+
+.tooltip-top::before {
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 4px 4px 0 4px;
+  border-color: rgba(0, 0, 0, 0.9) transparent transparent transparent;
+}
+
+.tooltip-right::before {
+  left: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-width: 4px 4px 4px 0;
+  border-color: transparent rgba(0, 0, 0, 0.9) transparent transparent;
+}
+
+.tooltip-left::before {
+  right: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-width: 4px 0 4px 4px;
+  border-color: transparent transparent transparent rgba(0, 0, 0, 0.9);
+}
+
+/* Smooth fade-in animation - Requirements: 9.4 */
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .tooltip {
+    background: rgba(255, 255, 255, 0.9);
+    color: #000000;
+  }
+  
+  .tooltip-bottom::before {
+    border-color: transparent transparent rgba(255, 255, 255, 0.9) transparent;
+  }
+  
+  .tooltip-top::before {
+    border-color: rgba(255, 255, 255, 0.9) transparent transparent transparent;
+  }
+  
+  .tooltip-right::before {
+    border-color: transparent rgba(255, 255, 255, 0.9) transparent transparent;
+  }
+  
+  .tooltip-left::before {
+    border-color: transparent transparent transparent rgba(255, 255, 255, 0.9);
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .tooltip {
+    background: #000000;
+    border: 1px solid #ffffff;
+    color: #ffffff;
+  }
+  
+  .tooltip-bottom::before {
+    border-color: transparent transparent #000000 transparent;
+  }
+  
+  .tooltip-top::before {
+    border-color: #000000 transparent transparent transparent;
+  }
+  
+  .tooltip-right::before {
+    border-color: transparent #000000 transparent transparent;
+  }
+  
+  .tooltip-left::before {
+    border-color: transparent transparent transparent #000000;
+  }
+}
+
+/* Reduced motion support - Requirements: 9.4 */
+@media (prefers-reduced-motion: reduce) {
+  .tooltip {
+    animation: none;
+  }
+  
+  @keyframes tooltipFadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .tooltip {
+    font-size: 11px;
+    padding: 4px 6px;
+    max-width: 150px;
+  }
+}
+
+@media (max-height: 600px) {
+  .tooltip {
+    font-size: 11px;
+    padding: 4px 6px;
+  }
+}
