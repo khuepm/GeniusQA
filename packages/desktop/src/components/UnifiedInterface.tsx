@@ -4,7 +4,8 @@
  * Requirements: 1.1, 1.3, 1.4
  */
 
-import React, { createContext, useContext, useReducer, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode, useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { ErrorBoundary } from './ErrorBoundary';
 import './UnifiedInterface.css';
 
 // Application state types
@@ -123,53 +124,65 @@ const unifiedInterfaceReducer = (
 
   try {
     switch (action.type) {
-      case 'SET_MODE':
-        if (!validateApplicationMode(action.payload)) {
-          console.error('Invalid application mode:', action.payload);
+      case 'SET_MODE': {
+        const payload = (action as { type: 'SET_MODE'; payload: ApplicationMode }).payload;
+        if (!validateApplicationMode(payload)) {
+          console.error('Invalid application mode:', payload);
           return state;
         }
-        newState = { ...state, applicationMode: action.payload };
+        newState = { ...state, applicationMode: payload };
         break;
-      case 'SET_CURRENT_SCRIPT':
-        if (!validateScriptFile(action.payload)) {
-          console.error('Invalid script file:', action.payload);
+      }
+      case 'SET_CURRENT_SCRIPT': {
+        const payload = (action as { type: 'SET_CURRENT_SCRIPT'; payload: ScriptFile | null }).payload;
+        if (!validateScriptFile(payload)) {
+          console.error('Invalid script file:', payload);
           return state;
         }
-        newState = { ...state, currentScript: action.payload };
+        newState = { ...state, currentScript: payload };
         break;
-      case 'SET_RECORDING_SESSION':
-        if (!validateRecordingSession(action.payload)) {
-          console.error('Invalid recording session:', action.payload);
+      }
+      case 'SET_RECORDING_SESSION': {
+        const payload = (action as { type: 'SET_RECORDING_SESSION'; payload: RecordingSession | null }).payload;
+        if (!validateRecordingSession(payload)) {
+          console.error('Invalid recording session:', payload);
           return state;
         }
-        newState = { ...state, recordingSession: action.payload };
+        newState = { ...state, recordingSession: payload };
         break;
-      case 'SET_PLAYBACK_SESSION':
-        if (!validatePlaybackSession(action.payload)) {
-          console.error('Invalid playback session:', action.payload);
+      }
+      case 'SET_PLAYBACK_SESSION': {
+        const payload = (action as { type: 'SET_PLAYBACK_SESSION'; payload: PlaybackSession | null }).payload;
+        if (!validatePlaybackSession(payload)) {
+          console.error('Invalid playback session:', payload);
           return state;
         }
-        newState = { ...state, playbackSession: action.payload };
+        newState = { ...state, playbackSession: payload };
         break;
-      case 'SET_EDITOR_VISIBLE':
-        if (typeof action.payload !== 'boolean') {
-          console.error('Invalid editor visible value:', action.payload);
+      }
+      case 'SET_EDITOR_VISIBLE': {
+        const payload = (action as { type: 'SET_EDITOR_VISIBLE'; payload: boolean }).payload;
+        if (typeof payload !== 'boolean') {
+          console.error('Invalid editor visible value:', payload);
           return state;
         }
-        newState = { ...state, editorVisible: action.payload };
+        newState = { ...state, editorVisible: payload };
         break;
-      case 'SET_TOOLBAR_COLLAPSED':
-        if (typeof action.payload !== 'boolean') {
-          console.error('Invalid toolbar collapsed value:', action.payload);
+      }
+      case 'SET_TOOLBAR_COLLAPSED': {
+        const payload = (action as { type: 'SET_TOOLBAR_COLLAPSED'; payload: boolean }).payload;
+        if (typeof payload !== 'boolean') {
+          console.error('Invalid toolbar collapsed value:', payload);
           return state;
         }
-        newState = { ...state, toolbarCollapsed: action.payload };
+        newState = { ...state, toolbarCollapsed: payload };
         break;
+      }
       case 'RESET_STATE':
         newState = initialState;
         break;
       default:
-        console.warn('Unknown action type:', action);
+        console.warn('Unknown action type:', (action as any).type);
         return state;
     }
 
@@ -209,61 +222,61 @@ interface UnifiedInterfaceProviderProps {
 }
 
 // Context provider component
-export const UnifiedInterfaceProvider: React.FC<UnifiedInterfaceProviderProps> = ({ children }) => {
+export const UnifiedInterfaceProvider: React.FC<UnifiedInterfaceProviderProps> = React.memo(({ children }) => {
   const [state, dispatch] = useReducer(unifiedInterfaceReducer, initialState);
 
-  // Action helpers with validation
-  const setMode = (mode: ApplicationMode) => {
+  // Memoize action helpers with validation to prevent unnecessary re-renders
+  const setMode = useCallback((mode: ApplicationMode) => {
     if (!validateApplicationMode(mode)) {
       console.error('Invalid mode provided to setMode:', mode);
       return;
     }
     dispatch({ type: 'SET_MODE', payload: mode });
-  };
+  }, []);
 
-  const setCurrentScript = (script: ScriptFile | null) => {
+  const setCurrentScript = useCallback((script: ScriptFile | null) => {
     if (!validateScriptFile(script)) {
       console.error('Invalid script provided to setCurrentScript:', script);
       return;
     }
     dispatch({ type: 'SET_CURRENT_SCRIPT', payload: script });
-  };
+  }, []);
 
-  const setRecordingSession = (session: RecordingSession | null) => {
+  const setRecordingSession = useCallback((session: RecordingSession | null) => {
     if (!validateRecordingSession(session)) {
       console.error('Invalid recording session provided to setRecordingSession:', session);
       return;
     }
     dispatch({ type: 'SET_RECORDING_SESSION', payload: session });
-  };
+  }, []);
 
-  const setPlaybackSession = (session: PlaybackSession | null) => {
+  const setPlaybackSession = useCallback((session: PlaybackSession | null) => {
     if (!validatePlaybackSession(session)) {
       console.error('Invalid playback session provided to setPlaybackSession:', session);
       return;
     }
     dispatch({ type: 'SET_PLAYBACK_SESSION', payload: session });
-  };
+  }, []);
 
-  const setEditorVisible = (visible: boolean) => {
+  const setEditorVisible = useCallback((visible: boolean) => {
     if (typeof visible !== 'boolean') {
       console.error('Invalid visible value provided to setEditorVisible:', visible);
       return;
     }
     dispatch({ type: 'SET_EDITOR_VISIBLE', payload: visible });
-  };
+  }, []);
 
-  const setToolbarCollapsed = (collapsed: boolean) => {
+  const setToolbarCollapsed = useCallback((collapsed: boolean) => {
     if (typeof collapsed !== 'boolean') {
       console.error('Invalid collapsed value provided to setToolbarCollapsed:', collapsed);
       return;
     }
     dispatch({ type: 'SET_TOOLBAR_COLLAPSED', payload: collapsed });
-  };
+  }, []);
 
-  const resetState = () => {
+  const resetState = useCallback(() => {
     dispatch({ type: 'RESET_STATE' });
-  };
+  }, []);
 
   // Validate state on every render in development
   React.useEffect(() => {
@@ -274,7 +287,8 @@ export const UnifiedInterfaceProvider: React.FC<UnifiedInterfaceProviderProps> =
     }
   }, [state]);
 
-  const contextValue: UnifiedInterfaceContextType = {
+  // Memoize context value to prevent unnecessary re-renders
+  const contextValue: UnifiedInterfaceContextType = useMemo(() => ({
     state,
     dispatch,
     setMode,
@@ -284,14 +298,14 @@ export const UnifiedInterfaceProvider: React.FC<UnifiedInterfaceProviderProps> =
     setEditorVisible,
     setToolbarCollapsed,
     resetState,
-  };
+  }), [state, setMode, setCurrentScript, setRecordingSession, setPlaybackSession, setEditorVisible, setToolbarCollapsed, resetState]);
 
   return (
     <UnifiedInterfaceContext.Provider value={contextValue}>
       {children}
     </UnifiedInterfaceContext.Provider>
   );
-};
+});
 
 // Custom hook to use the context
 export const useUnifiedInterface = (): UnifiedInterfaceContextType => {
@@ -310,77 +324,178 @@ interface UnifiedInterfaceProps {
 /**
  * UnifiedInterface Component
  * Main container that provides the unified layout structure
- * Requirements: 1.1, 1.3, 1.4
+ * Requirements: 1.1, 1.3, 1.4, 6.2, 6.3, 6.5
  */
-export const UnifiedInterface: React.FC<UnifiedInterfaceProps> = ({ children }) => {
-  const { state, setMode } = useUnifiedInterface();
+export const UnifiedInterface: React.FC<UnifiedInterfaceProps> = React.memo(({ children }) => {
+  const { state } = useUnifiedInterface();
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [previousMode, setPreviousMode] = useState<ApplicationMode>('idle');
+  const editorScrollPositionRef = useRef<number>(0);
+  const editorContentRef = useRef<any>(null);
+
+  // Debounce rapid state changes to prevent excessive re-renders
+  const debouncedMode = useMemo(() => {
+    let timeoutId: NodeJS.Timeout;
+    return (mode: ApplicationMode) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        setPreviousMode(mode);
+      }, 50); // 50ms debounce
+    };
+  }, []);
+
+  // Memoize transition styles to prevent recalculation
+  const transitionStyles = useMemo(() => ({
+    // Prevent layout changes during transitions
+    transition: isTransitioning ? 'opacity 150ms ease-in-out, transform 150ms ease-in-out' : 'none',
+    opacity: isTransitioning ? 0.8 : 1,
+    transform: isTransitioning ? 'translateY(2px)' : 'translateY(0)'
+  }), [isTransitioning]);
+
+  // Error handling for component lifecycle
+  const handleComponentError = useCallback((error: Error, errorInfo: React.ErrorInfo) => {
+    console.error('UnifiedInterface error:', error, errorInfo);
+
+    // Attempt to recover by resetting to idle state
+    try {
+      // Reset to safe state if possible
+      window.dispatchEvent(new CustomEvent('interface-error-recovery'));
+    } catch (recoveryError) {
+      console.error('Failed to recover from interface error:', recoveryError);
+    }
+  }, []);
+
+  // Handle smooth mode transitions - Requirements: 6.2, 6.3, 6.5
+  useEffect(() => {
+    if (previousMode !== state.applicationMode) {
+      setIsTransitioning(true);
+
+      // Preserve editor scroll position during transitions
+      const editorElement = document.querySelector('.editor-area .editor-content');
+      if (editorElement) {
+        editorScrollPositionRef.current = editorElement.scrollTop;
+      }
+
+      // Smooth transition timing
+      const transitionTimer = setTimeout(() => {
+        setIsTransitioning(false);
+
+        // Restore editor scroll position after transition
+        const editorElementAfter = document.querySelector('.editor-area .editor-content');
+        if (editorElementAfter && editorScrollPositionRef.current > 0) {
+          editorElementAfter.scrollTop = editorScrollPositionRef.current;
+        }
+      }, 150); // 150ms transition duration
+
+      debouncedMode(state.applicationMode);
+
+      return () => clearTimeout(transitionTimer);
+    }
+  }, [state.applicationMode, previousMode, debouncedMode]);
+
+  // Preserve editor content during mode switches - Requirements: 6.2, 6.3
+  useEffect(() => {
+    // Store editor content reference to prevent loss during transitions
+    const editorElement = document.querySelector('.editor-area');
+    if (editorElement) {
+      editorContentRef.current = {
+        scrollTop: editorElement.scrollTop,
+        selectedElements: document.querySelectorAll('.action-item.selected'),
+        focusedElement: document.activeElement
+      };
+    }
+  }, [state.applicationMode]);
+
+  // Memoize keyboard event handler to prevent recreation on every render
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    // Prevent keyboard shortcuts during transitions to avoid conflicts
+    if (isTransitioning) {
+      return;
+    }
+
+    // Handle application-level keyboard shortcuts
+    if (event.key === 'Escape') {
+      // ESC key handling - stop current action if recording or playing
+      if (state.applicationMode === 'recording' || state.applicationMode === 'playing') {
+        // Dispatch custom event for toolbar to handle
+        window.dispatchEvent(new CustomEvent('keyboard-stop-action'));
+      }
+      return;
+    }
+
+    // Additional shortcuts with Ctrl/Cmd key
+    if (event.ctrlKey || event.metaKey) {
+      switch (event.key) {
+        case 'r':
+          event.preventDefault();
+          if (state.applicationMode === 'idle') {
+            window.dispatchEvent(new CustomEvent('keyboard-start-recording'));
+          }
+          break;
+        case 'p':
+          event.preventDefault();
+          if (state.applicationMode === 'idle' && state.currentScript) {
+            window.dispatchEvent(new CustomEvent('keyboard-start-playback'));
+          }
+          break;
+        case 's':
+          event.preventDefault();
+          if (state.applicationMode === 'recording' || state.applicationMode === 'playing') {
+            window.dispatchEvent(new CustomEvent('keyboard-stop-action'));
+          } else if (state.currentScript && (state.applicationMode === 'idle' || state.applicationMode === 'editing')) {
+            window.dispatchEvent(new CustomEvent('keyboard-save-script'));
+          }
+          break;
+        case 'o':
+          event.preventDefault();
+          if (state.applicationMode === 'idle') {
+            window.dispatchEvent(new CustomEvent('keyboard-open-script'));
+          }
+          break;
+      }
+    }
+  }, [state.applicationMode, state.currentScript, isTransitioning]);
 
   // Handle keyboard shortcuts - preserve existing functionality
-  React.useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Handle application-level keyboard shortcuts
-      if (event.key === 'Escape') {
-        // ESC key handling - stop current action if recording or playing
-        if (state.applicationMode === 'recording' || state.applicationMode === 'playing') {
-          // Dispatch custom event for toolbar to handle
-          window.dispatchEvent(new CustomEvent('keyboard-stop-action'));
-        }
-        return;
-      }
-
-      // Additional shortcuts with Ctrl/Cmd key
-      if (event.ctrlKey || event.metaKey) {
-        switch (event.key) {
-          case 'r':
-            event.preventDefault();
-            if (state.applicationMode === 'idle') {
-              window.dispatchEvent(new CustomEvent('keyboard-start-recording'));
-            }
-            break;
-          case 'p':
-            event.preventDefault();
-            if (state.applicationMode === 'idle' && state.currentScript) {
-              window.dispatchEvent(new CustomEvent('keyboard-start-playback'));
-            }
-            break;
-          case 's':
-            event.preventDefault();
-            if (state.applicationMode === 'recording' || state.applicationMode === 'playing') {
-              window.dispatchEvent(new CustomEvent('keyboard-stop-action'));
-            } else if (state.currentScript && state.applicationMode !== 'recording') {
-              window.dispatchEvent(new CustomEvent('keyboard-save-script'));
-            }
-            break;
-          case 'o':
-            event.preventDefault();
-            if (state.applicationMode === 'idle') {
-              window.dispatchEvent(new CustomEvent('keyboard-open-script'));
-            }
-            break;
-        }
-      }
-    };
-
+  useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [state.applicationMode, state.currentScript]);
+  }, [handleKeyDown]);
 
   return (
-    <div className={`unified-interface ${state.toolbarCollapsed ? 'toolbar-collapsed' : ''}`}>
-      {/* Top Toolbar Area */}
-      <div className="toolbar-area">
-        {/* Toolbar component will be rendered here by children */}
-      </div>
+    <ErrorBoundary
+      onError={handleComponentError}
+      resetKeys={[state.applicationMode]}
+      resetOnPropsChange={true}
+    >
+      <div
+        className={`unified-interface ${state.toolbarCollapsed ? 'toolbar-collapsed' : ''} ${isTransitioning ? 'transitioning' : ''} mode-${state.applicationMode}`}
+        data-testid="unified-interface"
+        role="main"
+        aria-label="GeniusQA Desktop Application"
+      >
+        {/* Top Toolbar Area */}
+        <div className="toolbar-area" role="toolbar" aria-label="Main toolbar">
+          {/* Toolbar component will be rendered here by children */}
+        </div>
 
-      {/* Editor Area */}
-      <div className={`editor-area ${state.editorVisible ? 'visible' : 'hidden'}`} data-testid="editor-area">
-        {/* Editor component will be rendered here by children */}
-      </div>
+        {/* Editor Area - Requirements: 6.2, 6.3, 6.5 */}
+        <div
+          className={`editor-area ${state.editorVisible ? 'visible' : 'hidden'} ${isTransitioning ? 'transitioning' : ''}`}
+          data-testid="editor-area"
+          role="region"
+          aria-label="Script editor"
+          aria-hidden={!state.editorVisible}
+          style={transitionStyles}
+        >
+          {/* Editor component will be rendered here by children */}
+        </div>
 
-      {/* Render children components */}
-      {children}
-    </div>
+        {/* Render children components */}
+        {children}
+      </div>
+    </ErrorBoundary>
   );
-};
+});
 
 export default UnifiedInterface;

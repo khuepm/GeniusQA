@@ -14,6 +14,7 @@ export interface TooltipProps {
   visible: boolean;
   targetRect?: DOMRect;
   className?: string;
+  id?: string;
 }
 
 /**
@@ -27,7 +28,8 @@ export const Tooltip: React.FC<TooltipProps> = ({
   delay = 500,
   visible,
   targetRect,
-  className = ''
+  className = '',
+  id
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [actualPosition, setActualPosition] = useState(position);
@@ -144,6 +146,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   return (
     <div
       ref={tooltipRef}
+      id={id}
       className={tooltipClasses}
       style={getTooltipStyle()}
       role="tooltip"

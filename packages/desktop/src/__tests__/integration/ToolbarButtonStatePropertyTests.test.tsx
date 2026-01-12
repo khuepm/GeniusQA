@@ -171,56 +171,63 @@ describe('Toolbar Button State Consistency Property Tests', () => {
           };
 
           // Render the toolbar
-          render(
+          const { unmount } = render(
             <TopToolbar
               hasRecordings={hasRecordings}
               {...mockHandlers}
             />
           );
 
-          // Verify Record button state - should be enabled only when idle
-          const recordButton = screen.getByTestId('button-record');
-          const recordShouldBeEnabled = applicationMode === 'idle';
-          expect(recordButton.disabled).toBe(!recordShouldBeEnabled);
+          try {
+            // Verify Record button state - should be enabled only when idle
+            const recordButton = screen.getByTestId('button-record');
+            const recordShouldBeEnabled = applicationMode === 'idle';
+            expect(recordButton.disabled).toBe(!recordShouldBeEnabled);
 
-          // Verify Play button state - should be enabled when idle and has script or recordings
-          const playButton = screen.getByTestId('button-play');
-          const playShouldBeEnabled = applicationMode === 'idle' && (currentScript !== null || hasRecordings);
-          expect(playButton.disabled).toBe(!playShouldBeEnabled);
+            // Verify Play button state - should be enabled when idle and has script or recordings
+            const playButton = screen.getByTestId('button-play');
+            const playShouldBeEnabled = applicationMode === 'idle' && (currentScript !== null || hasRecordings);
+            expect(playButton.disabled).toBe(!playShouldBeEnabled);
 
-          // Verify Stop button state - should be enabled when recording or playing
-          const stopButton = screen.getByTestId('button-stop');
-          const stopShouldBeEnabled = applicationMode === 'recording' || applicationMode === 'playing';
-          expect(stopButton.disabled).toBe(!stopShouldBeEnabled);
+            // Verify Stop button state - should be enabled when recording or playing
+            const stopButton = screen.getByTestId('button-stop');
+            const stopShouldBeEnabled = applicationMode === 'recording' || applicationMode === 'playing';
+            expect(stopButton.disabled).toBe(!stopShouldBeEnabled);
 
-          // Verify Save button state - should be enabled when has script and not recording
-          const saveButton = screen.getByTestId('button-save');
-          const saveShouldBeEnabled = currentScript !== null && applicationMode !== 'recording';
-          expect(saveButton.disabled).toBe(!saveShouldBeEnabled);
+            // Verify Save button state - should be enabled when has script and not recording
+            const saveButton = screen.getByTestId('button-save');
+            const saveShouldBeEnabled = currentScript !== null && applicationMode !== 'recording';
+            expect(saveButton.disabled).toBe(!saveShouldBeEnabled);
 
-          // Verify Open button state - should be enabled when idle
-          const openButton = screen.getByTestId('button-open');
-          const openShouldBeEnabled = applicationMode === 'idle';
-          expect(openButton.disabled).toBe(!openShouldBeEnabled);
+            // Verify Open button state - should be enabled when idle
+            const openButton = screen.getByTestId('button-open');
+            const openShouldBeEnabled = applicationMode === 'idle';
+            expect(openButton.disabled).toBe(!openShouldBeEnabled);
 
-          // Verify Clear button state - should be enabled when has script and idle
-          const clearButton = screen.getByTestId('button-clear');
-          const clearShouldBeEnabled = currentScript !== null && applicationMode === 'idle';
-          expect(clearButton.disabled).toBe(!clearShouldBeEnabled);
+            // Verify Clear button state - should be enabled when has script and idle
+            const clearButton = screen.getByTestId('button-clear');
+            const clearShouldBeEnabled = currentScript !== null && applicationMode === 'idle';
+            expect(clearButton.disabled).toBe(!clearShouldBeEnabled);
 
-          // Verify Settings button state - should always be enabled
-          const settingsButton = screen.getByTestId('button-settings');
-          expect(settingsButton.disabled).toBe(false);
+            // Verify Settings button state - should always be enabled
+            const settingsButton = screen.getByTestId('button-settings');
+            expect(settingsButton.disabled).toBe(false);
 
-          // Verify active states
-          // Record button should be active when recording
-          if (applicationMode === 'recording') {
-            expect(recordButton.classList.contains('active')).toBe(true);
-          }
+            // Verify active states
+            // Record button should be active when recording
+            if (applicationMode === 'recording') {
+              expect(recordButton.classList.contains('active')).toBe(true);
+            }
 
-          // Play button should be active when playing
-          if (applicationMode === 'playing') {
-            expect(playButton.classList.contains('active')).toBe(true);
+            // Play button should be active when playing
+            if (applicationMode === 'playing') {
+              expect(playButton.classList.contains('active')).toBe(true);
+            }
+
+            return true;
+          } finally {
+            // Clean up after each property test iteration
+            unmount();
           }
         }
       ),
@@ -245,6 +252,13 @@ describe('Toolbar Button State Consistency Property Tests', () => {
         hasRecordings: false,
         expectedEnabled: ['record', 'play', 'save', 'open', 'clear', 'settings']
       },
+      // Idle with no script but has recordings - record, play, open, settings should be enabled
+      {
+        applicationMode: 'idle' as ApplicationMode,
+        currentScript: null,
+        hasRecordings: true,
+        expectedEnabled: ['record', 'play', 'open', 'settings']
+      },
       // Recording state - only stop and settings should be enabled
       {
         applicationMode: 'recording' as ApplicationMode,
@@ -252,12 +266,19 @@ describe('Toolbar Button State Consistency Property Tests', () => {
         hasRecordings: false,
         expectedEnabled: ['stop', 'settings']
       },
-      // Playing state - only stop and settings should be enabled
+      // Playing state - stop, save (if has script), settings should be enabled
       {
         applicationMode: 'playing' as ApplicationMode,
         currentScript: { path: '/test.json', filename: 'test.json' },
         hasRecordings: true,
-        expectedEnabled: ['stop', 'settings']
+        expectedEnabled: ['stop', 'save', 'settings']
+      },
+      // Editing state with script - only save and settings should be enabled (clear requires idle mode)
+      {
+        applicationMode: 'editing' as ApplicationMode,
+        currentScript: { path: '/test.json', filename: 'test.json' },
+        hasRecordings: false,
+        expectedEnabled: ['save', 'settings']
       }
     ];
 

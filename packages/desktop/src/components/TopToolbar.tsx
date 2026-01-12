@@ -4,10 +4,11 @@
  * Requirements: 4.1, 4.2, 4.3, 4.4, 4.5
  */
 
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { useUnifiedInterface } from './UnifiedInterface';
 import { ToolbarButton } from './ToolbarButton';
 import { IconType } from './icons';
+import { ErrorBoundary } from './ErrorBoundary';
 import './TopToolbar.css';
 
 // Button configuration interface
@@ -39,7 +40,7 @@ export interface TopToolbarProps {
  * TopToolbar Component
  * Renders the main toolbar with grouped action buttons
  */
-export const TopToolbar: React.FC<TopToolbarProps> = ({
+export const TopToolbar: React.FC<TopToolbarProps> = React.memo(({
   hasRecordings = false,
   onRecordStart,
   onRecordStop,
@@ -52,31 +53,8 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
 }) => {
   const { state } = useUnifiedInterface();
 
-  // Handle keyboard shortcuts from UnifiedInterface
-  React.useEffect(() => {
-    const handleKeyboardStartRecording = () => actionHandlers.START_RECORDING();
-    const handleKeyboardStartPlayback = () => actionHandlers.START_PLAYBACK();
-    const handleKeyboardStopAction = () => actionHandlers.STOP_ACTION();
-    const handleKeyboardSaveScript = () => actionHandlers.SAVE_SCRIPT();
-    const handleKeyboardOpenScript = () => actionHandlers.OPEN_SCRIPT();
-
-    window.addEventListener('keyboard-start-recording', handleKeyboardStartRecording);
-    window.addEventListener('keyboard-start-playback', handleKeyboardStartPlayback);
-    window.addEventListener('keyboard-stop-action', handleKeyboardStopAction);
-    window.addEventListener('keyboard-save-script', handleKeyboardSaveScript);
-    window.addEventListener('keyboard-open-script', handleKeyboardOpenScript);
-
-    return () => {
-      window.removeEventListener('keyboard-start-recording', handleKeyboardStartRecording);
-      window.removeEventListener('keyboard-start-playback', handleKeyboardStartPlayback);
-      window.removeEventListener('keyboard-stop-action', handleKeyboardStopAction);
-      window.removeEventListener('keyboard-save-script', handleKeyboardSaveScript);
-      window.removeEventListener('keyboard-open-script', handleKeyboardOpenScript);
-    };
-  }, [state.applicationMode, state.currentScript, onRecordStart, onRecordStop, onPlayStart, onPlayStop, onSave, onOpen]);
-
-  // Enhanced action handlers with state integration
-  const actionHandlers: Record<string, () => void> = {
+  // Memoize action handlers to prevent recreation on every render
+  const actionHandlers: Record<string, () => void> = useMemo(() => ({
     START_RECORDING: () => {
       // Only allow recording if in idle mode
       if (state.applicationMode === 'idle') {
@@ -130,10 +108,33 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
       // Settings can always be opened
       onSettings?.();
     }
-  };
+  }), [state.applicationMode, state.currentScript, onRecordStart, onRecordStop, onPlayStart, onPlayStop, onSave, onOpen, onClear, onSettings]);
 
-  // Enhanced button configurations with proper state-based enabling
-  const getButtonConfigs = (): ButtonConfig[] => [
+  // Memoize keyboard event handlers to prevent recreation
+  const handleKeyboardStartRecording = useCallback(() => actionHandlers.START_RECORDING(), [actionHandlers]);
+  const handleKeyboardStartPlayback = useCallback(() => actionHandlers.START_PLAYBACK(), [actionHandlers]);
+  const handleKeyboardStopAction = useCallback(() => actionHandlers.STOP_ACTION(), [actionHandlers]);
+  const handleKeyboardSaveScript = useCallback(() => actionHandlers.SAVE_SCRIPT(), [actionHandlers]);
+  const handleKeyboardOpenScript = useCallback(() => actionHandlers.OPEN_SCRIPT(), [actionHandlers]);
+
+  // Handle keyboard shortcuts from UnifiedInterface
+  React.useEffect(() => {
+    window.addEventListener('keyboard-start-recording', handleKeyboardStartRecording);
+    window.addEventListener('keyboard-start-playback', handleKeyboardStartPlayback);
+    window.addEventListener('keyboard-stop-action', handleKeyboardStopAction);
+    window.addEventListener('keyboard-save-script', handleKeyboardSaveScript);
+    window.addEventListener('keyboard-open-script', handleKeyboardOpenScript);
+
+    return () => {
+      window.removeEventListener('keyboard-start-recording', handleKeyboardStartRecording);
+      window.removeEventListener('keyboard-start-playback', handleKeyboardStartPlayback);
+      window.removeEventListener('keyboard-stop-action', handleKeyboardStopAction);
+      window.removeEventListener('keyboard-save-script', handleKeyboardSaveScript);
+      window.removeEventListener('keyboard-open-script', handleKeyboardOpenScript);
+    };
+  }, [handleKeyboardStartRecording, handleKeyboardStartPlayback, handleKeyboardStopAction, handleKeyboardSaveScript, handleKeyboardOpenScript]);
+  // Memoize button configurations to prevent recreation on every render
+  const buttonConfigs = useMemo((): ButtonConfig[] => [
     // Recording Group
     {
       id: 'record',
@@ -209,65 +210,89 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
       action: 'OPEN_SETTINGS',
       enabledWhen: () => true
     }
-  ];
+  ], [hasRecordings]);
 
-  // Get current button configurations
-  const buttonConfigs = getButtonConfigs();
+  // Memoize grouped buttons to prevent recalculation
+  const groupedButtons = useMemo(() => {
+    return buttonConfigs.reduce((groups, button) => {
+      if (!groups[button.group]) {
+        groups[button.group] = [];
+      }
+      groups[button.group].push(button);
+      return groups;
+    }, {} as Record<string, ButtonConfig[]>);
+  }, [buttonConfigs]);
 
-  // Group buttons by their group property
-  const groupedButtons = buttonConfigs.reduce((groups, button) => {
-    if (!groups[button.group]) {
-      groups[button.group] = [];
-    }
-    groups[button.group].push(button);
-    return groups;
-  }, {} as Record<string, ButtonConfig[]>);
+  // Memoize render button group function
+  const renderButtonGroup = useCallback((groupName: string, buttons: ButtonConfig[]) => (
+    <ErrorBoundary
+      key={groupName}
+      fallback={
+        <div className={`toolbar-group toolbar-group-${groupName} error`}>
+          <div className="toolbar-error">⚠️</div>
+        </div>
+      }
+    >
+      <div className={`toolbar-group toolbar-group-${groupName}`}>
+        {buttons.map((button) => {
+          const appState = {
+            ...state,
+            hasRecordings
+          };
 
-  // Render a group of buttons
-  const renderButtonGroup = (groupName: string, buttons: ButtonConfig[]) => (
-    <div key={groupName} className={`toolbar-group toolbar-group-${groupName}`}>
-      {buttons.map((button) => {
-        const appState = {
-          ...state,
-          hasRecordings
-        };
+          const isEnabled = button.enabledWhen(appState);
+          const isActive = button.activeWhen?.(appState) || false;
 
-        const isEnabled = button.enabledWhen(appState);
-        const isActive = button.activeWhen?.(appState) || false;
-
-        return (
-          <ToolbarButton
-            key={button.id}
-            icon={button.icon}
-            tooltip={button.tooltip}
-            onClick={actionHandlers[button.action]}
-            disabled={!isEnabled}
-            active={isActive}
-            variant={button.variant}
-          />
-        );
-      })}
-    </div>
-  );
+          return (
+            <ToolbarButton
+              key={button.id}
+              icon={button.icon}
+              tooltip={button.tooltip}
+              onClick={actionHandlers[button.action]}
+              disabled={!isEnabled}
+              active={isActive}
+              variant={button.variant}
+            />
+          );
+        })}
+      </div>
+    </ErrorBoundary>
+  ), [state, hasRecordings, actionHandlers]);
 
   return (
-    <div className="top-toolbar" data-testid="top-toolbar">
-      {/* Recording Group */}
-      {groupedButtons.recording && renderButtonGroup('recording', groupedButtons.recording)}
+    <ErrorBoundary
+      fallback={
+        <div className="top-toolbar error" data-testid="top-toolbar">
+          <div className="toolbar-error-message">
+            <span>⚠️ Toolbar temporarily unavailable</span>
+            <button onClick={() => window.location.reload()}>Refresh</button>
+          </div>
+        </div>
+      }
+    >
+      <div
+        className="top-toolbar"
+        data-testid="top-toolbar"
+        role="toolbar"
+        aria-label="Main application toolbar"
+      >
+        {/* Recording Group */}
+        {groupedButtons.recording && renderButtonGroup('recording', groupedButtons.recording)}
 
-      {/* Playback Group */}
-      {groupedButtons.playback && renderButtonGroup('playback', groupedButtons.playback)}
+        {/* Playback Group */}
+        {groupedButtons.playback && renderButtonGroup('playback', groupedButtons.playback)}
 
-      {/* Editor Group */}
-      {groupedButtons.editor && renderButtonGroup('editor', groupedButtons.editor)}
+        {/* Editor Group */}
+        {groupedButtons.editor && renderButtonGroup('editor', groupedButtons.editor)}
 
-      {/* Spacer to push settings to the right */}
-      <div className="toolbar-spacer" />
+        {/* Spacer to push settings to the right */}
+        <div className="toolbar-spacer" />
 
-      {/* Settings Group */}
-      {groupedButtons.settings && renderButtonGroup('settings', groupedButtons.settings)}
-    </div>
+        {/* Settings Group */}
+        {groupedButtons.settings && renderButtonGroup('settings', groupedButtons.settings)}
+      </div>
+    </ErrorBoundary>
   );
-};
+});
 
 export default TopToolbar;

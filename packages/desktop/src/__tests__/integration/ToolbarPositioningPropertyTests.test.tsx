@@ -95,9 +95,7 @@ function renderToolbarInContext(props: any = {}) {
   return render(
     <UnifiedInterfaceProvider>
       <UnifiedInterface>
-        <div className="toolbar-area">
-          <TopToolbar {...props} />
-        </div>
+        <TopToolbar {...props} />
       </UnifiedInterface>
     </UnifiedInterfaceProvider>
   );
@@ -172,12 +170,11 @@ describe('Toolbar Positioning Property Tests', () => {
           if (!toolbar) return false;
 
           // Toolbar should exist and be positioned at the top
-          const toolbarArea = container.querySelector('.toolbar-area');
-          if (!toolbarArea) return false;
+          const unifiedInterface = container.querySelector('.unified-interface');
+          if (!unifiedInterface) return false;
 
-          // Toolbar should be the first child of toolbar-area
-          const firstChild = toolbarArea.firstElementChild;
-          return firstChild === toolbar;
+          // Toolbar should be a child of the unified interface
+          return unifiedInterface.contains(toolbar);
         }),
         { numRuns: 100 }
       );
@@ -439,11 +436,11 @@ describe('Toolbar Positioning Property Tests', () => {
             if (!toolbar) return false;
 
             // Toolbar should always be present regardless of mode
-            const toolbarArea = container.querySelector('.toolbar-area');
-            if (!toolbarArea) return false;
+            const unifiedInterface = container.querySelector('.unified-interface');
+            if (!unifiedInterface) return false;
 
-            // Should contain the toolbar as direct child
-            if (!toolbarArea.contains(toolbar)) return false;
+            // Should contain the toolbar as child
+            if (!unifiedInterface.contains(toolbar)) return false;
 
             // Should maintain button structure
             const buttons = getToolbarButtons(toolbar);

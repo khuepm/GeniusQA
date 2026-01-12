@@ -4,7 +4,7 @@
  * Requirements: 3.1, 3.2, 3.5, 7.1, 7.2, 7.3, 7.4, 7.5, 9.1, 9.2, 9.3, 9.4, 9.5
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { IconType, ICON_COMPONENTS } from './icons';
 import { Tooltip } from './Tooltip';
 import './ToolbarButton.css';
@@ -30,7 +30,7 @@ interface ToolbarButtonState {
  * ToolbarButton Component
  * Requirements: 3.1, 3.2, 3.5, 7.1, 7.2, 7.3, 7.4, 7.5, 9.1, 9.2, 9.3, 9.4, 9.5
  */
-export const ToolbarButton: React.FC<ToolbarButtonProps> = ({
+export const ToolbarButton: React.FC<ToolbarButtonProps> = React.memo(({
   icon,
   tooltip,
   onClick,
@@ -50,6 +50,46 @@ export const ToolbarButton: React.FC<ToolbarButtonProps> = ({
 
   // Get icon component
   const IconComponent = ICON_COMPONENTS[icon];
+
+  // Handle keyboard navigation
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (disabled) return;
+
+    switch (event.key) {
+      case 'Enter':
+      case ' ':
+        event.preventDefault();
+        handleClick();
+        break;
+      case 'Escape':
+        // Hide tooltip on escape
+        setState(prev => ({ ...prev, tooltipVisible: false }));
+        if (tooltipTimeoutRef.current) {
+          clearTimeout(tooltipTimeoutRef.current);
+        }
+        break;
+    }
+  };
+
+  // Handle focus events for accessibility
+  const handleFocus = () => {
+    if (disabled) return;
+
+    // Show tooltip on focus for keyboard users
+    tooltipTimeoutRef.current = setTimeout(() => {
+      if (buttonRef.current) {
+        setTargetRect(buttonRef.current.getBoundingClientRect());
+        setState(prev => ({ ...prev, tooltipVisible: true }));
+      }
+    }, 100); // Shorter delay for keyboard focus
+  };
+
+  const handleBlur = () => {
+    setState(prev => ({ ...prev, tooltipVisible: false }));
+    if (tooltipTimeoutRef.current) {
+      clearTimeout(tooltipTimeoutRef.current);
+    }
+  };
 
   // Handle mouse enter - Requirements: 9.1, 9.4
   const handleMouseEnter = () => {
@@ -125,14 +165,21 @@ export const ToolbarButton: React.FC<ToolbarButtonProps> = ({
         onMouseLeave={handleMouseLeave}
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
+        onKeyDown={handleKeyDown}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
         disabled={disabled}
         aria-label={tooltip}
+        aria-pressed={active}
+        aria-describedby={state.tooltipVisible ? `tooltip-${icon}` : undefined}
         title="" // Prevent default browser tooltip
         data-testid={`button-${icon}`}
+        tabIndex={disabled ? -1 : 0}
       >
         <IconComponent
           size={16}
           className="toolbar-button-icon"
+          aria-hidden="true"
         />
       </button>
 
@@ -142,9 +189,10 @@ export const ToolbarButton: React.FC<ToolbarButtonProps> = ({
         position="bottom"
         visible={state.tooltipVisible}
         targetRect={targetRect}
+        id={`tooltip-${icon}`}
       />
     </>
   );
-};
+});
 
 export default ToolbarButton;

@@ -1,0 +1,126 @@
+/**
+ * ErrorBoundary Styles
+ * Styling for error boundary fallback UI
+ */
+
+.error-boundary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: 24px;
+  background: var(--primary-bg, #ffffff);
+  border: 1px solid var(--border-light, #e9ecef);
+  border-radius: 8px;
+}
+
+.error-boundary-content {
+  text-align: center;
+  max-width: 400px;
+}
+
+.error-boundary-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.error-boundary-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary, #212529);
+  margin: 0 0 8px 0;
+}
+
+.error-boundary-message {
+  font-size: 14px;
+  color: var(--text-secondary, #6c757d);
+  margin: 0 0 24px 0;
+  line-height: 1.5;
+}
+
+.error-boundary-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.error-boundary-button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.error-boundary-button.primary {
+  background: var(--accent-primary, #1976d2);
+  color: white;
+}
+
+.error-boundary-button.primary:hover {
+  background: var(--accent-primary-dark, #1565c0);
+}
+
+.error-boundary-button.secondary {
+  background: var(--secondary-bg, #f8f9fa);
+  color: var(--text-primary, #212529);
+  border: 1px solid var(--border-medium, #dee2e6);
+}
+
+.error-boundary-button.secondary:hover {
+  background: var(--border-light, #e9ecef);
+}
+
+.error-boundary-details {
+  margin-top: 16px;
+  text-align: left;
+}
+
+.error-boundary-details summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-secondary, #6c757d);
+  margin-bottom: 8px;
+}
+
+.error-boundary-stack {
+  background: var(--secondary-bg, #f8f9fa);
+  border: 1px solid var(--border-light, #e9ecef);
+  border-radius: 4px;
+  padding: 12px;
+  font-size: 11px;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
+  color: var(--text-primary, #212529);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Compact error boundary for smaller components */
+.error-boundary.compact {
+  min-height: 100px;
+  padding: 16px;
+}
+
+.error-boundary.compact .error-boundary-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.error-boundary.compact .error-boundary-title {
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.error-boundary.compact .error-boundary-message {
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+
+.error-boundary.compact .error-boundary-button {
+  padding: 6px 12px;
+  font-size: 12px;
+}
