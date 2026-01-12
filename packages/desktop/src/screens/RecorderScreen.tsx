@@ -854,6 +854,35 @@ const RecorderScreen: React.FC = () => {
           >
             ←
           </button>
+
+          {/* New Unified Interface Button */}
+          <button
+            className="unified-interface-button"
+            onClick={() => navigate('/unified-recorder')}
+            title="Switch to New Unified Interface"
+            style={{
+              marginLeft: '12px',
+              padding: '8px 16px',
+              backgroundColor: '#1976d2',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#1565c0';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#1976d2';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            🚀 Try New Interface
+          </button>
         </div>
 
         {/* Status Display */}

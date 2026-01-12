@@ -24,7 +24,8 @@ import {
 } from '../types/recorder.types';
 import { TestScript, TestStep } from '../types/testCaseDriven.types';
 import './UnifiedRecorderScreen.css';
-
+import SimpleUnifiedInterface from '../components/SimpleUnifiedInterface';
+import '../components/SimpleUnifiedInterface.css';
 /**
  * Extended ScriptInfo interface with source and target OS
  * Requirements: 9.1, 9.2, 9.5
@@ -1337,7 +1338,8 @@ const UnifiedRecorderScreen: React.FC = () => {
   return (
     <UnifiedInterfaceProvider>
       <div className="unified-recorder-screen">
-        <UnifiedRecorderContent />
+        {/*<UnifiedRecorderContent />*/}
+        <SimpleUnifiedInterface />
       </div>
     </UnifiedInterfaceProvider>
   );
