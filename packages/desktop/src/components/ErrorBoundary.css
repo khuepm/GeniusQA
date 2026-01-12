@@ -124,3 +124,179 @@
   padding: 6px 12px;
   font-size: 12px;
 }
+/* Enhanced Error Boundary Styles for Task 18.2 */
+
+/* Error severity levels */
+.error-boundary-low {
+  border-color: var(--accent-info, #2196f3);
+}
+
+.error-boundary-medium {
+  border-color: var(--accent-warning, #ff9800);
+}
+
+.error-boundary-high {
+  border-color: var(--accent-danger, #f44336);
+}
+
+.error-boundary-critical {
+  border-color: var(--accent-danger, #f44336);
+  background: rgba(244, 67, 54, 0.05);
+}
+
+/* Enhanced error header */
+.error-boundary-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+.error-boundary-title-section {
+  flex: 1;
+}
+
+.error-boundary-subtitle {
+  font-size: 12px;
+  color: var(--text-muted, #868e96);
+  margin-top: 4px;
+  font-family: var(--font-family-mono, monospace);
+}
+
+/* Recovery instructions */
+.error-boundary-instructions {
+  background: var(--secondary-bg, #f8f9fa);
+  border: 1px solid var(--border-light, #e9ecef);
+  border-radius: 4px;
+  padding: 12px;
+  margin: 16px 0;
+  font-size: 13px;
+  color: var(--text-secondary, #6c757d);
+  text-align: left;
+}
+
+/* Retry status indicator */
+.error-boundary-retry-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(25, 118, 210, 0.1);
+  border: 1px solid var(--accent-primary, #1976d2);
+  border-radius: 4px;
+  margin: 16px 0;
+  font-size: 13px;
+  color: var(--accent-primary, #1976d2);
+}
+
+.retry-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid var(--accent-primary, #1976d2);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Enhanced action buttons */
+.error-boundary-button.danger {
+  background: var(--accent-danger, #f44336);
+  color: white;
+}
+
+.error-boundary-button.danger:hover {
+  background: var(--accent-danger-dark, #d32f2f);
+}
+
+.error-boundary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error-boundary-button:disabled:hover {
+  background: var(--accent-primary, #1976d2);
+}
+
+/* Enhanced error details */
+.error-details-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.error-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.error-detail-section strong {
+  font-size: 12px;
+  color: var(--text-primary, #212529);
+}
+
+.error-boundary-stack {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .error-boundary {
+    padding: 16px;
+  }
+  
+  .error-boundary-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 8px;
+  }
+  
+  .error-boundary-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .error-boundary-button {
+    width: 100%;
+  }
+  
+  .error-boundary-instructions {
+    text-align: center;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .error-boundary {
+    border-width: 2px;
+  }
+  
+  .error-boundary-button {
+    border: 1px solid;
+  }
+  
+  .error-boundary-instructions {
+    border-width: 2px;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .retry-spinner {
+    animation: none;
+  }
+  
+  .error-boundary-button {
+    transition: none;
+  }
+}

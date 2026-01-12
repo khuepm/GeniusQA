@@ -249,6 +249,381 @@ const ActionList: React.FC<{
   };
 
 /**
+ * TimelineView Component
+ * Displays actions in a visual timeline format with timestamps
+ */
+const TimelineView: React.FC<{
+  actions: Action[];
+  selectedActionId: string | null;
+  onActionSelect: (actionId: string) => void;
+  onActionEdit: (actionId: string, changes: Partial<Action>) => void;
+  onActionDelete: (actionId: string) => void;
+}> = ({ actions, selectedActionId, onActionSelect, onActionEdit, onActionDelete }) => {
+  const timelineRef = useRef<HTMLDivElement>(null);
+
+  // Calculate timeline scale based on action timestamps
+  const timelineScale = useMemo(() => {
+    if (actions.length === 0) return { start: 0, end: 1, scale: 1 };
+
+    const timestamps = actions.map(action => action.timestamp);
+    const start = Math.min(...timestamps);
+    const end = Math.max(...timestamps);
+    const duration = end - start || 1;
+
+    return {
+      start,
+      end,
+      scale: 800 / duration // 800px timeline width
+    };
+  }, [actions]);
+
+  // Get position on timeline for an action
+  const getTimelinePosition = (timestamp: number): number => {
+    return (timestamp - timelineScale.start) * timelineScale.scale;
+  };
+
+  // Format duration for display
+  const formatDuration = (ms: number): string => {
+    if (ms < 1000) return `${ms.toFixed(0)}ms`;
+    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+    return `${Math.floor(ms / 60000)}:${((ms % 60000) / 1000).toFixed(0).padStart(2, '0')}`;
+  };
+
+  // Get action color based on type
+  const getActionColor = (actionType: string): string => {
+    switch (actionType) {
+      case 'mouse_click': return '#4CAF50';
+      case 'mouse_move': return '#2196F3';
+      case 'key_press':
+      case 'key_release': return '#FF9800';
+      case 'delay': return '#9C27B0';
+      default: return '#757575';
+    }
+  };
+
+  if (actions.length === 0) {
+    return (
+      <div className="timeline-view editor-scrollable-content" role="region" aria-label="Timeline view">
+        <div className="timeline-empty">
+          <div className="empty-icon">📊</div>
+          <div className="empty-title">No Timeline Data</div>
+          <div className="empty-description">
+            Record some actions to see them displayed on the timeline
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="timeline-view editor-scrollable-content" role="region" aria-label="Timeline view">
+      <div className="timeline-header">
+        <div className="timeline-info">
+          <span className="timeline-duration">
+            Duration: {formatDuration(timelineScale.end - timelineScale.start)}
+          </span>
+          <span className="timeline-actions">
+            {actions.length} actions
+          </span>
+        </div>
+      </div>
+
+      <div className="timeline-container" ref={timelineRef}>
+        <div className="timeline-track">
+          {/* Timeline ruler */}
+          <div className="timeline-ruler">
+            {Array.from({ length: 11 }, (_, i) => {
+              const time = timelineScale.start + (timelineScale.end - timelineScale.start) * (i / 10);
+              return (
+                <div
+                  key={i}
+                  className="timeline-tick"
+                  style={{ left: `${(i / 10) * 100}%` }}
+                >
+                  <div className="timeline-tick-mark" />
+                  <div className="timeline-tick-label">
+                    {formatDuration(time)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Action markers */}
+          <div className="timeline-actions">
+            {actions.map((action, index) => (
+              <div
+                key={action.id}
+                className={`timeline-action ${selectedActionId === action.id ? 'selected' : ''}`}
+                style={{
+                  left: `${(getTimelinePosition(action.timestamp) / 800) * 100}%`,
+                  backgroundColor: getActionColor(action.type)
+                }}
+                onClick={() => onActionSelect(action.id)}
+                role="button"
+                tabIndex={0}
+                aria-label={`Action ${index + 1}: ${action.type} at ${formatDuration(action.timestamp)}`}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onActionSelect(action.id);
+                  }
+                }}
+              >
+                <div className="timeline-action-marker" />
+                <div className="timeline-action-tooltip">
+                  <div className="tooltip-title">Action {index + 1}</div>
+                  <div className="tooltip-type">{action.type}</div>
+                  <div className="tooltip-time">{formatDuration(action.timestamp)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Selected action details */}
+        {selectedActionId && (
+          <div className="timeline-details">
+            {(() => {
+              const selectedAction = actions.find(a => a.id === selectedActionId);
+              if (!selectedAction) return null;
+
+              return (
+                <div className="action-details-panel">
+                  <div className="details-header">
+                    <h4>Action Details</h4>
+                    <div className="details-controls">
+                      <button
+                        className="edit-btn"
+                        onClick={() => onActionEdit(selectedActionId, {})}
+                        aria-label="Edit action"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="delete-btn"
+                        onClick={() => onActionDelete(selectedActionId)}
+                        aria-label="Delete action"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                  <div className="details-content">
+                    <div className="detail-row">
+                      <span className="detail-label">Type:</span>
+                      <span className="detail-value">{selectedAction.type}</span>
+                    </div>
+                    <div className="detail-row">
+                      <span className="detail-label">Time:</span>
+                      <span className="detail-value">{formatDuration(selectedAction.timestamp)}</span>
+                    </div>
+                    {selectedAction.data && Object.keys(selectedAction.data).length > 0 && (
+                      <div className="detail-row">
+                        <span className="detail-label">Data:</span>
+                        <pre className="detail-value">{JSON.stringify(selectedAction.data, null, 2)}</pre>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * CodeView Component
+ * Displays and allows editing of the script in code format
+ */
+const CodeView: React.FC<{
+  actions: Action[];
+  script?: ScriptFile | null;
+  onScriptChange?: (script: ScriptFile) => void;
+}> = ({ actions, script, onScriptChange }) => {
+  const [codeContent, setCodeContent] = useState<string>('');
+  const [isEditing, setIsEditing] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Generate code representation from actions
+  const generateCode = useCallback((actionList: Action[]): string => {
+    if (actionList.length === 0) {
+      return '# No actions recorded yet\n# Start recording to see generated code here';
+    }
+
+    const lines: string[] = [
+      '# Generated automation script',
+      '# This code represents the recorded actions',
+      '',
+      'import time',
+      'from automation import mouse, keyboard',
+      '',
+      'def run_automation():',
+      '    """Execute the recorded automation sequence"""'
+    ];
+
+    actionList.forEach((action, index) => {
+      lines.push(`    # Action ${index + 1}: ${action.type}`);
+
+      switch (action.type) {
+        case 'mouse_click':
+          lines.push(`    mouse.click(${action.data.x}, ${action.data.y})`);
+          break;
+        case 'mouse_move':
+          lines.push(`    mouse.move(${action.data.x}, ${action.data.y})`);
+          break;
+        case 'key_press':
+          lines.push(`    keyboard.press('${action.data.key}')`);
+          break;
+        case 'key_release':
+          lines.push(`    keyboard.release('${action.data.key}')`);
+          break;
+        case 'delay':
+          lines.push(`    time.sleep(${action.data.duration / 1000})`);
+          break;
+        default:
+          lines.push(`    # Unknown action: ${action.type}`);
+      }
+
+      if (index < actionList.length - 1) {
+        lines.push('');
+      }
+    });
+
+    lines.push('');
+    lines.push('if __name__ == "__main__":');
+    lines.push('    run_automation()');
+
+    return lines.join('\n');
+  }, []);
+
+  // Update code content when actions change
+  useEffect(() => {
+    if (!isEditing) {
+      setCodeContent(generateCode(actions));
+    }
+  }, [actions, generateCode, isEditing]);
+
+  // Handle code editing
+  const handleCodeChange = (newCode: string) => {
+    setCodeContent(newCode);
+  };
+
+  const handleSaveCode = () => {
+    if (script && onScriptChange) {
+      // In a real implementation, we would parse the code back to actions
+      // For now, we just update the script content
+      const updatedScript: ScriptFile = {
+        ...script,
+        content: codeContent,
+        lastModified: Date.now()
+      };
+      onScriptChange(updatedScript);
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancelEdit = () => {
+    setCodeContent(generateCode(actions));
+    setIsEditing(false);
+  };
+
+  const handleCopyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(codeContent);
+      // Show success feedback (could be improved with a toast notification)
+      const button = document.querySelector('.copy-btn') as HTMLButtonElement;
+      if (button) {
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        setTimeout(() => {
+          button.textContent = originalText;
+        }, 2000);
+      }
+    } catch (err) {
+      console.error('Failed to copy code:', err);
+    }
+  };
+
+  return (
+    <div className="code-view editor-scrollable-content" role="region" aria-label="Code view">
+      <div className="code-header">
+        <div className="code-info">
+          <h4>Generated Code</h4>
+          <span className="code-language">Python</span>
+        </div>
+        <div className="code-controls">
+          <button
+            className="copy-btn"
+            onClick={handleCopyCode}
+            aria-label="Copy code to clipboard"
+          >
+            Copy
+          </button>
+          {!isEditing ? (
+            <button
+              className="edit-btn"
+              onClick={() => setIsEditing(true)}
+              aria-label="Edit code"
+            >
+              Edit
+            </button>
+          ) : (
+            <>
+              <button
+                className="save-btn"
+                onClick={handleSaveCode}
+                aria-label="Save code changes"
+              >
+                Save
+              </button>
+              <button
+                className="cancel-btn"
+                onClick={handleCancelEdit}
+                aria-label="Cancel code editing"
+              >
+                Cancel
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="code-content">
+        {isEditing ? (
+          <textarea
+            ref={textareaRef}
+            className="code-editor"
+            value={codeContent}
+            onChange={(e) => handleCodeChange(e.target.value)}
+            placeholder="Enter your automation code here..."
+            aria-label="Code editor"
+            spellCheck={false}
+          />
+        ) : (
+          <pre className="code-display">
+            <code>{codeContent}</code>
+          </pre>
+        )}
+      </div>
+
+      {actions.length === 0 && (
+        <div className="code-empty">
+          <div className="empty-icon">💻</div>
+          <div className="empty-title">No Code Generated</div>
+          <div className="empty-description">
+            Record some actions to see the generated automation code
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
  * StatusPanel Component
  * Shows recording, playback, and editor status
  */
@@ -483,19 +858,21 @@ export const EditorArea: React.FC<EditorAreaProps> = React.memo(({
             )}
 
             {editorState.viewMode === 'timeline' && (
-              <div className="timeline-view editor-scrollable-content" role="region" aria-label="Timeline view">
-                <div className="timeline-placeholder">
-                  Timeline view will be implemented in future tasks
-                </div>
-              </div>
+              <TimelineView
+                actions={actions}
+                selectedActionId={editorState.selectedActionId}
+                onActionSelect={handleActionSelect}
+                onActionEdit={handleActionEdit}
+                onActionDelete={handleActionDelete}
+              />
             )}
 
             {editorState.viewMode === 'code' && (
-              <div className="code-view editor-scrollable-content" role="region" aria-label="Code view">
-                <div className="code-placeholder">
-                  Code view will be implemented in future tasks
-                </div>
-              </div>
+              <CodeView
+                actions={actions}
+                script={script}
+                onScriptChange={onScriptChange}
+              />
             )}
           </ErrorBoundary>
         </div>

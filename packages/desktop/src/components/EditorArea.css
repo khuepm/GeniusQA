@@ -755,3 +755,527 @@
 .editor-content-error button:hover {
   background: var(--border-light, #e9ecef);
 }
+/* Timeline View Styles */
+.timeline-view {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--px-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--px-md);
+}
+
+.timeline-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  min-height: 200px;
+}
+
+.timeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--py-sm) 0;
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: var(--px-md);
+}
+
+.timeline-info {
+  display: flex;
+  align-items: center;
+  gap: var(--px-lg);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.timeline-duration {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.timeline-container {
+  flex: 1;
+  min-height: 200px;
+  position: relative;
+}
+
+.timeline-track {
+  position: relative;
+  height: 120px;
+  background: var(--secondary-bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--button-border-radius);
+  overflow: hidden;
+}
+
+.timeline-ruler {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  background: var(--primary-bg);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.timeline-tick {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.timeline-tick-mark {
+  width: 1px;
+  height: 15px;
+  background: var(--border-medium);
+}
+
+.timeline-tick-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+.timeline-actions {
+  position: absolute;
+  top: 30px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: var(--py-sm) var(--px-sm);
+}
+
+.timeline-action {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  z-index: 2;
+}
+
+.timeline-action:hover {
+  transform: translateY(-50%) scale(1.3);
+  z-index: 3;
+}
+
+.timeline-action.selected {
+  transform: translateY(-50%) scale(1.5);
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.3);
+  z-index: 4;
+}
+
+.timeline-action-marker {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: inherit;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.timeline-action-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--tooltip-bg);
+  color: var(--tooltip-text);
+  padding: var(--py-xs) var(--px-sm);
+  border-radius: var(--button-border-radius);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: all var(--transition-fast);
+  z-index: 10;
+  margin-bottom: 8px;
+}
+
+.timeline-action:hover .timeline-action-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.tooltip-title {
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: 2px;
+}
+
+.tooltip-type {
+  color: var(--tooltip-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.tooltip-time {
+  color: var(--tooltip-text-secondary);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-family-mono);
+}
+
+.timeline-details {
+  margin-top: var(--px-lg);
+  padding: var(--px-md);
+  background: var(--secondary-bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--button-border-radius);
+}
+
+.action-details-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--px-sm);
+}
+
+.details-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--py-sm);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.details-header h4 {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.details-controls {
+  display: flex;
+  gap: var(--px-sm);
+}
+
+.details-controls .edit-btn,
+.details-controls .delete-btn {
+  padding: var(--py-xs) var(--px-sm);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--button-border-radius);
+  background: var(--primary-bg);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.details-controls .edit-btn {
+  color: var(--accent-primary);
+}
+
+.details-controls .edit-btn:hover {
+  background: var(--button-hover);
+  border-color: var(--accent-primary);
+}
+
+.details-controls .delete-btn {
+  color: var(--accent-danger);
+}
+
+.details-controls .delete-btn:hover {
+  background: rgba(244, 67, 54, 0.08);
+  border-color: var(--accent-danger);
+}
+
+.details-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--py-xs);
+}
+
+.detail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--px-sm);
+}
+
+.detail-label {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  min-width: 60px;
+  font-size: var(--font-size-sm);
+}
+
+.detail-value {
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-mono);
+  flex: 1;
+}
+
+.detail-value pre {
+  margin: 0;
+  padding: var(--py-xs) var(--px-sm);
+  background: var(--primary-bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--button-border-radius);
+  font-size: var(--font-size-xs);
+  overflow-x: auto;
+}
+
+/* Code View Styles */
+.code-view {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--px-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--px-md);
+}
+
+.code-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  min-height: 200px;
+}
+
+.code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--py-sm) 0;
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: var(--px-md);
+}
+
+.code-info {
+  display: flex;
+  align-items: center;
+  gap: var(--px-md);
+}
+
+.code-info h4 {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.code-language {
+  padding: var(--py-xs) var(--px-sm);
+  background: var(--accent-primary);
+  color: white;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--button-border-radius);
+}
+
+.code-controls {
+  display: flex;
+  gap: var(--px-sm);
+}
+
+.code-controls button {
+  padding: var(--py-xs) var(--px-sm);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--button-border-radius);
+  background: var(--primary-bg);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.copy-btn {
+  color: var(--text-secondary);
+}
+
+.copy-btn:hover {
+  background: var(--button-hover);
+  color: var(--text-primary);
+}
+
+.edit-btn {
+  color: var(--accent-primary);
+}
+
+.edit-btn:hover {
+  background: var(--button-hover);
+  border-color: var(--accent-primary);
+}
+
+.save-btn {
+  color: var(--accent-success);
+}
+
+.save-btn:hover {
+  background: rgba(76, 175, 80, 0.08);
+  border-color: var(--accent-success);
+}
+
+.cancel-btn {
+  color: var(--accent-danger);
+}
+
+.cancel-btn:hover {
+  background: rgba(244, 67, 54, 0.08);
+  border-color: var(--accent-danger);
+}
+
+.code-content {
+  flex: 1;
+  min-height: 200px;
+  position: relative;
+}
+
+.code-editor {
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  padding: var(--px-md);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--button-border-radius);
+  background: var(--primary-bg);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-code);
+  color: var(--text-primary);
+  resize: vertical;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.code-editor:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.2);
+}
+
+.code-display {
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  padding: var(--px-md);
+  margin: 0;
+  background: var(--secondary-bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--button-border-radius);
+  overflow: auto;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-code);
+}
+
+.code-display code {
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Syntax highlighting for code display */
+.code-display .comment {
+  color: var(--syntax-comment);
+  font-style: italic;
+}
+
+.code-display .keyword {
+  color: var(--syntax-keyword);
+  font-weight: var(--font-weight-semibold);
+}
+
+.code-display .string {
+  color: var(--syntax-string);
+}
+
+.code-display .number {
+  color: var(--syntax-number);
+}
+
+.code-display .function {
+  color: var(--syntax-function);
+}
+
+/* Responsive adjustments for timeline and code views */
+@media (max-width: 768px) {
+  .timeline-track {
+    height: 80px;
+  }
+  
+  .timeline-ruler {
+    height: 25px;
+  }
+  
+  .timeline-actions {
+    top: 25px;
+  }
+  
+  .timeline-action {
+    width: 10px;
+    height: 10px;
+  }
+  
+  .code-editor,
+  .code-display {
+    min-height: 150px;
+    font-size: var(--font-size-xs);
+  }
+  
+  .timeline-header,
+  .code-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--py-sm);
+  }
+  
+  .timeline-info,
+  .code-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* Accessibility improvements for timeline and code views */
+.timeline-action:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.code-editor:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
+/* High contrast mode for timeline and code views */
+@media (prefers-contrast: high) {
+  .timeline-action {
+    border: 2px solid;
+  }
+  
+  .timeline-action.selected {
+    border: 3px solid;
+  }
+  
+  .code-editor,
+  .code-display {
+    border: 2px solid;
+  }
+}
+
+/* Reduced motion for timeline and code views */
+@media (prefers-reduced-motion: reduce) {
+  .timeline-action {
+    transition: none;
+  }
+  
+  .timeline-action-tooltip {
+    transition: none;
+  }
+  
+  .code-editor {
+    transition: none;
+  }
+}
