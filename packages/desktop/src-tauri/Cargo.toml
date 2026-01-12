@@ -44,6 +44,7 @@ dirs = "5.0"
 
 # Application-Focused Automation dependencies
 # Note: serde, tokio, uuid, chrono already included above
+openssl = { version = "0.10", features = ["vendored"] }
 
 [dev-dependencies]
 proptest = "1.4"
