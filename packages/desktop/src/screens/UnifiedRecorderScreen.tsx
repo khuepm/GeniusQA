@@ -987,15 +987,6 @@ const UnifiedRecorderContent: React.FC = () => {
       {/* Click Cursor Overlay - temporarily disabled as fullscreen overlay not working */}
       {/* <ClickCursorOverlay isRecording={status === 'recording'} /> */}
 
-      {/* Back button - positioned outside the unified interface */}
-      <button
-        className="back-button"
-        onClick={() => navigate(-1)}
-        title="Back to Dashboard"
-      >
-        ←
-      </button>
-
       {/* Error Display - enhanced from RecorderScreen */}
       {error && (
         <div className="error-banner">
@@ -1105,6 +1096,9 @@ const UnifiedRecorderContent: React.FC = () => {
           onOpen={handleOpen}
           onClear={handleClear}
           onSettings={handleSettings}
+          // Navigation props
+          onBack={() => navigate(-1)}
+          onSwitchToClassic={() => navigate('/recorder')}
           // Script selection props
           selectedScriptName={getSelectedScriptName()}
           onScriptSelect={openScriptSelector}

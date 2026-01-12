@@ -69,6 +69,10 @@
   gap: 4px;
 }
 
+.toolbar-group-nav {
+  gap: 4px;
+}
+
 .toolbar-separator {
   width: 1px;
   height: 24px;
@@ -89,6 +93,20 @@
   justify-content: center;
   transition: all 0.2s ease;
   position: relative;
+}
+
+/* Navigation Buttons */
+.toolbar-btn.back-btn {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.toolbar-btn.classic-btn {
+  width: auto;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #666;
 }
 
 .toolbar-btn:hover:not(:disabled) {

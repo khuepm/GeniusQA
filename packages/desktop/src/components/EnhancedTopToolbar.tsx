@@ -19,6 +19,9 @@ export interface EnhancedTopToolbarProps {
   onOpen?: () => void;
   onClear?: () => void;
   onSettings?: () => void;
+  // Navigation props
+  onBack?: () => void;
+  onSwitchToClassic?: () => void;
   // Script selection props
   selectedScriptName?: string;
   onScriptSelect?: () => void;
@@ -52,6 +55,8 @@ export const EnhancedTopToolbar: React.FC<EnhancedTopToolbarProps> = ({
   onOpen,
   onClear,
   onSettings,
+  onBack,
+  onSwitchToClassic,
   selectedScriptName = 'Latest recording',
   onScriptSelect,
   playbackSpeed = 1.0,
@@ -84,8 +89,29 @@ export const EnhancedTopToolbar: React.FC<EnhancedTopToolbarProps> = ({
 
   return (
     <div className="enhanced-top-toolbar">
-      {/* Left Section: Main Action Buttons */}
+      {/* Left Section: Navigation and Main Action Buttons */}
       <div className="toolbar-section toolbar-section-main">
+        {/* Navigation Group */}
+        <div className="toolbar-group toolbar-group-nav">
+          <button
+            className="toolbar-btn back-btn"
+            onClick={onBack}
+            title="Back to Dashboard"
+          >
+            ←
+          </button>
+          <button
+            className="toolbar-btn classic-btn"
+            onClick={onSwitchToClassic}
+            title="Switch to Classic Interface"
+          >
+            Classic
+          </button>
+        </div>
+
+        {/* Separator */}
+        <div className="toolbar-separator" />
+
         {/* Step indicator */}
         <div className="step-indicator">
           <div className="step-icon">📋</div>
