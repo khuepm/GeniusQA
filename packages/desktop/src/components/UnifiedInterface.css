@@ -52,10 +52,12 @@
 }
 
 /* Smooth mode transitions - Requirements: 6.2, 6.3, 6.5 */
+/* TEMPORARILY DISABLED - was blocking button clicks */
+/*
 .unified-interface.transitioning {
-  /* Prevent layout shifts during transitions */
   pointer-events: none;
 }
+*/
 
 .unified-interface.transitioning * {
   /* Ensure all child elements maintain their positions */

@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { UnifiedInterface, UnifiedInterfaceProvider, useUnifiedInterface } from '../components/UnifiedInterface';
+import { UnifiedInterface, UnifiedInterfaceProvider, useUnifiedInterface, RecordingSession } from '../components/UnifiedInterface';
 import { EnhancedTopToolbar } from '../components/EnhancedTopToolbar';
 import { EditorArea } from '../components/EditorArea';
 import { ClickCursorOverlay } from '../components/ClickCursorOverlay';
@@ -91,6 +91,29 @@ const UnifiedRecorderContent: React.FC = () => {
   const [activeRecordingStepId, setActiveRecordingStepId] = useState<string | null>(null);
   const [showScriptLoaderForRecording, setShowScriptLoaderForRecording] = useState<boolean>(false);
 
+  // Core initialization state
+  const [coreInitialized, setCoreInitialized] = useState<boolean>(false);
+
+  /**
+   * Initialize core status - copied from RecorderScreen
+   * This ensures the Rust core is ready before recording
+   */
+  const initializeCoreStatus = async () => {
+    try {
+      console.log('[UnifiedRecorder] Initializing core status...');
+      // Get core status to ensure backend is ready
+      const status = await ipcBridge.getCoreStatus();
+      console.log('[UnifiedRecorder] Core status:', status);
+      setCoreInitialized(true);
+      return true;
+    } catch (err) {
+      console.error('[UnifiedRecorder] Core initialization error:', err);
+      // Still mark as initialized to allow attempts
+      setCoreInitialized(true);
+      return false;
+    }
+  };
+
   /**
    * Initialize component - preserved from RecorderScreen
    * Requirements: 2.5, 6.4, 9.1, 9.5
@@ -98,6 +121,9 @@ const UnifiedRecorderContent: React.FC = () => {
   useEffect(() => {
     const initialize = async () => {
       try {
+        // Initialize core status first - critical for recording to work
+        await initializeCoreStatus();
+
         const requestedScriptPath = (location.state as { scriptPath?: string } | null)?.scriptPath;
 
         // Check for existing recordings
@@ -241,6 +267,31 @@ const UnifiedRecorderContent: React.FC = () => {
       setRecordingSession(null);
     };
 
+    // Add event listener for recording actions
+    const handleRecordingActionEvent = (event: IPCEvent) => {
+      console.log('[UnifiedRecorder] Recording action received:', event.data);
+
+      if (event.data?.action && status === 'recording') {
+        // Update recording session with new action
+        const currentSession = state.recordingSession;
+        if (currentSession) {
+          const newAction = {
+            ...event.data.action,
+            id: `action_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: event.data.action.timestamp || ((Date.now() - (currentSession.startTime || Date.now())) / 1000)
+          };
+
+          const updatedSession: RecordingSession = {
+            ...currentSession,
+            actions: [...currentSession.actions, newAction]
+          };
+
+          setRecordingSession(updatedSession);
+          console.log('[UnifiedRecorder] Recording session updated with new action:', newAction);
+        }
+      }
+    };
+
     const handlePlaybackStoppedEvent = (event: IPCEvent) => {
       console.log('Playback stopped by ESC key:', event.data);
       setStatus('idle');
@@ -269,6 +320,7 @@ const UnifiedRecorderContent: React.FC = () => {
     ipcBridge.addEventListener('recording_stopped', handleRecordingStoppedEvent);
     ipcBridge.addEventListener('playback_stopped', handlePlaybackStoppedEvent);
     ipcBridge.addEventListener('playback_paused', handlePlaybackPausedEvent);
+    ipcBridge.addEventListener('recording_action', handleRecordingActionEvent);
 
     // Add custom event listener for opening script loader
     window.addEventListener('open-script-loader-for-recording', handleOpenScriptLoaderForRecording);
@@ -282,6 +334,7 @@ const UnifiedRecorderContent: React.FC = () => {
       ipcBridge.removeEventListener('recording_stopped', handleRecordingStoppedEvent);
       ipcBridge.removeEventListener('playback_stopped', handlePlaybackStoppedEvent);
       ipcBridge.removeEventListener('playback_paused', handlePlaybackPausedEvent);
+      ipcBridge.removeEventListener('recording_action', handleRecordingActionEvent);
 
       // Remove custom event listener
       window.removeEventListener('open-script-loader-for-recording', handleOpenScriptLoaderForRecording);
@@ -352,33 +405,102 @@ const UnifiedRecorderContent: React.FC = () => {
 
   /**
    * Handle Record Start - Requirements: 1.1, 1.3, 5.1, 5.2
-   * Preserved from RecorderScreen with step-based recording support
+   * Preserved from RecorderScreen with step-based recording support and enhanced state management
    */
   const handleRecordStart = async () => {
     try {
       setError(null);
       setLoading(true);
 
-      // Start recording
-      await ipcBridge.startRecording();
+      console.log('[UnifiedRecorder] Starting recording...');
+      console.log('[UnifiedRecorder] Current status:', status);
+
+      // Start recording - add timeout to prevent infinite hang
+      console.log('[UnifiedRecorder] Calling ipcBridge.startRecording()...');
+
+      const startPromise = ipcBridge.startRecording();
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Recording start timeout after 10s')), 10000)
+      );
+
+      await Promise.race([startPromise, timeoutPromise]);
+
+      console.log('[UnifiedRecorder] startRecording() completed successfully');
+
       setStatus('recording');
       setMode('recording');
       setRecordingStartTime(Date.now());
       setRecordingTime(0);
 
       // Create recording session
-      setRecordingSession({
+      const newRecordingSession: RecordingSession = {
         isActive: true,
         startTime: Date.now(),
         actions: []
-      });
+      };
+
+      setRecordingSession(newRecordingSession);
+      console.log('[UnifiedRecorder] Recording session created:', newRecordingSession);
 
       // Ensure editor is visible during recording - Requirements: 5.1
       setEditorVisible(true);
+
+      console.log('[UnifiedRecorder] Recording started successfully');
+
+      // TEMPORARY: Add test actions to verify UI is working
+      // This will be removed once backend events are working properly
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[UnifiedRecorder] Adding test actions for development...');
+
+        // Simulate some test actions after a short delay
+        setTimeout(() => {
+          const testActions = [
+            {
+              id: `action_${Date.now()}_1`,
+              type: 'mouse_click',
+              timestamp: 1.0,
+              x: 100,
+              y: 200,
+              button: 'left'
+            },
+            {
+              id: `action_${Date.now()}_2`,
+              type: 'key_press',
+              timestamp: 2.5,
+              key: 'a'
+            },
+            {
+              id: `action_${Date.now()}_3`,
+              type: 'mouse_move',
+              timestamp: 3.2,
+              x: 150,
+              y: 250
+            }
+          ];
+
+          // Add test actions to recording session
+          const currentSession = state.recordingSession;
+          if (currentSession && status === 'recording') {
+            const updatedSession: RecordingSession = {
+              ...currentSession,
+              actions: [...currentSession.actions, ...testActions]
+            };
+            setRecordingSession(updatedSession);
+            console.log('[UnifiedRecorder] Test actions added:', testActions);
+          }
+        }, 2000); // Add test actions after 2 seconds
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to start recording';
       setError(errorMessage);
-      console.error('Recording error:', err);
+      console.error('[UnifiedRecorder] Recording error:', err);
+
+      // Reset state on start failure
+      setStatus('idle');
+      setMode('idle');
+      setRecordingStartTime(null);
+      setRecordingTime(0);
+      setRecordingSession(null);
     } finally {
       setLoading(false);
     }
@@ -386,9 +508,22 @@ const UnifiedRecorderContent: React.FC = () => {
 
   /**
    * Handle Record Stop - Requirements: 1.3, 2.4
-   * Preserved from RecorderScreen
+   * Preserved from RecorderScreen with enhanced error handling
    */
   const handleRecordStop = async () => {
+    // Check if we're actually recording before calling stop
+    // This prevents the "No recording in progress" error when ESC key already stopped recording
+    if (status !== 'recording') {
+      console.log('[UnifiedRecorder] Not recording, skipping stop');
+      // Just ensure UI state is synced
+      setStatus('idle');
+      setMode('idle');
+      setRecordingStartTime(null);
+      setRecordingTime(0);
+      setRecordingSession(null);
+      return;
+    }
+
     try {
       setError(null);
       setLoading(true);
@@ -397,9 +532,14 @@ const UnifiedRecorderContent: React.FC = () => {
       const result = await ipcBridge.stopRecording();
 
       if (result.success) {
+        // Handle successful stop with potential warning
+        if (result.warning) {
+          console.warn('Recording stop warning:', result.warning);
+        }
+
         setLastRecordingPath(result.scriptPath || null);
         setSelectedScriptPath(result.scriptPath || null);
-        setHasRecordings(true);
+        setHasRecordings(result.scriptPath ? true : hasRecordings);
         setStatus('idle');
         setMode('idle');
         setRecordingStartTime(null);
@@ -411,19 +551,38 @@ const UnifiedRecorderContent: React.FC = () => {
             path: result.scriptPath,
             filename: result.scriptPath.split('/').pop() || 'Unknown',
             content: '',
-            actions: [] // Actions will be loaded when needed
+            actions: []
           });
-        }
 
-        // Reload available scripts to include the new recording
-        await loadAvailableScripts();
+          // Reload available scripts to include the new recording
+          await loadAvailableScripts();
+        }
       } else {
-        setError(result.error || 'Failed to stop recording');
+        // Handle specific "No recording in progress" error gracefully
+        if (result.error?.includes('No recording in progress')) {
+          console.warn('Recording was already stopped (likely by ESC key)');
+          // Just sync frontend state
+          setStatus('idle');
+          setMode('idle');
+          setRecordingStartTime(null);
+          setRecordingTime(0);
+        } else {
+          setError(result.error || 'Failed to stop recording');
+        }
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to stop recording';
-      setError(errorMessage);
-      console.error('Stop recording error:', err);
+
+      if (errorMessage.includes('No recording in progress')) {
+        console.warn('Recording was already stopped (likely by ESC key)');
+        setStatus('idle');
+        setMode('idle');
+        setRecordingStartTime(null);
+        setRecordingTime(0);
+      } else {
+        setError(errorMessage);
+        console.error('Stop recording error:', err);
+      }
     } finally {
       setLoading(false);
       setRecordingSession(null);
@@ -825,8 +984,8 @@ const UnifiedRecorderContent: React.FC = () => {
 
   return (
     <UnifiedInterface>
-      {/* Click Cursor Overlay - preserved from RecorderScreen */}
-      <ClickCursorOverlay isRecording={status === 'recording'} />
+      {/* Click Cursor Overlay - temporarily disabled as fullscreen overlay not working */}
+      {/* <ClickCursorOverlay isRecording={status === 'recording'} /> */}
 
       {/* Back button - positioned outside the unified interface */}
       <button
