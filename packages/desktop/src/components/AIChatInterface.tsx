@@ -16,6 +16,7 @@ import { getSuggestions, getExamplePrompts } from '../utils/scriptSuggestions';
 import { ProviderSelector } from './ProviderSelector';
 import { ModelSelector } from './ModelSelector';
 import { getIPCBridge } from '../services/ipcBridgeService';
+import { useAnalytics } from '../hooks/useAnalytics';
 import './AIChatInterface.css';
 
 /**
@@ -305,6 +306,7 @@ export const AIChatInterface: React.FC<ChatInterfaceProps> = ({
   providerLoading = false,
 }) => {
   const ipcBridge = getIPCBridge();
+  const { trackEvent, trackFeatureUsed, trackError } = useAnalytics();
   const {
     messages,
     inputValue,
@@ -424,6 +426,18 @@ export const AIChatInterface: React.FC<ChatInterfaceProps> = ({
     e.preventDefault();
     if (inputValue.trim() && !isLoading) {
       setShowSuggestions(false);
+
+      // Track ai_interaction event
+      trackEvent('ai_interaction', {
+        interactionType: 'message_sent',
+        provider: activeProvider,
+        model: activeModel,
+        messageLength: inputValue.trim().length,
+      });
+
+      // Track feature usage for AI chat
+      trackFeatureUsed('ai_chat', { action: 'send_message' });
+
       await sendMessage(inputValue.trim());
     }
   };
@@ -451,6 +465,12 @@ export const AIChatInterface: React.FC<ChatInterfaceProps> = ({
    * Requirements: 5.2
    */
   const handleSuggestionSelect = (suggestion: ActionSuggestion) => {
+    // Track ai_interaction event for suggestion selection
+    trackEvent('ai_interaction', {
+      interactionType: 'suggestion_selected',
+      suggestionType: suggestion.actionType,
+    });
+
     // Append the action description to the input
     const newValue = inputValue.trim() + ' ' + suggestion.description;
     setInputValue(newValue);
@@ -463,6 +483,12 @@ export const AIChatInterface: React.FC<ChatInterfaceProps> = ({
    * Requirements: 5.4
    */
   const handleExampleSelect = (example: ExamplePrompt) => {
+    // Track ai_interaction event for example selection
+    trackEvent('ai_interaction', {
+      interactionType: 'example_selected',
+      exampleId: example.id,
+    });
+
     setInputValue(example.promptText);
     inputRef.current?.focus();
   };

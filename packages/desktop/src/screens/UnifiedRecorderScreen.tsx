@@ -15,6 +15,7 @@ import { ScriptListItem } from '../components/ScriptListItem';
 import { ScriptFilter } from '../components/ScriptFilter';
 import { getIPCBridge } from '../services/ipcBridgeService';
 import { scriptStorageService, StoredScriptInfo, ScriptFilter as ScriptFilterType, ScriptSource, TargetOS } from '../services/scriptStorageService';
+import { useAnalytics } from '../hooks/useAnalytics';
 import {
   RecorderStatus,
   IPCEvent,
@@ -47,6 +48,7 @@ const UnifiedRecorderContent: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const ipcBridge = getIPCBridge();
+  const { trackEvent, trackFeatureUsed, trackError } = useAnalytics();
   const {
     state,
     setMode,
@@ -203,6 +205,16 @@ const UnifiedRecorderContent: React.FC = () => {
 
     const handleCompleteEvent = (event: IPCEvent) => {
       console.log('Playback complete:', event.data);
+
+      // Track playback_completed event (natural completion)
+      trackEvent('playback_completed', {
+        completedActions: event.data?.totalActions || totalActions,
+        totalActions: event.data?.totalActions || totalActions,
+        completedLoops: event.data?.totalLoops || totalLoops,
+        totalLoops: event.data?.totalLoops || totalLoops,
+        stoppedByUser: false,
+      });
+
       setStatus('idle');
       setMode('idle');
       setLoading(false);
@@ -226,7 +238,25 @@ const UnifiedRecorderContent: React.FC = () => {
 
     const handleErrorEvent = (event: IPCEvent) => {
       console.error('IPC Error:', event.data);
-      setError(event.data?.message || 'An error occurred');
+      const errorMessage = event.data?.message || 'An error occurred';
+
+      // Track error event
+      trackEvent('playback_failed', {
+        error: errorMessage,
+        phase: 'execution',
+        errorType: event.data?.type,
+      });
+
+      // Check for element_not_found error
+      if (event.data?.type === 'element_not_found' || errorMessage.includes('element not found')) {
+        trackError(new Error(errorMessage), {
+          component: 'UnifiedRecorderScreen',
+          action: 'playback_element_not_found',
+          errorType: 'element_not_found',
+        });
+      }
+
+      setError(errorMessage);
       setStatus('idle');
       setMode('idle');
       setLoading(false);
@@ -241,6 +271,15 @@ const UnifiedRecorderContent: React.FC = () => {
 
     const handleRecordingStoppedEvent = async (event: IPCEvent) => {
       console.log('Recording stopped by ESC key:', event.data);
+
+      // Track recording_completed event (ESC key stop)
+      trackEvent('recording_completed', {
+        duration: recordingTime,
+        actionCount: state.recordingSession?.actions?.length || 0,
+        scriptPath: event.data?.scriptPath,
+        stoppedByEsc: true,
+      });
+
       setStatus('idle');
       setMode('idle');
       setLoading(false);
@@ -339,7 +378,7 @@ const UnifiedRecorderContent: React.FC = () => {
       // Remove custom event listener
       window.removeEventListener('open-script-loader-for-recording', handleOpenScriptLoaderForRecording);
     };
-  }, [location.state, ipcBridge, setMode, setCurrentScript, setRecordingSession, setPlaybackSession, setEditorVisible]);
+  }, [location.state, ipcBridge, setMode, setCurrentScript, setRecordingSession, setPlaybackSession, setEditorVisible, trackEvent, trackError, recordingTime, state.recordingSession, totalActions, totalLoops]);
 
   /**
    * Update recording time while recording - preserved from RecorderScreen
@@ -415,6 +454,9 @@ const UnifiedRecorderContent: React.FC = () => {
       console.log('[UnifiedRecorder] Starting recording...');
       console.log('[UnifiedRecorder] Current status:', status);
 
+      // Track feature usage for recorder
+      trackFeatureUsed('recorder', { action: 'start' });
+
       // Start recording - add timeout to prevent infinite hang
       console.log('[UnifiedRecorder] Calling ipcBridge.startRecording()...');
 
@@ -431,6 +473,12 @@ const UnifiedRecorderContent: React.FC = () => {
       setMode('recording');
       setRecordingStartTime(Date.now());
       setRecordingTime(0);
+
+      // Track recording_started event
+      trackEvent('recording_started', {
+        stepRecordingEnabled,
+        hasActiveScript: !!activeRecordingScript,
+      });
 
       // Create recording session
       const newRecordingSession: RecordingSession = {
@@ -495,6 +543,20 @@ const UnifiedRecorderContent: React.FC = () => {
       setError(errorMessage);
       console.error('[UnifiedRecorder] Recording error:', err);
 
+      // Track recording_failed event
+      trackEvent('recording_failed', {
+        error: errorMessage,
+        phase: 'start',
+      });
+
+      // Track error for error tracking
+      if (err instanceof Error) {
+        trackError(err, {
+          component: 'UnifiedRecorderScreen',
+          action: 'handleRecordStart',
+        });
+      }
+
       // Reset state on start failure
       setStatus('idle');
       setMode('idle');
@@ -524,6 +586,9 @@ const UnifiedRecorderContent: React.FC = () => {
       return;
     }
 
+    const recordingDuration = recordingTime;
+    const actionCount = state.recordingSession?.actions?.length || 0;
+
     try {
       setError(null);
       setLoading(true);
@@ -536,6 +601,13 @@ const UnifiedRecorderContent: React.FC = () => {
         if (result.warning) {
           console.warn('Recording stop warning:', result.warning);
         }
+
+        // Track recording_completed event
+        trackEvent('recording_completed', {
+          duration: recordingDuration,
+          actionCount,
+          scriptPath: result.scriptPath,
+        });
 
         setLastRecordingPath(result.scriptPath || null);
         setSelectedScriptPath(result.scriptPath || null);
@@ -568,6 +640,13 @@ const UnifiedRecorderContent: React.FC = () => {
           setRecordingTime(0);
         } else {
           setError(result.error || 'Failed to stop recording');
+
+          // Track recording_failed event
+          trackEvent('recording_failed', {
+            error: result.error || 'Failed to stop recording',
+            phase: 'stop',
+            duration: recordingDuration,
+          });
         }
       }
     } catch (err) {
@@ -582,6 +661,21 @@ const UnifiedRecorderContent: React.FC = () => {
       } else {
         setError(errorMessage);
         console.error('Stop recording error:', err);
+
+        // Track recording_failed event
+        trackEvent('recording_failed', {
+          error: errorMessage,
+          phase: 'stop',
+          duration: recordingDuration,
+        });
+
+        // Track error for error tracking
+        if (err instanceof Error) {
+          trackError(err, {
+            component: 'UnifiedRecorderScreen',
+            action: 'handleRecordStop',
+          });
+        }
       }
     } finally {
       setLoading(false);
@@ -611,10 +705,20 @@ const UnifiedRecorderContent: React.FC = () => {
         throw new Error('No script selected for playback');
       }
 
+      // Track feature usage for playback
+      trackFeatureUsed('playback', { action: 'start' });
+
       // Start playback with preserved speed and loop settings
       await ipcBridge.startPlayback(scriptPath, playbackSpeed, loopCount);
       setStatus('playing');
       setMode('playing');
+
+      // Track playback_started event
+      trackEvent('playback_started', {
+        scriptPath,
+        playbackSpeed,
+        loopCount,
+      });
 
       // Create playback session
       setPlaybackSession({
@@ -627,6 +731,20 @@ const UnifiedRecorderContent: React.FC = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to start playback';
       setError(errorMessage);
       console.error('Playback error:', err);
+
+      // Track playback_failed event
+      trackEvent('playback_failed', {
+        error: errorMessage,
+        phase: 'start',
+      });
+
+      // Track error for error tracking
+      if (err instanceof Error) {
+        trackError(err, {
+          component: 'UnifiedRecorderScreen',
+          action: 'handlePlayStart',
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -637,12 +755,25 @@ const UnifiedRecorderContent: React.FC = () => {
    * Preserved from RecorderScreen
    */
   const handlePlayStop = async () => {
+    const completedActions = actionIndex;
+    const totalActionsCount = totalActions;
+
     try {
       setError(null);
       setLoading(true);
 
       // Stop playback
       await ipcBridge.stopPlayback();
+
+      // Track playback_completed event (user-initiated stop)
+      trackEvent('playback_completed', {
+        completedActions,
+        totalActions: totalActionsCount,
+        completedLoops: currentLoop,
+        totalLoops,
+        stoppedByUser: true,
+      });
+
       setStatus('idle');
       setMode('idle');
 
@@ -661,6 +792,21 @@ const UnifiedRecorderContent: React.FC = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to stop playback';
       setError(errorMessage);
       console.error('Stop playback error:', err);
+
+      // Track playback_failed event
+      trackEvent('playback_failed', {
+        error: errorMessage,
+        phase: 'stop',
+        completedActions,
+      });
+
+      // Track error for error tracking
+      if (err instanceof Error) {
+        trackError(err, {
+          component: 'UnifiedRecorderScreen',
+          action: 'handlePlayStop',
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -733,6 +879,11 @@ const UnifiedRecorderContent: React.FC = () => {
       setLoading(true);
       await loadAvailableScripts();
       setShowScriptSelector(true);
+
+      // Track dialog_opened event
+      trackEvent('dialog_opened', {
+        dialogName: 'ScriptSelector',
+      });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load scripts';
       setError(errorMessage);
@@ -774,9 +925,19 @@ const UnifiedRecorderContent: React.FC = () => {
       if (event.key === 'Escape') {
         if (status === 'recording') {
           event.preventDefault();
+          // Track shortcut_used event
+          trackEvent('shortcut_used', {
+            shortcut: 'Escape',
+            action: 'stop_recording',
+          });
           void handleRecordStop();
         } else if (status === 'playing') {
           event.preventDefault();
+          // Track shortcut_used event
+          trackEvent('shortcut_used', {
+            shortcut: 'Escape',
+            action: 'stop_playback',
+          });
           void handlePlayStop();
         }
       }
@@ -787,7 +948,7 @@ const UnifiedRecorderContent: React.FC = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [status]);
+  }, [status, trackEvent]);
 
   /**
    * Step-based recording handlers - preserved from RecorderScreen
@@ -823,7 +984,12 @@ const UnifiedRecorderContent: React.FC = () => {
 
   const handleLoadScriptForRecording = useCallback(() => {
     setShowScriptLoaderForRecording(true);
-  }, []);
+
+    // Track dialog_opened event
+    trackEvent('dialog_opened', {
+      dialogName: 'ScriptLoaderForRecording',
+    });
+  }, [trackEvent]);
 
   const handleSelectScriptForRecording = useCallback(async (scriptPath: string) => {
     try {
