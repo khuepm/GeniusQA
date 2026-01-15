@@ -298,7 +298,7 @@ export interface ConsentStatus {
  */
 export const DEFAULT_ANALYTICS_CONFIG: AnalyticsConfig = {
   enabled: true,
-  debugMode: false,
+  debugMode: true, // Enable debug logging to console
   batchSize: 10,
   flushInterval: 30000, // 30 seconds
   maxQueueSize: 1000,

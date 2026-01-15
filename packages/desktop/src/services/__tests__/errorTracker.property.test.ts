@@ -543,7 +543,7 @@ describe('ErrorTracker Property Tests', () => {
     it('different error types are tracked separately for escalation', () => {
       fc.assert(
         fc.property(
-          fc.array(errorNameArbitrary, { minLength: 2, maxLength: 5 }),
+          fc.uniqueArray(errorNameArbitrary, { minLength: 2, maxLength: 5 }),
           fc.integer({ min: 1, max: 3 }),
           (errorTypes: string[], countPerType: number) => {
             const mockService = createMockAnalyticsService();

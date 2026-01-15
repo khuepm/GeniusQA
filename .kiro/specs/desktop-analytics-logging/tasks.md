@@ -157,9 +157,7 @@ Kế hoạch triển khai hệ thống Analytics Logging cho GeniusQA Desktop Ap
 
   - [x] 6.7 Write property test for critical error escalation
     - **Property 4: Critical Error Escalation**
-    - **Status: PARTIAL** - 5/6 tests pass. Test 'different error types are tracked separately for escalation' fails with counterexample: `[["Error","Error"],1]`
-    - **Root Cause:** Test generator issue - `fc.array(errorNameArbitrary)` can produce arrays with duplicate values, causing the test to fail when it expects unique error types
-    - **Fix Option:** Update the test to use `fc.uniqueArray(errorNameArbitrary)` or filter duplicates before assertion
+    - **Status: PASSED** - All 6 tests pass after fix in Task 16.1 (changed fc.array to fc.uniqueArray)
     - **Validates: Requirements 4.4**
 
 - [x] 7. Implement PerformanceTracker Service
@@ -334,13 +332,14 @@ Kế hoạch triển khai hệ thống Analytics Logging cho GeniusQA Desktop Ap
   3. Verify email received at configured ALERT_RECIPIENTS
   4. Check rate limiting by triggering >10 errors of same type within 1 hour
 
-- [ ] 16. Fix Property Test Generator Issue
-  - [ ] 16.1 Fix errorTracker property test for unique error types
+- [x] 16. Fix Property Test Generator Issue
+  - [x] 16.1 Fix errorTracker property test for unique error types
     - Update `packages/desktop/src/services/__tests__/errorTracker.property.test.ts`
     - Change `fc.array(errorNameArbitrary, { minLength: 2, maxLength: 5 })` to use `fc.uniqueArray(errorNameArbitrary, { minLength: 2, maxLength: 5 })`
     - This ensures the test generates arrays with unique error types, matching the test's intent
     - _Requirements: 4.4_
     - _Fixes: Task 6.7 failing test_
+    - **Status: PASSED** - Changed fc.array to fc.uniqueArray. All 38 errorTracker property tests pass.
 
 ## Notes
 
