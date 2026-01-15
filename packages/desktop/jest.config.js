@@ -6,7 +6,10 @@ module.exports = {
   projects: [
     {
       displayName: 'services',
-      testMatch: ['<rootDir>/src/services/**/*.test.ts'],
+      testMatch: [
+        '<rootDir>/src/services/**/*.test.ts',
+        '<rootDir>/src/services/**/*.property.test.ts',
+      ],
       testEnvironment: 'node',
       transform: {
         '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { configFile: './babel.config.js' }],
