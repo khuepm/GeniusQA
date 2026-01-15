@@ -1,0 +1,293 @@
+/**
+ * AnalyticsSettings Component Styles
+ *
+ * Styles for the analytics settings panel.
+ * Requirements: 6.3
+ */
+
+.analytics-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border: 1px solid #e8eaed;
+  border-radius: 12px;
+}
+
+/* Header with toggle */
+.analytics-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.analytics-settings-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+}
+
+.analytics-settings-icon {
+  font-size: 28px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.analytics-settings-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.analytics-settings-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #202124;
+}
+
+.analytics-settings-description {
+  margin: 0;
+  font-size: 13px;
+  color: #5f6368;
+  line-height: 1.4;
+}
+
+/* Toggle switch */
+.analytics-toggle {
+  position: relative;
+  display: inline-block;
+  width: 52px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.analytics-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.analytics-toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #dadce0;
+  border-radius: 28px;
+  transition: all 0.3s ease;
+}
+
+.analytics-toggle-slider::before {
+  position: absolute;
+  content: '';
+  height: 22px;
+  width: 22px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.analytics-toggle input:checked + .analytics-toggle-slider {
+  background-color: #34a853;
+}
+
+.analytics-toggle input:checked + .analytics-toggle-slider::before {
+  transform: translateX(24px);
+}
+
+.analytics-toggle input:disabled + .analytics-toggle-slider {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Status indicator */
+.analytics-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.analytics-status.enabled {
+  background-color: #e6f4ea;
+  color: #137333;
+}
+
+.analytics-status.disabled {
+  background-color: #f1f3f4;
+  color: #5f6368;
+}
+
+.analytics-status-icon {
+  font-size: 14px;
+}
+
+/* Data collection section */
+.analytics-data-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.analytics-data-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #5f6368;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.analytics-data-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.analytics-data-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e8eaed;
+}
+
+.analytics-data-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.analytics-data-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.analytics-data-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #202124;
+}
+
+.analytics-data-desc {
+  font-size: 11px;
+  color: #5f6368;
+  line-height: 1.3;
+}
+
+/* Privacy note */
+.analytics-privacy-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background-color: #e8f0fe;
+  border-radius: 8px;
+}
+
+.analytics-privacy-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.analytics-privacy-text {
+  margin: 0;
+  font-size: 12px;
+  color: #1967d2;
+  line-height: 1.5;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .analytics-settings {
+    padding: 16px;
+  }
+
+  .analytics-settings-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .analytics-toggle {
+    align-self: flex-end;
+    margin-top: -40px;
+  }
+
+  .analytics-data-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .analytics-settings {
+    background-color: #2d2d2d;
+    border-color: #404040;
+  }
+
+  .analytics-settings-title {
+    color: #f9fafb;
+  }
+
+  .analytics-settings-description {
+    color: #9ca3af;
+  }
+
+  .analytics-toggle-slider {
+    background-color: #4b5563;
+  }
+
+  .analytics-status.enabled {
+    background-color: rgba(52, 168, 83, 0.15);
+    color: #34d399;
+  }
+
+  .analytics-status.disabled {
+    background-color: #374151;
+    color: #9ca3af;
+  }
+
+  .analytics-data-title {
+    color: #9ca3af;
+  }
+
+  .analytics-data-item {
+    background-color: #374151;
+    border-color: #4b5563;
+  }
+
+  .analytics-data-name {
+    color: #f9fafb;
+  }
+
+  .analytics-data-desc {
+    color: #9ca3af;
+  }
+
+  .analytics-privacy-note {
+    background-color: rgba(59, 130, 246, 0.15);
+  }
+
+  .analytics-privacy-text {
+    color: #60a5fa;
+  }
+}

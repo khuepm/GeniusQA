@@ -1,4 +1,6 @@
 import { initializeApp, FirebaseApp } from 'firebase/app';
+import { getAnalytics, Analytics, isSupported } from 'firebase/analytics';
+import { getFirestore, Firestore } from 'firebase/firestore';
 import { getEnvVar } from '../utils/env';
 
 /**
@@ -53,5 +55,51 @@ const firebaseConfig: FirebaseConfig = {
 
 // Initialize Firebase app
 export const app: FirebaseApp = initializeApp(firebaseConfig);
+
+// Initialize Firestore
+export const firestore: Firestore = getFirestore(app);
+
+// Initialize Analytics (may not be supported in all environments)
+let analyticsInstance: Analytics | null = null;
+
+/**
+ * Get the Analytics instance.
+ * Analytics may not be available in non-browser environments (e.g., Node.js, SSR).
+ * Returns null if analytics is not supported.
+ */
+export const getAnalyticsInstance = async (): Promise<Analytics | null> => {
+  if (analyticsInstance) {
+    return analyticsInstance;
+  }
+  
+  try {
+    const supported = await isSupported();
+    if (supported) {
+      analyticsInstance = getAnalytics(app);
+      return analyticsInstance;
+    }
+    console.warn('Firebase Analytics is not supported in this environment');
+    return null;
+  } catch (error) {
+    console.warn('Failed to initialize Firebase Analytics:', error);
+    return null;
+  }
+};
+
+// Synchronous getter for analytics (returns null if not yet initialized)
+export const analytics: Analytics | null = null;
+
+// Initialize analytics asynchronously
+isSupported().then((supported) => {
+  if (supported) {
+    try {
+      (globalThis as { __firebaseAnalytics?: Analytics }).__firebaseAnalytics = getAnalytics(app);
+    } catch (error) {
+      console.warn('Failed to initialize Firebase Analytics:', error);
+    }
+  }
+}).catch(() => {
+  // Analytics not supported, silently ignore
+});
 
 export default firebaseConfig;

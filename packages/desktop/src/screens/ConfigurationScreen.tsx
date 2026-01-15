@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/tauri';
 import { ApplicationFocusConfig, FocusLossStrategy } from '../types/applicationFocusedAutomation.types';
+import { AnalyticsSettings } from '../components/AnalyticsSettings';
 import './ConfigurationScreen.css';
 
 export const ConfigurationScreen: React.FC = () => {
@@ -317,6 +318,12 @@ export const ConfigurationScreen: React.FC = () => {
               How long notifications stay visible (1-300000ms)
             </span>
           </div>
+        </div>
+
+        {/* Analytics Settings Section */}
+        <div className="config-section">
+          <h2>Privacy & Analytics</h2>
+          <AnalyticsSettings />
         </div>
       </div>
 
