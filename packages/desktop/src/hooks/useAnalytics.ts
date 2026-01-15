@@ -29,6 +29,8 @@ export interface UseAnalyticsReturn {
   isEnabled: boolean;
   /** Enable or disable analytics (consent management) */
   setEnabled: (enabled: boolean) => void;
+  /** Whether the analytics service has been initialized */
+  isInitialized: boolean;
 }
 
 /**
@@ -65,7 +67,7 @@ export function useAnalytics(): UseAnalyticsReturn {
     throw new Error('useAnalytics must be used within an AnalyticsProvider');
   }
 
-  const { analyticsService, errorTracker, isEnabled, setEnabled } = context;
+  const { analyticsService, errorTracker, isEnabled, setEnabled, isInitialized } = context;
 
   /**
    * Track a custom analytics event
@@ -118,6 +120,7 @@ export function useAnalytics(): UseAnalyticsReturn {
     trackError,
     isEnabled,
     setEnabled,
+    isInitialized,
   };
 }
 

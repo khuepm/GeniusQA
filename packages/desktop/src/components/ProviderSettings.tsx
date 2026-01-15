@@ -5,8 +5,9 @@
  * Displays all supported providers with their configuration status
  * and allows users to add, update, or delete API keys.
  * Also manages custom AI models with OpenAI-compatible endpoints.
+ * Includes analytics settings for consent management.
  *
- * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 11.1, 11.7, 11.8
+ * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 11.1, 11.7, 11.8, 6.3
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -20,6 +21,7 @@ import {
 import { apiKeyService } from '../services/apiKeyService';
 import { customModelService } from '../services/customModelService';
 import { CustomModelDialog } from './CustomModelDialog';
+import { AnalyticsSettings } from './AnalyticsSettings';
 import './ProviderSettings.css';
 
 /**
@@ -769,6 +771,11 @@ export const ProviderSettings: React.FC<ProviderSettingsProps> = ({
       {/* Custom Models Section */}
       {renderCustomModelsSection()}
 
+      {/* Analytics Settings Section */}
+      <div className="analytics-settings-section" data-testid="analytics-settings-section">
+        <AnalyticsSettings />
+      </div>
+
       {/* Custom Model Dialog */}
       <CustomModelDialog
         isOpen={customModelDialogOpen}
@@ -822,6 +829,11 @@ export const ProviderSettings: React.FC<ProviderSettingsProps> = ({
 
             {/* Custom Models Section in Modal */}
             {renderCustomModelsSection()}
+
+            {/* Analytics Settings Section in Modal */}
+            <div className="analytics-settings-section" data-testid="analytics-settings-section-modal">
+              <AnalyticsSettings />
+            </div>
           </div>
         </div>
 
