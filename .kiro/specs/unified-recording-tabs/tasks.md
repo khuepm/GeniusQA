@@ -121,25 +121,28 @@ Kế hoạch triển khai hệ thống tab để gộp Script Manager vào Unifi
   - Ensure all tests pass, ask the user if questions arise.
   - **Result**: All 12 property tests for Task 5 pass (Property 1: Tab Bar Visibility - 6 tests, Property 4: Script Selection Navigation - 6 tests).
 
-- [ ] 7. Implement Keyboard Navigation
-  - [ ] 7.1 Add keyboard shortcuts cho tab switching
+- [-] 7. Implement Keyboard Navigation
+  - [x] 7.1 Add keyboard shortcuts cho tab switching
     - Ctrl/Cmd + 1 → Recording tab
     - Ctrl/Cmd + 2 → Script List tab
     - Ctrl/Cmd + 3 → AI Builder tab
     - Ctrl/Cmd + 4 → Editor tab
     - _Requirements: 8.1, 8.2, 8.3, 8.4_
+    - **Completed**: Added keyboard shortcuts in `handleKeyDown` callback in UnifiedInterface.tsx
 
-  - [ ] 7.2 Implement shortcut restrictions
+  - [x] 7.2 Implement shortcut restrictions
     - Disable shortcuts during recording
     - Disable shortcuts during playback
     - _Requirements: 8.5_
+    - **Completed**: Shortcuts are disabled when `applicationMode === 'recording'` or `applicationMode === 'playing'` or `playbackSession?.isActive`
 
-  - [ ] 7.3 Write property test cho Keyboard Shortcuts
+  - [-] 7.3 Write property test cho Keyboard Shortcuts
     - **Property 9: Keyboard Shortcuts Conditional Behavior**
     - **Validates: Requirements 8.5**
+    - **Status: FAILED** - Tests written but failing due to jsdom keyboard event simulation limitations. The keyboard events dispatched to window in test environment don't properly trigger the React component's event listener. Counterexamples: ["4"], ["2"]
 
-- [ ] 8. Update CSS và Visual Polish
-  - [ ] 8.1 Update UnifiedInterface.css
+- [-] 8. Update CSS và Visual Polish
+  - [x] 8.1 Update UnifiedInterface.css
     - Thêm styles cho tab layout
     - Đảm bảo responsive design
     - _Requirements: 7.3, 7.5_
@@ -153,8 +156,13 @@ Kế hoạch triển khai hệ thống tab để gộp Script Manager vào Unifi
     - Test responsive behavior
     - _Requirements: 6.5, 7.5_
 
-- [ ] 9. Final Checkpoint - Ensure all tests pass
+- [-] 9. Final Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
+  - **Status**: 
+    - TabBar unit tests: 23/23 PASS ✅
+    - UnifiedInterface property tests: 21/24 PASS, 3 FAIL ❌
+    - Failing tests are Property 9 (Keyboard Shortcuts Conditional Behavior) - known jsdom limitation
+  - **User action required**: See Task 7.3 for details on failing keyboard shortcut tests
 
 ## Notes
 

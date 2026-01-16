@@ -48,6 +48,44 @@ const TabButton: React.FC<TabButtonProps> = React.memo(({ tab, isActive, onClick
 TabButton.displayName = 'TabButton';
 
 /**
+ * ModeIndicator Component
+ * Visual indicator showing current application mode
+ * Requirements: 6.5
+ */
+const ModeIndicator: React.FC<{ mode: string }> = React.memo(({ mode }) => {
+  const getModeLabel = (mode: string): string => {
+    switch (mode) {
+      case 'recording':
+        return 'Recording';
+      case 'playing':
+        return 'Playing';
+      case 'editing':
+        return 'Editing';
+      default:
+        return '';
+    }
+  };
+
+  const label = getModeLabel(mode);
+  if (!label) return null;
+
+  return (
+    <div
+      className={`mode-indicator ${mode}`}
+      data-testid="mode-indicator"
+      role="status"
+      aria-live="polite"
+      aria-label={`Current mode: ${label}`}
+    >
+      <span className="mode-indicator-dot" aria-hidden="true" />
+      <span className="mode-indicator-label">{label}</span>
+    </div>
+  );
+});
+
+ModeIndicator.displayName = 'ModeIndicator';
+
+/**
  * TabBar Component
  * Main tab bar container that renders all tabs
  */
@@ -70,6 +108,7 @@ export const TabBar: React.FC<TabBarProps> = React.memo(({
       aria-label="Main navigation tabs"
       data-testid="tab-bar"
     >
+      <ModeIndicator mode={applicationMode} />
       {TAB_CONFIGS.map((tab) => (
         <TabButton
           key={tab.id}

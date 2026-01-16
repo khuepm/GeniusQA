@@ -269,6 +269,108 @@ describe('TabBar Component', () => {
     });
   });
 
+  describe('Mode Indicators - Requirements: 6.5', () => {
+    it('should not show mode indicator in idle mode', () => {
+      render(
+        <TabBar
+          activeTab="recording"
+          onTabChange={mockOnTabChange}
+          applicationMode="idle"
+        />
+      );
+
+      expect(screen.queryByTestId('mode-indicator')).not.toBeInTheDocument();
+    });
+
+    it('should show recording indicator with correct label', () => {
+      render(
+        <TabBar
+          activeTab="recording"
+          onTabChange={mockOnTabChange}
+          applicationMode="recording"
+        />
+      );
+
+      const indicator = screen.getByTestId('mode-indicator');
+      expect(indicator).toBeInTheDocument();
+      expect(indicator).toHaveClass('recording');
+      // Query within the mode indicator to avoid matching the tab label
+      expect(indicator).toHaveTextContent('Recording');
+    });
+
+    it('should show playing indicator with correct label', () => {
+      render(
+        <TabBar
+          activeTab="recording"
+          onTabChange={mockOnTabChange}
+          applicationMode="playing"
+        />
+      );
+
+      const indicator = screen.getByTestId('mode-indicator');
+      expect(indicator).toBeInTheDocument();
+      expect(indicator).toHaveClass('playing');
+      expect(screen.getByText('Playing')).toBeInTheDocument();
+    });
+
+    it('should show editing indicator with correct label', () => {
+      render(
+        <TabBar
+          activeTab="recording"
+          onTabChange={mockOnTabChange}
+          applicationMode="editing"
+        />
+      );
+
+      const indicator = screen.getByTestId('mode-indicator');
+      expect(indicator).toBeInTheDocument();
+      expect(indicator).toHaveClass('editing');
+      expect(screen.getByText('Editing')).toBeInTheDocument();
+    });
+
+    it('should have accessible aria attributes on mode indicator', () => {
+      render(
+        <TabBar
+          activeTab="recording"
+          onTabChange={mockOnTabChange}
+          applicationMode="recording"
+        />
+      );
+
+      const indicator = screen.getByTestId('mode-indicator');
+      expect(indicator).toHaveAttribute('role', 'status');
+      expect(indicator).toHaveAttribute('aria-live', 'polite');
+      expect(indicator).toHaveAttribute('aria-label', 'Current mode: Recording');
+    });
+
+    it('should update mode indicator when mode changes', () => {
+      const { rerender } = render(
+        <TabBar
+          activeTab="recording"
+          onTabChange={mockOnTabChange}
+          applicationMode="recording"
+        />
+      );
+
+      const indicator = screen.getByTestId('mode-indicator');
+      expect(indicator).toHaveClass('recording');
+      // Query within the mode indicator to avoid matching the tab label
+      expect(indicator).toHaveTextContent('Recording');
+
+      rerender(
+        <TabBar
+          activeTab="recording"
+          onTabChange={mockOnTabChange}
+          applicationMode="playing"
+        />
+      );
+
+      const updatedIndicator = screen.getByTestId('mode-indicator');
+      expect(updatedIndicator).toHaveClass('playing');
+      expect(updatedIndicator).toHaveTextContent('Playing');
+    });
+  });
+
   describe('Keyboard Navigation', () => {
     it('should handle Enter key press on tab', () => {
       render(

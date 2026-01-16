@@ -99,14 +99,95 @@
 /* Mode-specific styling for tab bar */
 .tab-bar.mode-recording {
   border-top-color: var(--accent-danger, #f44336);
+  border-top-width: 2px;
 }
 
 .tab-bar.mode-playing {
   border-top-color: var(--accent-success, #4caf50);
+  border-top-width: 2px;
 }
 
 .tab-bar.mode-editing {
   border-top-color: var(--accent-primary, #1976d2);
+  border-top-width: 2px;
+}
+
+/* Mode indicator element - Requirements: 6.5 */
+.mode-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 28px;
+  border-radius: 14px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 8px;
+}
+
+.mode-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* Recording mode indicator - pulsing red dot */
+.mode-indicator.recording {
+  background: rgba(244, 67, 54, 0.1);
+  color: var(--accent-danger, #f44336);
+}
+
+.mode-indicator.recording .mode-indicator-dot {
+  background: var(--accent-danger, #f44336);
+  animation: pulse-recording 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-recording {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}
+
+/* Playing mode indicator - animated progress */
+.mode-indicator.playing {
+  background: rgba(76, 175, 80, 0.1);
+  color: var(--accent-success, #4caf50);
+}
+
+.mode-indicator.playing .mode-indicator-dot {
+  background: var(--accent-success, #4caf50);
+  animation: pulse-playing 1s ease-in-out infinite;
+}
+
+@keyframes pulse-playing {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* Editing mode indicator - static blue */
+.mode-indicator.editing {
+  background: rgba(25, 118, 210, 0.1);
+  color: var(--accent-primary, #1976d2);
+}
+
+.mode-indicator.editing .mode-indicator-dot {
+  background: var(--accent-primary, #1976d2);
+}
+
+/* Idle mode - hidden */
+.mode-indicator.idle {
+  display: none;
 }
 
 /* Responsive adjustments */

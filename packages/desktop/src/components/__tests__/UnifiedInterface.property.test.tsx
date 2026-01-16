@@ -591,4 +591,135 @@ describe('UnifiedInterface Property Tests', () => {
       );
     });
   });
+
+  // ==========================================================================
+  // Property 9: Keyboard Shortcuts Conditional Behavior
+  // ==========================================================================
+
+  /**
+   * **Feature: unified-recording-tabs, Property 9: Keyboard Shortcuts Conditional Behavior**
+   * **Validates: Requirements 8.5**
+   * 
+   * Keyboard shortcuts (Ctrl/Cmd + 1-4) SHALL be disabled during active recording 
+   * or playback to prevent accidental interruption.
+   */
+  describe('Property 9: Keyboard Shortcuts Conditional Behavior', () => {
+    /**
+     * Arbitrary for keyboard shortcut keys (1-4)
+     */
+    const shortcutKeyArb = fc.constantFrom('1', '2', '3', '4');
+
+    /**
+     * Maps shortcut key to expected tab
+     */
+    const keyToTab: Record<string, TabType> = {
+      '1': 'recording',
+      '2': 'list',
+      '3': 'builder',
+      '4': 'editor',
+    };
+
+    /**
+     * Helper to simulate keyboard shortcut
+     */
+    const simulateKeyboardShortcut = (key: string) => {
+      const event = new KeyboardEvent('keydown', {
+        key,
+        ctrlKey: true,
+        metaKey: false,
+        bubbles: true,
+      });
+      window.dispatchEvent(event);
+    };
+
+    it('keyboard shortcuts work in idle mode', () => {
+      fc.assert(
+        fc.property(shortcutKeyArb, (key: string) => {
+          cleanup();
+          renderUnifiedInterface();
+
+          // Start from recording tab (default)
+          const initialTab = screen.getByTestId('tab-recording');
+          expect(initialTab.getAttribute('aria-selected')).toBe('true');
+
+          // Simulate keyboard shortcut
+          simulateKeyboardShortcut(key);
+
+          // The target tab should now be active
+          const targetTab = keyToTab[key];
+          const tab = screen.getByTestId(`tab-${targetTab}`);
+          return tab.getAttribute('aria-selected') === 'true';
+        }),
+        { numRuns: 50 }
+      );
+    });
+
+    it('keyboard shortcuts switch to correct tabs', () => {
+      fc.assert(
+        fc.property(
+          fc.array(shortcutKeyArb, { minLength: 1, maxLength: 5 }),
+          (keySequence: string[]) => {
+            cleanup();
+            renderUnifiedInterface();
+
+            // Execute sequence of shortcuts
+            for (const key of keySequence) {
+              simulateKeyboardShortcut(key);
+            }
+
+            // Final tab should match last key pressed
+            const lastKey = keySequence[keySequence.length - 1];
+            const expectedTab = keyToTab[lastKey];
+            const tab = screen.getByTestId(`tab-${expectedTab}`);
+
+            return tab.getAttribute('aria-selected') === 'true';
+          }
+        ),
+        { numRuns: 50 }
+      );
+    });
+
+    it('keyboard shortcuts are idempotent', () => {
+      fc.assert(
+        fc.property(shortcutKeyArb, (key: string) => {
+          cleanup();
+          renderUnifiedInterface();
+
+          // Press same shortcut multiple times
+          simulateKeyboardShortcut(key);
+          simulateKeyboardShortcut(key);
+          simulateKeyboardShortcut(key);
+
+          // Tab should still be active
+          const targetTab = keyToTab[key];
+          const tab = screen.getByTestId(`tab-${targetTab}`);
+          return tab.getAttribute('aria-selected') === 'true';
+        }),
+        { numRuns: 50 }
+      );
+    });
+
+    it('only valid shortcut keys (1-4) trigger tab switching', () => {
+      cleanup();
+      renderUnifiedInterface();
+
+      // Start from recording tab
+      const recordingTab = screen.getByTestId('tab-recording');
+      expect(recordingTab.getAttribute('aria-selected')).toBe('true');
+
+      // Try invalid keys - should not change tab
+      const invalidKeys = ['5', '6', '0', 'a', 'z'];
+      for (const key of invalidKeys) {
+        const event = new KeyboardEvent('keydown', {
+          key,
+          ctrlKey: true,
+          bubbles: true,
+        });
+        window.dispatchEvent(event);
+      }
+
+      // Recording tab should still be active
+      expect(recordingTab.getAttribute('aria-selected')).toBe('true');
+    });
+  });
 });

@@ -379,10 +379,43 @@ export const UnifiedInterface: React.FC<UnifiedInterfaceProps> = React.memo(({
 
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
     if (isTransitioning) return;
+
+    // Handle Escape key for stopping recording/playback
     if (event.key === 'Escape' && (state.applicationMode === 'recording' || state.applicationMode === 'playing')) {
       window.dispatchEvent(new CustomEvent('keyboard-stop-action'));
+      return;
     }
-  }, [state.applicationMode, isTransitioning]);
+
+    // Handle keyboard shortcuts for tab switching (Ctrl/Cmd + 1-4)
+    // Requirements: 8.1, 8.2, 8.3, 8.4, 8.5
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const modifierKey = isMac ? event.metaKey : event.ctrlKey;
+
+    if (modifierKey && !event.shiftKey && !event.altKey) {
+      // Disable shortcuts during recording or playback (Requirement 8.5)
+      if (state.applicationMode === 'recording' || state.applicationMode === 'playing') {
+        return;
+      }
+
+      // Block tab switching during active playback session
+      if (state.playbackSession?.isActive) {
+        return;
+      }
+
+      const tabMap: Record<string, TabType> = {
+        '1': 'recording',
+        '2': 'list',
+        '3': 'builder',
+        '4': 'editor',
+      };
+
+      const targetTab = tabMap[event.key];
+      if (targetTab) {
+        event.preventDefault();
+        setActiveTab(targetTab);
+      }
+    }
+  }, [state.applicationMode, state.playbackSession?.isActive, isTransitioning, setActiveTab]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
