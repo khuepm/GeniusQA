@@ -1,0 +1,180 @@
+/**
+ * TabBar Styles
+ * Styling for the bottom tab bar navigation
+ * Requirements: 1.5, 7.2, 7.3, 7.4, 7.5
+ */
+
+/* Tab bar container - positioned above status bar */
+.tab-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  min-height: 48px;
+  background: var(--toolbar-bg, #f1f3f4);
+  border-top: 1px solid var(--border-light, #e9ecef);
+  padding: 0 8px;
+  gap: 4px;
+  flex-shrink: 0;
+  z-index: 90;
+}
+
+/* Tab button base styles */
+.tab-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary, #6c757d);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+  flex: 1;
+  max-width: 180px;
+}
+
+/* Tab icon */
+.tab-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* Tab label */
+.tab-label {
+  font-size: 13px;
+}
+
+/* Tab shortcut hint */
+.tab-shortcut {
+  font-size: 10px;
+  color: var(--text-muted, #adb5bd);
+  margin-left: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+/* Show shortcut on hover */
+.tab-button:hover .tab-shortcut {
+  opacity: 1;
+}
+
+/* Hover state */
+.tab-button:hover:not(.disabled):not(.active) {
+  background: var(--button-hover, rgba(25, 118, 210, 0.08));
+  color: var(--text-primary, #212529);
+}
+
+/* Active/selected tab */
+.tab-button.active {
+  background: var(--accent-primary, #1976d2);
+  color: #ffffff;
+}
+
+.tab-button.active .tab-shortcut {
+  color: rgba(255, 255, 255, 0.7);
+  opacity: 1;
+}
+
+/* Focus state for accessibility */
+.tab-button:focus-visible {
+  outline: 2px solid var(--accent-primary, #1976d2);
+  outline-offset: 2px;
+}
+
+/* Disabled state */
+.tab-button.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Mode-specific styling for tab bar */
+.tab-bar.mode-recording {
+  border-top-color: var(--accent-danger, #f44336);
+}
+
+.tab-bar.mode-playing {
+  border-top-color: var(--accent-success, #4caf50);
+}
+
+.tab-bar.mode-editing {
+  border-top-color: var(--accent-primary, #1976d2);
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .tab-bar {
+    padding: 0 4px;
+    gap: 2px;
+  }
+
+  .tab-button {
+    padding: 0 8px;
+    gap: 4px;
+  }
+
+  .tab-label {
+    display: none;
+  }
+
+  .tab-shortcut {
+    display: none;
+  }
+
+  .tab-icon {
+    font-size: 20px;
+  }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .tab-button,
+  .tab-shortcut {
+    transition: none;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .tab-button {
+    border: 1px solid transparent;
+  }
+
+  .tab-button.active {
+    border-color: #000000;
+  }
+
+  .tab-button:focus-visible {
+    outline-width: 3px;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .tab-bar {
+    background: var(--toolbar-bg, #2d2d2d);
+    border-top-color: var(--border-light, #404040);
+  }
+
+  .tab-button {
+    color: var(--text-secondary, #b3b3b3);
+  }
+
+  .tab-button:hover:not(.disabled):not(.active) {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary, #ffffff);
+  }
+
+  .tab-button.active {
+    background: var(--accent-primary, #1976d2);
+    color: #ffffff;
+  }
+}
