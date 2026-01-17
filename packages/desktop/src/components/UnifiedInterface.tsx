@@ -418,8 +418,10 @@ export const UnifiedInterface: React.FC<UnifiedInterfaceProps> = React.memo(({
   }, [state.applicationMode, state.playbackSession?.isActive, isTransitioning, setActiveTab]);
 
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    // Listen on document instead of window for better jsdom compatibility
+    // Keyboard events bubble up from focused elements through document
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
   const renderTabContent = useCallback(() => {

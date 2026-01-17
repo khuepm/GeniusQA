@@ -414,4 +414,97 @@ describe('TabBar Component', () => {
       expect(mockOnTabChange).not.toHaveBeenCalled();
     });
   });
+
+  describe('Responsive Behavior - Requirements: 7.5', () => {
+    it('should render tab bar with flex layout for responsive sizing', () => {
+      render(
+        <TabBar
+          activeTab="recording"
+          onTabChange={mockOnTabChange}
+          applicationMode="idle"
+        />
+      );
+
+      const tabBar = screen.getByTestId('tab-bar');
+      expect(tabBar).toHaveClass('tab-bar');
+    });
+
+    it('should render all tabs with consistent structure across modes', () => {
+      const modes = ['idle', 'recording', 'playing', 'editing'] as const;
+
+      modes.forEach((mode) => {
+        const { unmount } = render(
+          <TabBar
+            activeTab="recording"
+            onTabChange={mockOnTabChange}
+            applicationMode={mode}
+          />
+        );
+
+        // All tabs should be present regardless of mode
+        TAB_CONFIGS.forEach((tab) => {
+          const tabButton = screen.getByTestId(`tab-${tab.id}`);
+          expect(tabButton).toBeInTheDocument();
+          expect(tabButton).toHaveClass('tab-button');
+        });
+
+        unmount();
+      });
+    });
+
+    it('should maintain tab structure with icon, label, and shortcut elements', () => {
+      render(
+        <TabBar
+          activeTab="recording"
+          onTabChange={mockOnTabChange}
+          applicationMode="idle"
+        />
+      );
+
+      TAB_CONFIGS.forEach((tab) => {
+        const tabButton = screen.getByTestId(`tab-${tab.id}`);
+
+        // Each tab should have icon, label, and shortcut
+        const icon = tabButton.querySelector('.tab-icon');
+        const label = tabButton.querySelector('.tab-label');
+        const shortcut = tabButton.querySelector('.tab-shortcut');
+
+        expect(icon).toBeInTheDocument();
+        expect(label).toBeInTheDocument();
+        expect(shortcut).toBeInTheDocument();
+      });
+    });
+
+    it('should apply correct mode-specific border styling class', () => {
+      const { rerender } = render(
+        <TabBar
+          activeTab="recording"
+          onTabChange={mockOnTabChange}
+          applicationMode="recording"
+        />
+      );
+
+      expect(screen.getByTestId('tab-bar')).toHaveClass('mode-recording');
+
+      rerender(
+        <TabBar
+          activeTab="recording"
+          onTabChange={mockOnTabChange}
+          applicationMode="playing"
+        />
+      );
+
+      expect(screen.getByTestId('tab-bar')).toHaveClass('mode-playing');
+
+      rerender(
+        <TabBar
+          activeTab="recording"
+          onTabChange={mockOnTabChange}
+          applicationMode="editing"
+        />
+      );
+
+      expect(screen.getByTestId('tab-bar')).toHaveClass('mode-editing');
+    });
+  });
 });

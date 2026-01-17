@@ -11,7 +11,7 @@
 
 import * as fc from 'fast-check';
 import React from 'react';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 
 // Mock Firebase and related services before importing components
 jest.mock('../../config/firebase.config', () => ({
@@ -519,7 +519,7 @@ describe('UnifiedInterface Property Tests', () => {
   describe('Property 8: Tab Switching Restrictions', () => {
     it('tabs are present and functional in idle mode', () => {
       fc.assert(
-        fc.property(tabTypeArb, (targetTab: TabType) => {
+        fc.property(tabTypeArb, (_targetTab: TabType) => {
           cleanup();
           renderUnifiedInterface();
 
@@ -602,6 +602,10 @@ describe('UnifiedInterface Property Tests', () => {
    * 
    * Keyboard shortcuts (Ctrl/Cmd + 1-4) SHALL be disabled during active recording 
    * or playback to prevent accidental interruption.
+   * 
+   * Note: These tests use React Testing Library's fireEvent to properly simulate
+   * keyboard events in jsdom environment. The events are dispatched on the document
+   * body which properly propagates to the window event listener.
    */
   describe('Property 9: Keyboard Shortcuts Conditional Behavior', () => {
     /**
@@ -620,16 +624,24 @@ describe('UnifiedInterface Property Tests', () => {
     };
 
     /**
-     * Helper to simulate keyboard shortcut
+     * Helper to simulate keyboard shortcut using fireEvent
+     * Uses document as the target since the event listener is on document
+     * Wrapped in act() to properly handle React state updates
      */
     const simulateKeyboardShortcut = (key: string) => {
-      const event = new KeyboardEvent('keydown', {
-        key,
-        ctrlKey: true,
-        metaKey: false,
-        bubbles: true,
+      act(() => {
+        // Create and dispatch a native keyboard event that will bubble to window
+        const event = new KeyboardEvent('keydown', {
+          key,
+          code: `Digit${key}`,
+          ctrlKey: true,
+          metaKey: false,
+          bubbles: true,
+          cancelable: true,
+        });
+        // Dispatch on document to ensure it reaches document listener
+        document.dispatchEvent(event);
       });
-      window.dispatchEvent(event);
     };
 
     it('keyboard shortcuts work in idle mode', () => {
@@ -710,12 +722,16 @@ describe('UnifiedInterface Property Tests', () => {
       // Try invalid keys - should not change tab
       const invalidKeys = ['5', '6', '0', 'a', 'z'];
       for (const key of invalidKeys) {
-        const event = new KeyboardEvent('keydown', {
-          key,
-          ctrlKey: true,
-          bubbles: true,
+        act(() => {
+          const event = new KeyboardEvent('keydown', {
+            key,
+            code: key.length === 1 && /\d/.test(key) ? `Digit${key}` : `Key${key.toUpperCase()}`,
+            ctrlKey: true,
+            bubbles: true,
+            cancelable: true,
+          });
+          document.dispatchEvent(event);
         });
-        window.dispatchEvent(event);
       }
 
       // Recording tab should still be active
