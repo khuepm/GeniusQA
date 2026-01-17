@@ -1288,6 +1288,7 @@ const UnifiedRecorderContent: React.FC = () => {
       {/* Editor Area */}
       <div
         className={`editor-area ${state.editorVisible ? 'visible' : 'hidden'}`}
+        style={{ height: `${editorAreaHeight}px` }}
       >
         <EditorArea
           script={state.currentScript}
@@ -1299,6 +1300,13 @@ const UnifiedRecorderContent: React.FC = () => {
         />
       </div>
 
+      {/* Resizable Divider between editor-area and rest of interface */}
+      <ResizableDivider
+        onResize={handleEditorResize}
+        currentY={editorAreaHeight}
+        minY={150}
+        maxY={window.innerHeight - 300}
+      />
 
       {/* Script Loader Modal for Step-Based Recording - preserved from RecorderScreen */}
       {showScriptLoaderForRecording && (

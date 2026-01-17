@@ -22,6 +22,8 @@
 .ai-builder-main {
   flex: 1;
   display: flex;
+  gap: 12px; /* Gap between chat and preview sections */
+  padding: 12px 16px; /* Match OS selector padding */
   overflow: hidden;
 }
 
@@ -31,7 +33,8 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--border-color, #2d2d44);
+  background: var(--bg-secondary, #16162a); /* Add background */
+  border-radius: 8px; /* Add border radius for consistency */
 }
 
 .ai-builder-chat-section > * {
@@ -47,6 +50,7 @@
   display: flex;
   flex-direction: column;
   background: var(--bg-secondary, #16162a);
+  border-radius: 8px; /* Add border radius for consistency */
 }
 
 .ai-builder-preview-section > * {

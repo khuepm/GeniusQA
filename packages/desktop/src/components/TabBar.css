@@ -29,7 +29,7 @@
   padding: 0 16px;
   border: none;
   border-radius: 8px;
-  background: transparent;
+  background: transparent !important; /* Force transparency for inactive tabs */
   color: var(--text-secondary, #6c757d);
   font-family: inherit;
   font-size: 13px;
@@ -74,13 +74,15 @@
 
 /* Active/selected tab */
 .tab-button.active {
-  background: var(--accent-primary, #1976d2);
-  color: #ffffff;
+  background: #ffffff;
+  color: var(--accent-primary, #1976d2);
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .tab-button.active .tab-shortcut {
-  color: rgba(255, 255, 255, 0.7);
-  opacity: 1;
+  color: var(--accent-primary, #1976d2);
+  opacity: 0.7;
 }
 
 /* Focus state for accessibility */

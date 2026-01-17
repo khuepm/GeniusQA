@@ -452,29 +452,22 @@ export const UnifiedInterface: React.FC<UnifiedInterfaceProps> = React.memo(({
 
   return (
     <ErrorBoundary onError={handleComponentError} resetKeys={[state.applicationMode]} resetOnPropsChange={true}>
-      <div
-        className={`unified-interface ${state.toolbarCollapsed ? 'toolbar-collapsed' : ''} ${isTransitioning ? 'transitioning' : ''} mode-${state.applicationMode}`}
-        data-testid="unified-interface"
-        role="main"
-        aria-label="GeniusQA Desktop Application"
-        style={{ '--editor-area-height': `${editorAreaHeight}px` } as React.CSSProperties}
-      >
-        {/* Render children (includes toolbar and editor-area from UnifiedRecorderScreen) */}
+      <div className={`unified-interface ${state.toolbarCollapsed ? 'toolbar-collapsed' : ''} ${isTransitioning ? 'transitioning' : ''} mode-${state.applicationMode}`} data-testid="unified-interface" role="main" aria-label="GeniusQA Desktop Application">
         {children}
-
-        {/* Resizable Divider between editor-area and data-area */}
-        <ResizableDivider
-          onResize={handleEditorResize}
-          currentY={editorAreaHeight}
-          minY={50}
-          maxY={window.innerHeight - 58}
-        />
-
-        {/* Bottom section: data-area + TabBar (takes remaining space) */}
-        <div className="bottom-section">
-          <div className="data-area" data-testid="data-area">{renderTabContent()}</div>
-          <TabBar activeTab={state.activeTab} onTabChange={handleTabChange} disabled={tabsDisabled} applicationMode={state.applicationMode} />
+        <div
+          className="data-area"
+          data-testid="data-area"
+          style={{ height: `${dataAreaHeight}px` }}
+        >
+          {renderTabContent()}
         </div>
+        <ResizableDivider
+          onResize={handleResize}
+          currentY={dataAreaHeight}
+          minY={200}
+          maxY={window.innerHeight - 150}
+        />
+        <TabBar activeTab={state.activeTab} onTabChange={handleTabChange} disabled={tabsDisabled} applicationMode={state.applicationMode} />
       </div>
     </ErrorBoundary>
   );

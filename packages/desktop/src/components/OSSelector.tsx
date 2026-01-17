@@ -9,11 +9,12 @@
 
 import React from 'react';
 import './OSSelector.css';
+import { TargetOS } from '../services/scriptStorageService';
 
 /**
- * Target operating system type
+ * Target operating system type - imported from scriptStorageService
  */
-export type TargetOS = 'macos' | 'windows' | 'universal';
+export type { TargetOS };
 
 /**
  * OS option configuration

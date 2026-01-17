@@ -99,15 +99,24 @@
   z-index: 100;
 }
 
+/* Bottom section containing data-area + TabBar */
+.bottom-section {
+  flex: 1; /* Take all remaining space after editor-area */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0; /* Allow shrinking below content size */
+}
+
 /* Data area - Tab content container - Requirements: 5.1, 5.2 */
 .data-area {
-  flex: 1;
+  flex: 1; /* Take remaining space, TabBar stays at bottom */
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: var(--primary-bg);
   position: relative;
-  min-height: 0; /* Allow flex shrinking */
+  min-height: 0; /* Allow complete collapse - content can disappear */
 }
 
 .data-area > * {
@@ -117,7 +126,8 @@
 
 /* Editor area below toolbar */
 .editor-area {
-  flex: 1;
+  flex: 0 0 auto; /* Don't grow or shrink, use explicit height from CSS variable */
+  height: var(--editor-area-height, 40vh); /* Use CSS variable, fallback to 40vh */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -125,6 +135,7 @@
   transition: opacity 0.2s ease, visibility 0.2s ease;
   /* Prevent content jumping during transitions */
   position: relative;
+  min-height: 150px; /* Minimum height constraint */
 }
 
 .editor-area.visible {
