@@ -13,13 +13,12 @@ import { ApplicationMode } from '../components/UnifiedInterface';
 /**
  * Tab type identifiers
  * 
- * @typedef {'recording' | 'list' | 'builder' | 'editor'} TabType
- * - recording: Default tab showing the recording interface
+ * @typedef {'list' | 'builder' | 'editor'} TabType
  * - list: Tab showing the script list from UnifiedScriptManager
- * - builder: Tab showing the AI Builder interface
+ * - builder: Default tab showing the AI Builder interface
  * - editor: Tab showing the script editor
  */
-export type TabType = 'recording' | 'list' | 'builder' | 'editor';
+export type TabType = 'list' | 'builder' | 'editor';
 
 /**
  * Tab configuration
@@ -83,10 +82,9 @@ export interface TabButtonProps {
  * Order determines display order in the TabBar.
  */
 export const TAB_CONFIGS: TabConfig[] = [
-  { id: 'recording', label: 'Recording', icon: '🎬', shortcut: '⌘1' },
+  { id: 'builder', label: 'AI Builder', icon: '🤖', shortcut: '⌘1' },
   { id: 'list', label: 'Script List', icon: '📋', shortcut: '⌘2' },
-  { id: 'builder', label: 'AI Builder', icon: '🤖', shortcut: '⌘3' },
-  { id: 'editor', label: 'Editor', icon: '✏️', shortcut: '⌘4' },
+  { id: 'editor', label: 'Editor', icon: '✏️', shortcut: '⌘3' },
 ];
 
 /**
@@ -106,5 +104,5 @@ export const getTabConfig = (tabId: TabType): TabConfig | undefined => {
  * @returns {boolean} True if valid tab type
  */
 export const isValidTabType = (tabId: string): tabId is TabType => {
-  return ['recording', 'list', 'builder', 'editor'].includes(tabId);
+  return ['list', 'builder', 'editor'].includes(tabId);
 };

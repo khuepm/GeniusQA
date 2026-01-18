@@ -133,3 +133,78 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* OAuth Flow Styles */
+.oauth-flow-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.oauth-step {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #e8eaed;
+}
+
+.oauth-step-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #202124;
+  margin: 0 0 8px 0;
+}
+
+.oauth-step-description {
+  font-size: 14px;
+  color: #5f6368;
+  margin: 0 0 12px 0;
+}
+
+.oauth-url-container {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.oauth-url-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #5f6368;
+  background-color: #ffffff;
+  font-family: 'Courier New', monospace;
+}
+
+.oauth-url-input:focus {
+  outline: none;
+  border-color: #1a73e8;
+}
+
+.oauth-copy-button {
+  padding: 10px 16px;
+  background-color: #1a73e8;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.oauth-copy-button:hover:not(:disabled) {
+  background-color: #1765cc;
+}
+
+.oauth-copy-button:active:not(:disabled) {
+  background-color: #185abc;
+}
+
+.oauth-copy-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

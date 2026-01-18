@@ -8,7 +8,6 @@ import React, { createContext, useContext, useReducer, ReactNode, useState, useE
 import { ErrorBoundary } from './ErrorBoundary';
 import { TabType, isValidTabType } from '../types/tabSystem.types';
 import { TabBar } from './TabBar';
-import { RecordingTabContent } from './tabs/RecordingTabContent';
 import { ScriptListTabContent } from './tabs/ScriptListTabContent';
 import { AIBuilderTabContent } from './tabs/AIBuilderTabContent';
 import { EditorTabContent } from './tabs/EditorTabContent';
@@ -42,11 +41,6 @@ export interface ScriptData {
 }
 
 // Tab state interfaces
-export interface RecordingTabState {
-  actions: any[];
-  isRecording: boolean;
-}
-
 export interface ScriptListTabState {
   filter: InternalScriptFilter;
   searchQuery: string;
@@ -67,7 +61,6 @@ export interface EditorTabState {
 }
 
 export interface TabStates {
-  recording: RecordingTabState;
   list: ScriptListTabState;
   builder: AIBuilderTabState;
   editor: EditorTabState;
@@ -113,12 +106,11 @@ export type UnifiedInterfaceAction =
   | { type: 'SET_TOOLBAR_COLLAPSED'; payload: boolean }
   | { type: 'RESET_STATE' }
   | { type: 'SET_ACTIVE_TAB'; payload: TabType }
-  | { type: 'UPDATE_TAB_STATE'; payload: { tab: TabType; state: Partial<RecordingTabState | ScriptListTabState | AIBuilderTabState | EditorTabState> } }
+  | { type: 'UPDATE_TAB_STATE'; payload: { tab: TabType; state: Partial<ScriptListTabState | AIBuilderTabState | EditorTabState> } }
   | { type: 'LOAD_SCRIPT_IN_EDITOR'; payload: { scriptPath: string; data: ScriptData } }
   | { type: 'REFRESH_SCRIPT_LIST' };
 
 const initialTabStates: TabStates = {
-  recording: { actions: [], isRecording: false },
   list: { filter: 'all', searchQuery: '', selectedScriptPath: null },
   builder: { chatHistory: [], generatedScript: null, targetOS: 'universal' },
   editor: { scriptData: null, editMode: false, textEditMode: false, unsavedChanges: false },
@@ -131,7 +123,7 @@ const initialState: UnifiedInterfaceState = {
   playbackSession: null,
   editorVisible: true,
   toolbarCollapsed: false,
-  activeTab: 'recording',
+  activeTab: 'builder',
   tabStates: initialTabStates,
 };
 
@@ -144,8 +136,6 @@ const validateActiveTab = (tab: TabType): boolean => isValidTabType(tab);
 
 const validateTabStates = (tabStates: TabStates): boolean => {
   return (
-    Array.isArray(tabStates.recording.actions) &&
-    typeof tabStates.recording.isRecording === 'boolean' &&
     ['all', 'recorded', 'ai_generated'].includes(tabStates.list.filter) &&
     typeof tabStates.list.searchQuery === 'string' &&
     Array.isArray(tabStates.builder.chatHistory) &&
@@ -172,7 +162,7 @@ const recoverFromInvalidState = (currentState: UnifiedInterfaceState, action: Un
   return {
     ...initialState,
     currentScript: validateScriptFile(currentState.currentScript) ? currentState.currentScript : null,
-    activeTab: validateActiveTab(currentState.activeTab) ? currentState.activeTab : 'recording',
+    activeTab: validateActiveTab(currentState.activeTab) ? currentState.activeTab : 'builder',
   };
 };
 
@@ -265,7 +255,7 @@ export interface UnifiedInterfaceContextType {
   setToolbarCollapsed: (collapsed: boolean) => void;
   resetState: () => void;
   setActiveTab: (tab: TabType) => void;
-  updateTabState: (tab: TabType, state: Partial<RecordingTabState | ScriptListTabState | AIBuilderTabState | EditorTabState>) => void;
+  updateTabState: (tab: TabType, state: Partial<ScriptListTabState | AIBuilderTabState | EditorTabState>) => void;
   loadScriptInEditor: (scriptPath: string, data: ScriptData) => void;
   refreshScriptList: () => void;
 }
@@ -283,7 +273,7 @@ export const UnifiedInterfaceProvider: React.FC<{ children: ReactNode }> = React
   const setToolbarCollapsed = useCallback((collapsed: boolean) => dispatch({ type: 'SET_TOOLBAR_COLLAPSED', payload: collapsed }), []);
   const resetState = useCallback(() => dispatch({ type: 'RESET_STATE' }), []);
   const setActiveTab = useCallback((tab: TabType) => dispatch({ type: 'SET_ACTIVE_TAB', payload: tab }), []);
-  const updateTabState = useCallback((tab: TabType, tabState: Partial<RecordingTabState | ScriptListTabState | AIBuilderTabState | EditorTabState>) => dispatch({ type: 'UPDATE_TAB_STATE', payload: { tab, state: tabState } }), []);
+  const updateTabState = useCallback((tab: TabType, tabState: Partial<ScriptListTabState | AIBuilderTabState | EditorTabState>) => dispatch({ type: 'UPDATE_TAB_STATE', payload: { tab, state: tabState } }), []);
   const loadScriptInEditor = useCallback((scriptPath: string, data: ScriptData) => dispatch({ type: 'LOAD_SCRIPT_IN_EDITOR', payload: { scriptPath, data } }), []);
   const refreshScriptList = useCallback(() => dispatch({ type: 'REFRESH_SCRIPT_LIST' }), []);
 
@@ -309,8 +299,6 @@ interface UnifiedInterfaceProps {
   onScriptReveal?: (script: StoredScriptInfo) => void;
   scriptsLoading?: boolean;
   apiKeyConfigured?: boolean;
-  onStartRecording?: () => void;
-  onStopRecording?: () => void;
   onScriptSave?: () => void;
   onActionUpdate?: (index: number, field: string, value: unknown) => void;
   onActionDelete?: (index: number) => void;
@@ -323,7 +311,7 @@ interface UnifiedInterfaceProps {
  */
 export const UnifiedInterface: React.FC<UnifiedInterfaceProps> = React.memo(({
   children, scripts = [], onScriptSelect, onScriptDelete, onScriptReveal, scriptsLoading = false,
-  apiKeyConfigured = false, onStartRecording, onStopRecording, onScriptSave, onActionUpdate, onActionDelete,
+  apiKeyConfigured = false, onScriptSave, onActionUpdate, onActionDelete,
   onScriptGenerated, onScriptSaved,
 }) => {
   const { state, setActiveTab, updateTabState, loadScriptInEditor, refreshScriptList } = useUnifiedInterface();
@@ -412,10 +400,9 @@ export const UnifiedInterface: React.FC<UnifiedInterfaceProps> = React.memo(({
       }
 
       const tabMap: Record<string, TabType> = {
-        '1': 'recording',
+        '1': 'builder',
         '2': 'list',
-        '3': 'builder',
-        '4': 'editor',
+        '3': 'editor',
       };
 
       const targetTab = tabMap[event.key];
@@ -435,18 +422,16 @@ export const UnifiedInterface: React.FC<UnifiedInterfaceProps> = React.memo(({
 
   const renderTabContent = useCallback(() => {
     switch (state.activeTab) {
-      case 'recording':
-        return <RecordingTabContent recordingSession={state.recordingSession} actions={state.tabStates.recording.actions as ActionData[]} onStartRecording={onStartRecording || (() => { })} onStopRecording={onStopRecording || (() => { })} />;
-      case 'list':
-        return <ScriptListTabContent scripts={scripts} filter={{ source: state.tabStates.list.filter === 'all' ? 'all' : state.tabStates.list.filter === 'recorded' ? 'recorded' : 'ai_generated', searchQuery: state.tabStates.list.searchQuery }} onFilterChange={handleFilterChange} onScriptSelect={handleScriptSelect} onScriptDelete={onScriptDelete || (() => { })} onScriptReveal={onScriptReveal} loading={scriptsLoading} selectedScriptPath={state.tabStates.list.selectedScriptPath} />;
       case 'builder':
         return <AIBuilderTabContent targetOS={state.tabStates.builder.targetOS} onOSChange={handleOSChange} onScriptGenerated={handleScriptGenerated} onScriptSaved={handleScriptSaved} apiKeyConfigured={apiKeyConfigured} />;
+      case 'list':
+        return <ScriptListTabContent scripts={scripts} filter={{ source: state.tabStates.list.filter === 'all' ? 'all' : state.tabStates.list.filter === 'recorded' ? 'recorded' : 'ai_generated', searchQuery: state.tabStates.list.searchQuery }} onFilterChange={handleFilterChange} onScriptSelect={handleScriptSelect} onScriptDelete={onScriptDelete || (() => { })} onScriptReveal={onScriptReveal} loading={scriptsLoading} selectedScriptPath={state.tabStates.list.selectedScriptPath} />;
       case 'editor':
         return <EditorTabContent script={state.tabStates.editor.scriptData as AIScriptData | null} selectedScript={scripts.find(s => s.path === state.tabStates.list.selectedScriptPath) || null} editMode={state.tabStates.editor.editMode} onEditModeChange={handleEditModeChange} onScriptSave={onScriptSave || (() => { })} onActionUpdate={onActionUpdate || (() => { })} onActionDelete={onActionDelete || (() => { })} />;
       default:
         return null;
     }
-  }, [state.activeTab, state.recordingSession, state.tabStates, scripts, scriptsLoading, apiKeyConfigured, onStartRecording, onStopRecording, onScriptDelete, onScriptReveal, onScriptSave, onActionUpdate, onActionDelete, handleFilterChange, handleScriptSelect, handleOSChange, handleScriptGenerated, handleScriptSaved, handleEditModeChange]);
+  }, [state.activeTab, state.tabStates, scripts, scriptsLoading, apiKeyConfigured, onScriptDelete, onScriptReveal, onScriptSave, onActionUpdate, onActionDelete, handleFilterChange, handleScriptSelect, handleOSChange, handleScriptGenerated, handleScriptSaved, handleEditModeChange]);
 
   const tabsDisabled = state.playbackSession?.isActive ?? false;
 

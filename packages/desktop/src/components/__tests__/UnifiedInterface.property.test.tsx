@@ -90,7 +90,7 @@ const applicationModeArb = fc.constantFrom<ApplicationMode>('idle', 'recording',
 /**
  * Arbitrary for valid tab types
  */
-const tabTypeArb = fc.constantFrom<TabType>('recording', 'list', 'builder', 'editor');
+const tabTypeArb = fc.constantFrom<TabType>('list', 'builder', 'editor');
 
 // ============================================================================
 // Test Utilities
@@ -121,7 +121,6 @@ const renderUnifiedInterface = (props: Partial<React.ComponentProps<typeof Unifi
  */
 const getContentTestId = (tabType: TabType): string => {
   const map: Record<TabType, string> = {
-    'recording': 'recording-tab-content',
     'list': 'script-list-tab-content',
     'builder': 'ai-builder-tab-content',
     'editor': 'editor-tab-content',
@@ -164,20 +163,18 @@ describe('UnifiedInterface Property Tests', () => {
       );
     });
 
-    it('tab bar contains all 4 tabs in any mode', () => {
+    it('tab bar contains all 3 tabs in any mode', () => {
       fc.assert(
         fc.property(applicationModeArb, (_mode: ApplicationMode) => {
           cleanup();
           renderUnifiedInterface();
 
-          // All 4 tabs should be present
-          const recordingTab = screen.queryByTestId('tab-recording');
+          // All 3 tabs should be present
           const listTab = screen.queryByTestId('tab-list');
           const builderTab = screen.queryByTestId('tab-builder');
           const editorTab = screen.queryByTestId('tab-editor');
 
           return (
-            recordingTab !== null &&
             listTab !== null &&
             builderTab !== null &&
             editorTab !== null
@@ -215,12 +212,12 @@ describe('UnifiedInterface Property Tests', () => {
       );
     });
 
-    it('recording tab is active by default', () => {
+    it('builder tab is active by default', () => {
       cleanup();
       renderUnifiedInterface();
 
-      const recordingTab = screen.getByTestId('tab-recording');
-      expect(recordingTab.getAttribute('aria-selected')).toBe('true');
+      const builderTab = screen.getByTestId('tab-builder');
+      expect(builderTab.getAttribute('aria-selected')).toBe('true');
     });
 
     it('data area is always rendered', () => {
@@ -313,12 +310,11 @@ describe('UnifiedInterface Property Tests', () => {
           fireEvent.click(tab);
 
           // Count visible tab contents
-          const recordingContent = screen.queryByTestId('recording-tab-content');
           const listContent = screen.queryByTestId('script-list-tab-content');
           const builderContent = screen.queryByTestId('ai-builder-tab-content');
           const editorContent = screen.queryByTestId('editor-tab-content');
 
-          const visibleContents = [recordingContent, listContent, builderContent, editorContent]
+          const visibleContents = [listContent, builderContent, editorContent]
             .filter(content => content !== null);
 
           return visibleContents.length === 1;
@@ -366,7 +362,7 @@ describe('UnifiedInterface Property Tests', () => {
           const content = screen.queryByTestId(contentTestId);
 
           // Also verify other contents are not shown
-          const allContentIds = ['recording-tab-content', 'script-list-tab-content', 'ai-builder-tab-content', 'editor-tab-content'];
+          const allContentIds = ['script-list-tab-content', 'ai-builder-tab-content', 'editor-tab-content'];
           const otherContents = allContentIds
             .filter(id => id !== contentTestId)
             .map(id => screen.queryByTestId(id))
@@ -465,7 +461,7 @@ describe('UnifiedInterface Property Tests', () => {
             }
 
             // All tabs should still be clickable and functional
-            const allTabsWork = (['recording', 'list', 'builder', 'editor'] as TabType[]).every(tabId => {
+            const allTabsWork = (['builder', 'list', 'editor'] as TabType[]).every(tabId => {
               const tab = screen.getByTestId(`tab-${tabId}`);
               fireEvent.click(tab);
               return tab.getAttribute('aria-selected') === 'true';
@@ -609,18 +605,17 @@ describe('UnifiedInterface Property Tests', () => {
    */
   describe('Property 9: Keyboard Shortcuts Conditional Behavior', () => {
     /**
-     * Arbitrary for keyboard shortcut keys (1-4)
+     * Arbitrary for keyboard shortcut keys (1-3)
      */
-    const shortcutKeyArb = fc.constantFrom('1', '2', '3', '4');
+    const shortcutKeyArb = fc.constantFrom('1', '2', '3');
 
     /**
      * Maps shortcut key to expected tab
      */
     const keyToTab: Record<string, TabType> = {
-      '1': 'recording',
+      '1': 'builder',
       '2': 'list',
-      '3': 'builder',
-      '4': 'editor',
+      '3': 'editor',
     };
 
     /**
@@ -650,8 +645,8 @@ describe('UnifiedInterface Property Tests', () => {
           cleanup();
           renderUnifiedInterface();
 
-          // Start from recording tab (default)
-          const initialTab = screen.getByTestId('tab-recording');
+          // Start from builder tab (default)
+          const initialTab = screen.getByTestId('tab-builder');
           expect(initialTab.getAttribute('aria-selected')).toBe('true');
 
           // Simulate keyboard shortcut
@@ -711,16 +706,16 @@ describe('UnifiedInterface Property Tests', () => {
       );
     });
 
-    it('only valid shortcut keys (1-4) trigger tab switching', () => {
+    it('only valid shortcut keys (1-3) trigger tab switching', () => {
       cleanup();
       renderUnifiedInterface();
 
-      // Start from recording tab
-      const recordingTab = screen.getByTestId('tab-recording');
-      expect(recordingTab.getAttribute('aria-selected')).toBe('true');
+      // Start from builder tab
+      const builderTab = screen.getByTestId('tab-builder');
+      expect(builderTab.getAttribute('aria-selected')).toBe('true');
 
       // Try invalid keys - should not change tab
-      const invalidKeys = ['5', '6', '0', 'a', 'z'];
+      const invalidKeys = ['4', '5', '6', '0', 'a', 'z'];
       for (const key of invalidKeys) {
         act(() => {
           const event = new KeyboardEvent('keydown', {
@@ -734,8 +729,8 @@ describe('UnifiedInterface Property Tests', () => {
         });
       }
 
-      // Recording tab should still be active
-      expect(recordingTab.getAttribute('aria-selected')).toBe('true');
+      // Builder tab should still be active
+      expect(builderTab.getAttribute('aria-selected')).toBe('true');
     });
   });
 });
