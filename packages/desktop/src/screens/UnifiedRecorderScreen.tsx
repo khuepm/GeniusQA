@@ -5,22 +5,21 @@
  * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.4, 2.5, 10.1, 10.2, 10.4
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { UnifiedInterface, UnifiedInterfaceProvider, useUnifiedInterface, RecordingSession } from '../components/UnifiedInterface';
-import { EnhancedTopToolbar } from '../components/EnhancedTopToolbar';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { EditorArea } from '../components/EditorArea';
-import { ClickCursorOverlay } from '../components/ClickCursorOverlay';
-import { ScriptListItem } from '../components/ScriptListItem';
+import { EnhancedTopToolbar } from '../components/EnhancedTopToolbar';
 import { ScriptFilter } from '../components/ScriptFilter';
-import { getIPCBridge } from '../services/ipcBridgeService';
-import { scriptStorageService, StoredScriptInfo, ScriptFilter as ScriptFilterType, ScriptSource, TargetOS } from '../services/scriptStorageService';
+import { ScriptListItem } from '../components/ScriptListItem';
+import { RecordingSession, UnifiedInterface, UnifiedInterfaceProvider, useUnifiedInterface } from '../components/UnifiedInterface';
 import { useAnalytics } from '../hooks/useAnalytics';
+import { getIPCBridge } from '../services/ipcBridgeService';
+import { ScriptFilter as ScriptFilterType, ScriptSource, scriptStorageService, StoredScriptInfo, TargetOS } from '../services/scriptStorageService';
 import {
-  RecorderStatus,
-  IPCEvent,
   ActionData,
   ActionPreviewData,
+  IPCEvent,
+  RecorderStatus,
 } from '../types/recorder.types';
 import { TestScript, TestStep } from '../types/testCaseDriven.types';
 import './UnifiedRecorderScreen.css';
@@ -252,7 +251,9 @@ const UnifiedRecorderContent: React.FC = () => {
         trackError(new Error(errorMessage), {
           component: 'UnifiedRecorderScreen',
           action: 'playback_element_not_found',
-          errorType: 'element_not_found',
+          metadata: {
+            errorType: 'element_not_found',
+          },
         });
       }
 

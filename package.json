@@ -11,5 +11,6 @@
     "preview": "npm run preview --workspace=packages/web",
     "lint": "npm run lint --workspace=packages/web",
     "type-check": "npm run type-check --workspace=packages/web"
-  }
+  },
+  "packageManager": "pnpm@9.16.6"
 }
