@@ -231,6 +231,17 @@ export interface StoredApiKey {
 // ============================================================================
 
 /**
+ * Playback progress information
+ * Requirements: 7.5, 7.6
+ */
+export interface PlaybackProgress {
+  currentAction: number;
+  totalActions: number;
+  status: 'playing' | 'paused' | 'completed' | 'error';
+  error?: string;
+}
+
+/**
  * Props for the script preview component
  */
 export interface ScriptPreviewProps {
@@ -238,7 +249,11 @@ export interface ScriptPreviewProps {
   onEdit: (script: ScriptData) => void;
   onSave: (script: ScriptData) => void;
   onDiscard: () => void;
+  onPlay?: (script: ScriptData) => void;
   validationResult: ValidationResult;
+  isSaved?: boolean;
+  isPlaying?: boolean;
+  playbackProgress?: PlaybackProgress;
 }
 
 // ============================================================================

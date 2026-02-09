@@ -9,19 +9,21 @@
  */
 
 import {
-  ScriptData,
-  Action,
-  ActionType,
-  ConversationContext,
-  AVAILABLE_ACTION_TYPES,
-  ACTION_TYPE_DESCRIPTIONS,
+    Action,
+    ACTION_TYPE_DESCRIPTIONS,
+    ActionType,
+    AVAILABLE_ACTION_TYPES,
+    ConversationContext,
+    ScriptData,
 } from '../../types/aiScriptBuilder.types';
 import {
-  AIProvider,
-  ProviderResponse,
-  ResponseMetadata,
+    AIProvider,
+    ProviderResponse,
+    ResponseMetadata,
 } from '../../types/providerAdapter.types';
-import { validateScript, autoFixScript } from '../scriptValidationService';
+import { getOSKeyMappings, ShortcutAction } from '../../utils/osKeyMappings';
+import { buildSystemPrompt } from '../promptTemplates';
+import { autoFixScript, validateScript } from '../scriptValidationService';
 
 // ============================================================================
 // Prompt Template Builder
@@ -75,57 +77,17 @@ export function buildActionSchemaDoc(): string {
 /**
  * System prompt for all AI providers
  * Requirements: 5.3 - Unified prompt template structure
+ * Requirements: 8.2 - Include OS context in AI prompt
+ * 
+ * Note: This is the base system prompt. For OS-specific prompts,
+ * use buildSystemPrompt(targetOS) from promptTemplates.
  */
-export const UNIFIED_SYSTEM_PROMPT = `You are an automation script generator for GeniusQA desktop application. Your task is to generate automation test scripts in JSON format based on user descriptions in natural language.
-
-## Your Role
-- Convert natural language descriptions into executable automation scripts
-- Generate valid, well-structured scripts compatible with the rust-core playback engine
-- Ask clarifying questions when the user's request is ambiguous
-- Provide helpful suggestions for improving automation scenarios
-
-## Available Action Types and Required Fields
-${buildActionSchemaDoc()}
-
-## Script JSON Schema
-Every script must follow this exact structure:
-\`\`\`json
-{
-  "version": "1.0",
-  "metadata": {
-    "created_at": "<ISO 8601 timestamp>",
-    "duration": <total duration in seconds>,
-    "action_count": <number of actions>,
-    "core_type": "rust",
-    "platform": "<windows|macos|linux>"
-  },
-  "actions": [
-    {
-      "type": "<action_type>",
-      "timestamp": <time in seconds from start>,
-      // ... action-specific fields
-    }
-  ]
-}
-\`\`\`
-
-## Important Rules
-1. **Timestamps**: Must be non-negative numbers in ascending order (seconds from script start)
-2. **Coordinates**: Must be positive integers within screen bounds (typically 0-4096)
-3. **Timing**: Include realistic delays between actions (0.1-0.5 seconds for human-like behavior)
-4. **Buttons**: Mouse buttons must be 'left', 'right', or 'middle'
-5. **Keys**: Use standard key names ('Enter', 'Tab', 'Escape', 'Ctrl', 'Alt', 'Shift', etc.)
-6. **Output**: Always wrap JSON in \`\`\`json code blocks
-
-## Response Guidelines
-- If the request is clear, generate the script immediately
-- If clarification is needed, ask specific questions
-- Explain what the script does in plain language before the JSON
-- Suggest improvements or alternatives when appropriate`;
+export const UNIFIED_SYSTEM_PROMPT = buildSystemPrompt();
 
 /**
  * Builds conversation context string from previous messages
  * Requirements: 5.3 - Include context about available actions
+ * Requirements: 8.2 - Include OS context and key mappings
  */
 export function buildContextString(context: ConversationContext): string {
   const parts: string[] = [];
@@ -133,8 +95,21 @@ export function buildContextString(context: ConversationContext): string {
   // Add available actions context
   parts.push('Available action types: ' + context.availableActions.join(', '));
 
+  // Add OS-specific context if target OS is specified
   if (context.targetOS) {
     parts.push('Target OS (already selected): ' + context.targetOS);
+    
+    // Add OS-specific key mappings
+    const osKeyMappings = getOSKeyMappings(context.targetOS);
+    const commonShortcuts: ShortcutAction[] = [
+      'copy', 'paste', 'cut', 'selectAll', 'save', 'undo', 'redo'
+    ];
+    
+    parts.push('\nCommon keyboard shortcuts for ' + context.targetOS + ':');
+    for (const action of commonShortcuts) {
+      const mapping = osKeyMappings[action];
+      parts.push(`  - ${mapping.displayName}: ${mapping.keys}`);
+    }
   }
 
   // Add current script context if exists
@@ -513,8 +488,7 @@ function isValidAction(action: Action): boolean {
 // ============================================================================
 
 export {
-  AVAILABLE_ACTION_TYPES,
-  ACTION_TYPE_DESCRIPTIONS,
+    ACTION_TYPE_DESCRIPTIONS, AVAILABLE_ACTION_TYPES
 };
 
 export default {

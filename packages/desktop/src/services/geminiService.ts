@@ -8,16 +8,17 @@
  */
 
 import {
-  ScriptData,
-  Action,
-  ActionType,
-  ConversationContext,
-  GenerationResult,
-  ChatMessage,
-  AVAILABLE_ACTION_TYPES,
-  ACTION_TYPE_DESCRIPTIONS,
+    Action,
+    ACTION_TYPE_DESCRIPTIONS,
+    ActionType,
+    AVAILABLE_ACTION_TYPES,
+    ConversationContext,
+    GenerationResult,
+    ScriptData
 } from '../types/aiScriptBuilder.types';
-import { validateScript, autoFixScript } from './scriptValidationService';
+import { buildSystemPrompt } from './promptTemplates';
+import { TargetOS } from './scriptStorageService';
+import { autoFixScript, validateScript } from './scriptValidationService';
 
 // ============================================================================
 // Constants and Prompt Templates
@@ -338,15 +339,17 @@ class GeminiService {
 
   /**
    * Generate a script from a user prompt
-   * Requirements: 3.1, 3.2
+   * Requirements: 3.1, 3.2, 8.2
    * 
    * @param prompt - The user's natural language description
-   * @param context - Conversation context including history
+   * @param context - Conversation context including history and targetOS
+   * @param targetOS - Target operating system for the script (optional, can also be in context)
    * @returns GenerationResult with script or error message
    */
   async generateScript(
     prompt: string,
-    context: ConversationContext
+    context: ConversationContext,
+    targetOS?: TargetOS
   ): Promise<GenerationResult> {
     if (!this.isInitialized()) {
       return {
@@ -356,12 +359,15 @@ class GeminiService {
     }
 
     try {
+      // Use targetOS from parameter or context
+      const effectiveTargetOS = targetOS || context.targetOS;
+      
       // Build the full prompt with context
       const contextString = buildContextString(context);
       const fullPrompt = `${contextString}\n\nUser request: ${prompt}`;
 
-      // Make API request
-      const response = await this.callGeminiApi(fullPrompt);
+      // Make API request with OS-specific system prompt
+      const response = await this.callGeminiApi(fullPrompt, effectiveTargetOS);
 
       if (!response.candidates || response.candidates.length === 0) {
         if (response.error) {
@@ -427,7 +433,7 @@ class GeminiService {
         }
 
         // If still invalid, request regeneration (Requirements: 3.4)
-        return await this.regenerateWithCorrections(prompt, context, validationResult.errors);
+        return await this.regenerateWithCorrections(prompt, context, validationResult.errors, targetOS);
       }
 
       return {
@@ -447,14 +453,17 @@ class GeminiService {
   /**
    * Refine an existing script based on user feedback
    * Requirements: 3.4 - Iterative improvements
+   * Requirements: 8.2 - Include OS context in API calls
    * 
    * @param currentScript - The current script to refine
    * @param feedback - User's feedback or modification request
+   * @param targetOS - Target operating system for the script (optional, extracted from script metadata if not provided)
    * @returns GenerationResult with refined script
    */
   async refineScript(
     currentScript: ScriptData,
-    feedback: string
+    feedback: string,
+    targetOS?: TargetOS
   ): Promise<GenerationResult> {
     if (!this.isInitialized()) {
       return {
@@ -464,6 +473,9 @@ class GeminiService {
     }
 
     try {
+      // Extract targetOS from script metadata if not provided
+      const effectiveTargetOS = targetOS || currentScript.metadata.target_os;
+      
       const scriptJson = JSON.stringify(currentScript, null, 2);
       const refinementPrompt = `Here is the current automation script:
 \`\`\`json
@@ -478,9 +490,10 @@ Please modify the script according to the feedback. Return the complete updated 
         previousMessages: [],
         currentScript,
         availableActions: AVAILABLE_ACTION_TYPES as ActionType[],
+        targetOS: effectiveTargetOS,
       };
 
-      return await this.generateScript(refinementPrompt, context);
+      return await this.generateScript(refinementPrompt, context, effectiveTargetOS);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       return {
@@ -493,11 +506,13 @@ Please modify the script according to the feedback. Return the complete updated 
   /**
    * Regenerate script with corrections for validation errors
    * Requirements: 3.4 - Request regeneration with corrections
+   * Requirements: 8.2 - Include OS context in API calls
    */
   private async regenerateWithCorrections(
     originalPrompt: string,
     context: ConversationContext,
-    errors: { field: string; message: string }[]
+    errors: { field: string; message: string }[],
+    targetOS?: TargetOS
   ): Promise<GenerationResult> {
     const errorSummary = errors.map(e => `- ${e.field}: ${e.message}`).join('\n');
     
@@ -513,7 +528,7 @@ Make sure to:
 4. Use valid coordinates (positive integers)`;
 
     try {
-      const response = await this.callGeminiApi(correctionPrompt);
+      const response = await this.callGeminiApi(correctionPrompt, targetOS);
 
       if (!response.candidates || response.candidates.length === 0) {
         return {
@@ -566,19 +581,23 @@ Make sure to:
 
   /**
    * Make a request to the Gemini API
+   * Requirements: 8.2 - Include OS context in API calls
    */
-  private async callGeminiApi(prompt: string): Promise<GeminiResponse> {
+  private async callGeminiApi(prompt: string, targetOS?: TargetOS): Promise<GeminiResponse> {
     if (!this.apiKey) {
       throw new Error('API key not configured');
     }
 
     const url = `${GEMINI_API_BASE_URL}/models/${GEMINI_MODEL}:generateContent?key=${this.apiKey}`;
 
+    // Build OS-specific system prompt
+    const systemPrompt = targetOS ? buildSystemPrompt(targetOS) : SYSTEM_PROMPT;
+
     const requestBody: GeminiRequest = {
       contents: [
         {
           role: 'user',
-          parts: [{ text: SYSTEM_PROMPT }],
+          parts: [{ text: systemPrompt }],
         },
         {
           role: 'model',
