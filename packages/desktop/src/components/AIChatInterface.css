@@ -327,7 +327,7 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  padding: 40px 20px;
+  padding: 12px  16px; /* Match OS selector padding */
   text-align: center;
 }
 

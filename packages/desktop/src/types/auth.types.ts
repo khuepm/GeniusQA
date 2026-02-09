@@ -37,6 +37,8 @@ export interface AuthContextType {
   loading: boolean;
   error: string | null;
   signInWithGoogle: () => Promise<void>;
+  signInWithGoogleExternalBrowser?: () => Promise<string>; // Returns OAuth URL
+  signInWithGoogleCode?: (code: string) => Promise<void>; // Complete OAuth with code
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;

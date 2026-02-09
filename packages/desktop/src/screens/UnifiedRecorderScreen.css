@@ -72,8 +72,9 @@
 .unified-recorder-screen .editor-area {
   position: relative;
   z-index: 50;
-  flex: 1; /* Takes remaining vertical space - Requirement 1.3 */
-  min-height: 200px; /* Minimum height constraint - Requirement 6.1 */
+  flex: 0 0 auto; /* Use explicit height instead of flex growth */
+  height: var(--editor-area-height, 40vh); /* Controlled by ResizableDivider via CSS variable */
+  min-height: 50px; /* Minimum height constraint - allows near-complete collapse */
   overflow: hidden; /* Ensure proper scrollable content areas */
   transition: opacity 0.2s ease, visibility 0.2s ease;
 }

@@ -1,0 +1,94 @@
+/**
+ * ResizableDivider Styles
+ * Horizontal divider with drag handle for resizing panels
+ */
+
+.resizable-divider {
+  height: 6px;
+  background: var(--border-light, #e9ecef);
+  cursor: row-resize;
+  position: relative;
+  flex-shrink: 0;
+  transition: background-color 0.2s ease;
+  user-select: none;
+  z-index: 10;
+}
+
+.resizable-divider:hover {
+  background: var(--accent-primary, #1976d2);
+}
+
+.resizable-divider.dragging {
+  background: var(--accent-primary, #1976d2);
+}
+
+.resizable-divider.disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Handle with visual grip */
+.divider-handle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.divider-grip {
+  width: 30px;
+  height: 3px;
+  background: var(--text-muted, #adb5bd);
+  border-radius: 2px;
+  transition: background-color 0.2s ease;
+}
+
+.resizable-divider:hover .divider-grip,
+.resizable-divider.dragging .divider-grip {
+  background: var(--primary-bg, #ffffff);
+}
+
+/* Accessibility - keyboard focus */
+.resizable-divider:focus {
+  outline: 2px solid var(--accent-primary, #1976d2);
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .resizable-divider {
+    background: #000000;
+    border: 2px solid #000000;
+  }
+  
+  .resizable-divider:hover,
+  .resizable-divider.dragging {
+    background: #0000ff;
+  }
+  
+  .divider-grip {
+    background: #000000;
+  }
+  
+  .resizable-divider:hover .divider-grip,
+  .resizable-divider.dragging .divider-grip {
+    background: #ffffff;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .resizable-divider {
+    background: var(--border-light, #404040);
+  }
+  
+  .divider-grip {
+    background: var(--text-muted, #666666);
+  }
+}

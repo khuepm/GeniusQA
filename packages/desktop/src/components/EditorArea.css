@@ -89,34 +89,41 @@
   display: flex;
   background: var(--primary-bg);
   border: 1px solid var(--border-light);
-  border-radius: var(--button-border-radius);
+  border-radius: 10px; /* Increased border radius */
   overflow: hidden;
+  gap: 2px; /* Add small gap between buttons */
 }
 
 .view-mode-btn {
-  padding: var(--py-xs) var(--px-md);
+  padding: 8px 20px; /* Increased padding for easier clicking */
   border: none;
   background: transparent;
-  font-size: var(--font-size-sm);
+  font-size: 14px; /* Slightly larger font */
   font-weight: var(--font-weight-medium);
   font-family: var(--font-family-system);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 0.2s ease; /* Smoother transition */
+  position: relative;
+  min-width: 80px; /* Minimum width for consistency */
 }
 
 .view-mode-btn:hover {
   background: var(--button-hover);
   color: var(--text-primary);
+  transform: translateY(-1px); /* Subtle lift effect */
 }
 
 .view-mode-btn.active {
-  background: var(--accent-primary);
-  color: white;
+  background: #ffffff;
+  color: var(--accent-primary);
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12); /* Enhanced shadow */
+  transform: scale(1.02); /* Slight scale on active */
 }
 
 .view-mode-btn:not(:last-child) {
-  border-right: 1px solid var(--border-light);
+  border-right: none; /* Remove border, use gap instead */
 }
 
 /* Editor content area - Requirements: 6.1, 6.4 */
@@ -426,7 +433,7 @@
 /* Status panel */
 .status-panel {
   display: flex;
-  align-items: center;
+  align-items: baseline; /* Changed from center to baseline for text alignment */
   gap: var(--button-group-gap);
   height: var(--editor-status-height);
   padding: 0 var(--toolbar-padding);
@@ -437,7 +444,7 @@
 
 .status-item {
   display: flex;
-  align-items: center;
+  align-items: baseline; /* Changed from center to baseline */
   gap: var(--button-gap);
   font-size: var(--font-size-sm);
   font-family: var(--font-family-system);
