@@ -3,19 +3,23 @@
  * Manages navigation between authentication and main app screens
  * 
  * Requirements: 10.1 - Unified interface with tabs for Script List, AI Builder, and Editor
+ * Requirements: Story 1.1 - Immediate access without login prompts
  */
 
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { GuestModeProvider } from '../contexts/GuestModeContext';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { FlexibleRoute } from '../components/FlexibleRoute';
 
 // Import screens
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import RecorderScreen from '../screens/RecorderScreen';
+import GuestRecorderScreen from '../screens/GuestRecorderScreen';
 import UnifiedRecorderScreen from '../screens/UnifiedRecorderScreen';
 import UnifiedScriptManager from '../screens/UnifiedScriptManager';
 
@@ -95,12 +99,13 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 /**
  * AppNavigator component
- * Conditionally renders auth or main app screens based on authentication state
+ * Supports both authenticated and anonymous access modes
  */
 const AppNavigator: React.FC = () => {
   return (
     <BrowserRouter>
-      <ScreenViewTracker>
+      <GuestModeProvider>
+        <ScreenViewTracker>
         <Routes>
           {/* Public routes */}
           <Route
@@ -120,60 +125,60 @@ const AppNavigator: React.FC = () => {
             }
           />
 
-          {/* Protected routes */}
+          {/* Main dashboard - supports both authenticated and guest modes */}
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute>
+              <FlexibleRoute guestFallback={<GuestRecorderScreen />}>
                 <DashboardScreen />
-              </ProtectedRoute>
+              </FlexibleRoute>
             }
           />
-          <Route
-            path="/recorder"
-            element={
-              <ProtectedRoute>
-                <RecorderScreen />
-              </ProtectedRoute>
-            }
-          />
+
           <Route
             path="/unified-recorder"
             element={
-              <ProtectedRoute>
+              <FlexibleRoute guestFallback={<GuestRecorderScreen />}>
                 <UnifiedRecorderScreen />
-              </ProtectedRoute>
+              </FlexibleRoute>
             }
           />
 
-          {/* Unified Script Manager - Requirements: 10.1 */}
-          {/* Main route for script management with all tabs */}
+          {/* Recorder - available to guest users for local recording */}
+          <Route
+            path="/recorder"
+            element={
+              <FlexibleRoute guestFallback={<GuestRecorderScreen />}>
+                <RecorderScreen />
+              </FlexibleRoute>
+            }
+          />
+
+          {/* Unified Script Manager - supports guest mode with local storage */}
           <Route
             path="/scripts"
             element={
-              <ProtectedRoute>
+              <FlexibleRoute>
                 <UnifiedScriptManager initialTab="list" />
-              </ProtectedRoute>
+              </FlexibleRoute>
             }
           />
 
-          {/* Direct access to AI Builder tab - Requirements: 10.4 */}
           <Route
             path="/scripts/builder"
             element={
-              <ProtectedRoute>
+              <FlexibleRoute>
                 <UnifiedScriptManager initialTab="builder" />
-              </ProtectedRoute>
+              </FlexibleRoute>
             }
           />
 
-          {/* Direct access to Editor tab - Requirements: 10.3 */}
           <Route
             path="/scripts/editor"
             element={
-              <ProtectedRoute>
+              <FlexibleRoute>
                 <UnifiedScriptManager initialTab="editor" />
-              </ProtectedRoute>
+              </FlexibleRoute>
             }
           />
 
@@ -187,7 +192,7 @@ const AppNavigator: React.FC = () => {
             element={<Navigate to="/scripts/builder" replace />}
           />
 
-          {/* Application-Focused Automation routes */}
+          {/* Application-Focused Automation routes - require authentication for cloud features */}
           <Route
             path="/automation"
             element={
@@ -221,11 +226,12 @@ const AppNavigator: React.FC = () => {
             }
           />
 
-          {/* Default redirect */}
+          {/* Default redirect - Requirements: Story 1.1 - Immediate access */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
-      </ScreenViewTracker>
+        </ScreenViewTracker>
+      </GuestModeProvider>
     </BrowserRouter>
   );
 };

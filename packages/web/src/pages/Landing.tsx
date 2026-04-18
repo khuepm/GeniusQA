@@ -94,10 +94,10 @@ export const Landing: React.FC = () => {
                 Sign In
               </Link>
               <Link
-                to="/register"
+                to="/dashboard"
                 className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-all shadow-md hover:shadow-lg"
               >
-                Get Started
+                Try Now
               </Link>
             </div>
           </div>
@@ -129,7 +129,7 @@ export const Landing: React.FC = () => {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
             <Link
-              to="/register"
+              to="/dashboard"
               className="group bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-blue-700 transition-all shadow-xl hover:shadow-2xl flex items-center space-x-2"
             >
               <span>Start Testing for Free</span>
@@ -346,7 +346,7 @@ export const Landing: React.FC = () => {
             Join solo developers who are shipping faster and sleeping better.
           </p>
           <Link
-            to="/register"
+            to="/dashboard"
             className="inline-flex items-center space-x-2 bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-blue-700 transition-all shadow-xl hover:shadow-2xl"
           >
             <span>Start Your Free Account</span>

@@ -1240,6 +1240,51 @@ export class IPCBridgeService {
   }
 
   /**
+   * Get script information
+   * 
+   * Gets basic information about a script file including duration and action count.
+   * Used for displaying script metadata in the UI.
+   * 
+   * @param {string} scriptPath - Absolute path to the script file
+   * @returns {Promise<{duration: number, actionCount: number}>} Script metadata
+   * 
+   * @throws {Error} If script file not found
+   * @throws {Error} If script file is corrupted
+   * 
+   * @example
+   * const info = await ipcBridge.getScriptInfo('/path/to/script.json');
+   * console.log(`Duration: ${info.duration}s, Actions: ${info.actionCount}`);
+   */
+  public async getScriptInfo(scriptPath: string): Promise<{duration: number, actionCount: number}> {
+    try {
+      // Load the script and extract basic info
+      const scriptData = await this.loadScript(scriptPath);
+      
+      // Calculate duration and action count from script data
+      let duration = 0;
+      let actionCount = 0;
+      
+      if (scriptData && scriptData.actions && Array.isArray(scriptData.actions)) {
+        actionCount = scriptData.actions.length;
+        
+        // Find the last action's timestamp for duration
+        if (actionCount > 0) {
+          const lastAction = scriptData.actions[actionCount - 1];
+          if (lastAction && typeof lastAction.timestamp === 'number') {
+            duration = lastAction.timestamp;
+          }
+        }
+      }
+      
+      return { duration, actionCount };
+    } catch (error) {
+      console.error('[IPC Bridge] getScriptInfo failed:', error);
+      // Return default values if script can't be loaded
+      return { duration: 0, actionCount: 0 };
+    }
+  }
+
+  /**
    * Capture current screen screenshot
    * 
    * Captures a screenshot of the current screen and returns it as base64.
