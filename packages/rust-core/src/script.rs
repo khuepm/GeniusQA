@@ -49,6 +49,7 @@ pub enum ActionType {
     MouseDrag,
     MouseScroll,
     AiVisionCapture,
+    VisualAssert,
     KeyPress,
     KeyRelease,
     KeyType,

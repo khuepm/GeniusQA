@@ -1,0 +1,697 @@
+/**
+ * SimpleUnifiedInterface Styles
+ * Clean, simple layout matching the user's mockup
+ */
+
+.simple-unified-interface {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f5f5f5;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  position: relative;
+}
+
+/* Back button inside interface */
+.interface-back-button {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #212529;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e0e0e0;
+}
+
+.interface-back-button:hover {
+  background: rgba(255, 255, 255, 1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.interface-back-button:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Error Banner */
+.error-banner {
+  background: #f44336;
+  color: white;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.error-banner button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+}
+
+/* Top Toolbar */
+.simple-toolbar {
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 12px 16px 12px 48px; /* Add left padding for back button */
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 8px;
+}
+
+.step-icon {
+  width: 24px;
+  height: 24px;
+  background: #2196f3;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: white;
+}
+
+.step-text {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+}
+
+.toolbar-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 4px;
+  background: #f5f5f5;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.toolbar-btn:hover:not(:disabled) {
+  background: #e0e0e0;
+  transform: translateY(-1px);
+}
+
+.toolbar-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Record Button */
+.record-btn.active {
+  background: #f44336;
+}
+
+.record-icon {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #f44336;
+  transition: all 0.2s ease;
+}
+
+.record-btn.active .record-icon {
+  background: white;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+/* Play Button */
+.play-btn.active {
+  background: #4caf50;
+}
+
+.play-icon {
+  width: 0;
+  height: 0;
+  border-left: 8px solid #4caf50;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  margin-left: 2px;
+}
+
+.play-btn.active .play-icon {
+  border-left-color: white;
+}
+
+/* Stop Button */
+.stop-icon {
+  width: 10px;
+  height: 10px;
+  background: #757575;
+  border-radius: 1px;
+}
+
+/* Save Button */
+.save-icon {
+  width: 12px;
+  height: 12px;
+  position: relative;
+  background: none;
+}
+
+.save-icon::before {
+  content: '💾';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+}
+
+/* Open Button */
+.open-icon {
+  width: 12px;
+  height: 12px;
+  position: relative;
+  background: none;
+}
+
+.open-icon::before {
+  content: '📁';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+}
+
+/* Clear Button */
+.clear-icon {
+  width: 12px;
+  height: 12px;
+  position: relative;
+  background: none;
+}
+
+.clear-icon::before {
+  content: '🗑️';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+}
+
+/* Settings Button */
+.settings-icon {
+  width: 12px;
+  height: 12px;
+  position: relative;
+  background: none;
+}
+
+.settings-icon::before {
+  content: '⚙️';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+}
+
+.toolbar-separator {
+  width: 1px;
+  height: 20px;
+  background: #e0e0e0;
+  margin: 0 4px;
+}
+
+/* Steps Container */
+.steps-container {
+  flex: 1;
+  background: white;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #757575;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-text {
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.empty-subtext {
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+/* Steps List */
+.steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.step-item:hover {
+  background: #f0f0f0;
+  border-color: #d0d0d0;
+}
+
+.step-number {
+  width: 24px;
+  height: 24px;
+  background: #2196f3;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.step-icon-container {
+  width: 32px;
+  height: 32px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.step-action-icon {
+  font-size: 16px;
+}
+
+.step-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-description {
+  font-size: 14px;
+  color: #333;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.step-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.step-action-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: background 0.2s ease;
+}
+
+.step-action-btn:hover {
+  background: #e0e0e0;
+}
+
+/* Recording Indicator */
+.recording-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  background: #fff3e0;
+  border: 1px solid #ffcc02;
+  border-radius: 8px;
+  color: #f57c00;
+  font-weight: 500;
+}
+
+.recording-pulse {
+  width: 12px;
+  height: 12px;
+  background: #f44336;
+  border-radius: 50%;
+  animation: pulse 1s infinite;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .simple-toolbar {
+    padding: 8px 12px 8px 44px; /* Adjust left padding for smaller back button */
+    gap: 8px;
+  }
+  
+  .toolbar-btn {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .steps-container {
+    padding: 12px;
+  }
+  
+  .step-item {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .interface-back-button {
+    top: 8px;
+    left: 8px;
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+  }
+}
+
+/* Recording Status */
+.recording-status-container {
+  background: #fff3e0;
+  border: 1px solid #ffcc02;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 16px;
+  color: #f57c00;
+}
+
+.recording-status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.recording-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recording-status-text {
+  font-weight: 500;
+}
+
+.recording-time-display {
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.recording-hint {
+  font-size: 12px;
+  opacity: 0.8;
+  text-align: center;
+}
+
+.recording-hint kbd {
+  background: #f57c00;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+/* Playback Progress */
+.main-progress-container {
+  background: #e3f2fd;
+  border: 1px solid #2196f3;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 16px;
+  color: #1976d2;
+}
+
+.main-progress-container.paused {
+  background: #fff3e0;
+  border-color: #ff9800;
+  color: #f57c00;
+}
+
+.main-progress-container.completed {
+  background: #e8f5e8;
+  border-color: #4caf50;
+  color: #2e7d32;
+}
+
+.main-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.progress-status-text {
+  font-weight: 500;
+}
+
+.progress-details {
+  display: flex;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.main-progress-bar-container {
+  height: 6px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.main-progress-bar {
+  height: 100%;
+  background: #2196f3;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.main-progress-bar.paused {
+  background: #ff9800;
+}
+
+.main-progress-bar.completed {
+  background: #4caf50;
+}
+
+/* Preview Card */
+.preview-card {
+  position: absolute;
+  top: 60px;
+  right: 16px;
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  z-index: 150;
+  max-width: 300px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.preview-title {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.preview-progress {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.modal-close-button {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.modal-close-button:hover {
+  background: #f0f0f0;
+}
+
+.script-filter-wrapper {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.script-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+.empty-text {
+  text-align: center;
+  color: #757575;
+  font-style: italic;
+  padding: 20px;
+}
+
+/* Loading states */
+.toolbar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toolbar-btn:disabled:hover {
+  background: #f5f5f5;
+  transform: none;
+}
+
+/* Enhanced responsive */
+@media (max-width: 768px) {
+  .recording-status-container,
+  .main-progress-container {
+    margin: 12px;
+    padding: 8px 12px;
+  }
+
+  .preview-card {
+    top: 50px;
+    right: 12px;
+    max-width: 250px;
+    padding: 8px 12px;
+  }
+
+  .modal-content {
+    width: 95%;
+    max-height: 90vh;
+  }
+
+  .modal-header {
+    padding: 12px 16px;
+  }
+
+  .script-filter-wrapper,
+  .script-list {
+    padding: 12px 16px;
+  }
+}

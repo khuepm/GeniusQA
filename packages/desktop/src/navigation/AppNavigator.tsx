@@ -6,10 +6,11 @@
  * Requirements: Story 1.1 - Immediate access without login prompts
  */
 
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { GuestModeProvider } from '../contexts/GuestModeContext';
+import { useAnalytics } from '../hooks/useAnalytics';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { FlexibleRoute } from '../components/FlexibleRoute';
 
@@ -19,6 +20,7 @@ import RegisterScreen from '../screens/RegisterScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import RecorderScreen from '../screens/RecorderScreen';
 import GuestRecorderScreen from '../screens/GuestRecorderScreen';
+import UnifiedRecorderScreen from '../screens/UnifiedRecorderScreen';
 import UnifiedScriptManager from '../screens/UnifiedScriptManager';
 
 // Application-Focused Automation screens
@@ -29,6 +31,43 @@ import { ConfigurationScreen } from '../screens/ConfigurationScreen';
 // Legacy imports - kept for backward compatibility redirects
 // import ScriptEditorScreen from '../screens/ScriptEditorScreen';
 // import AIScriptBuilderScreen from '../screens/AIScriptBuilderScreen';
+
+/**
+ * Screen View Tracker component
+ * Tracks screen_view events on navigation changes
+ * Requirements: 3.1
+ */
+const ScreenViewTracker: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const location = useLocation();
+  const { trackScreenView } = useAnalytics();
+
+  useEffect(() => {
+    // Map pathname to screen name
+    const getScreenName = (pathname: string): string => {
+      const screenMap: Record<string, string> = {
+        '/login': 'Login',
+        '/register': 'Register',
+        '/dashboard': 'Dashboard',
+        '/recorder': 'Recorder',
+        '/unified-recorder': 'UnifiedRecorder',
+        '/scripts': 'ScriptList',
+        '/scripts/builder': 'AIBuilder',
+        '/scripts/editor': 'ScriptEditor',
+        '/automation': 'AutomationControl',
+        '/automation/applications': 'ApplicationManagement',
+        '/automation/control': 'AutomationControl',
+        '/automation/settings': 'Configuration',
+      };
+
+      return screenMap[pathname] || pathname.replace(/^\//, '') || 'Unknown';
+    };
+
+    const screenName = getScreenName(location.pathname);
+    trackScreenView(screenName);
+  }, [location.pathname, trackScreenView]);
+
+  return <>{children}</>;
+};
 
 /**
  * Protected Route component
@@ -66,6 +105,7 @@ const AppNavigator: React.FC = () => {
   return (
     <BrowserRouter>
       <GuestModeProvider>
+        <ScreenViewTracker>
         <Routes>
           {/* Public routes */}
           <Route
@@ -91,6 +131,15 @@ const AppNavigator: React.FC = () => {
             element={
               <FlexibleRoute guestFallback={<GuestRecorderScreen />}>
                 <DashboardScreen />
+              </FlexibleRoute>
+            }
+          />
+
+          <Route
+            path="/unified-recorder"
+            element={
+              <FlexibleRoute guestFallback={<GuestRecorderScreen />}>
+                <UnifiedRecorderScreen />
               </FlexibleRoute>
             }
           />
@@ -181,6 +230,7 @@ const AppNavigator: React.FC = () => {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        </ScreenViewTracker>
       </GuestModeProvider>
     </BrowserRouter>
   );

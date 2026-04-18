@@ -10,7 +10,8 @@ import {
   Monitor,
   LogOut,
   Menu,
-  X
+  X,
+  AlertTriangle
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -37,6 +38,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: '/test-runs', icon: Play, label: 'Test Runs' },
     { path: '/auto-generate', icon: Sparkles, label: 'Auto Generate' },
     { path: '/desktop-agents', icon: Monitor, label: 'Desktop Agents' },
+    { path: '/error-logs', icon: AlertTriangle, label: 'Error Logs' },
   ];
 
   return (

@@ -6,6 +6,7 @@ import { ScriptExecutionProvider } from './contexts/ScriptExecutionContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { FlexibleRoute } from './components/FlexibleRoute';
 import { Landing } from './pages/Landing';
+import { Download } from './pages/Download';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
@@ -17,6 +18,7 @@ import { GuestTestCases } from './pages/GuestTestCases';
 import { TestRuns } from './pages/TestRuns';
 import { AutoGenerate } from './pages/AutoGenerate';
 import { DesktopAgents } from './pages/DesktopAgents';
+import { ErrorLogs } from './pages/ErrorLogs';
 
 function App() {
   return (
@@ -26,6 +28,7 @@ function App() {
           <GuestModeProvider>
             <Routes>
               <Route path="/" element={<Landing />} />
+              <Route path="/download" element={<Download />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
 
@@ -86,6 +89,12 @@ function App() {
               <Route path="/desktop-agents" element={
                 <ProtectedRoute>
                   <DesktopAgents />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/error-logs" element={
+                <ProtectedRoute>
+                  <ErrorLogs />
                 </ProtectedRoute>
               } />
             </Routes>
