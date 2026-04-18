@@ -1,0 +1,11 @@
+[build]
+  command = "pnpm --filter @geniusqa/web build"
+  publish = "packages/web/dist"
+
+[dev]
+  command = "pnpm --filter @geniusqa/web dev"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

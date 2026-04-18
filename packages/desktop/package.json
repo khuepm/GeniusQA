@@ -1,6 +1,6 @@
 {
   "name": "@geniusqa/desktop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "GeniusQA desktop application using React Native/Tauri for Windows and macOS",
   "private": true,
   "main": "dist/index.js",
@@ -20,6 +20,7 @@
     "firebase": "^12.6.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-markdown": "^9.0.1",
     "react-router-dom": "^6.20.0"
   },
   "devDependencies": {

@@ -1,0 +1,11 @@
+{
+  "buildCommand": "pnpm --filter @geniusqa/web build",
+  "outputDirectory": "packages/web/dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

@@ -232,6 +232,7 @@ describe('IPCBridgeService', () => {
       expect(mockListen).toHaveBeenCalledWith('action_preview', expect.any(Function));
       expect(mockListen).toHaveBeenCalledWith('complete', expect.any(Function));
       expect(mockListen).toHaveBeenCalledWith('error', expect.any(Function));
+      expect(mockListen).toHaveBeenCalledWith('visual_assert_result', expect.any(Function));
     });
 
     it('should forward Tauri events to registered listeners', async () => {
@@ -507,6 +508,14 @@ describe('IPCBridgeService', () => {
       await service.deleteScript('/path/to/script.json');
 
       expect(mockInvoke).toHaveBeenCalledWith('delete_script', { scriptPath: '/path/to/script.json' });
+    });
+
+    it('should call revealInFinder command', async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
+
+      await service.revealInFinder('/path/to/script.json');
+
+      expect(mockInvoke).toHaveBeenCalledWith('reveal_in_finder', { scriptPath: '/path/to/script.json' });
     });
   });
 

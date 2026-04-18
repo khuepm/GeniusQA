@@ -1,0 +1,293 @@
+/**
+ * ConsentDialog Styles
+ *
+ * Styles for the analytics consent dialog.
+ * Requirements: 6.1, 6.2
+ */
+
+.consent-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: consentFadeIn 0.3s ease-out;
+}
+
+@keyframes consentFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.consent-dialog {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  width: 90%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: consentSlideIn 0.3s ease-out;
+  outline: none;
+}
+
+@keyframes consentSlideIn {
+  from {
+    transform: translateY(-30px) scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Header */
+.consent-dialog-header {
+  padding: 28px 28px 0;
+  text-align: center;
+}
+
+.consent-dialog-icon {
+  font-size: 3rem;
+  margin-bottom: 12px;
+}
+
+.consent-dialog-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1.3;
+}
+
+/* Body */
+.consent-dialog-body {
+  padding: 20px 28px;
+}
+
+.consent-dialog-description {
+  margin: 0 0 24px 0;
+  color: #6b7280;
+  font-size: 1rem;
+  line-height: 1.6;
+  text-align: center;
+}
+
+/* Sections */
+.consent-dialog-section {
+  margin-bottom: 20px;
+}
+
+.consent-dialog-section-title {
+  margin: 0 0 12px 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Data collection list */
+.consent-dialog-data-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.consent-dialog-data-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+
+.consent-dialog-data-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.consent-dialog-data-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.consent-dialog-data-title {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 0.9rem;
+}
+
+.consent-dialog-data-description {
+  color: #6b7280;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+/* Privacy commitments list */
+.consent-dialog-privacy-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: #ecfdf5;
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+
+.consent-dialog-privacy-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  color: #047857;
+  font-size: 0.85rem;
+}
+
+.consent-dialog-check-icon {
+  font-weight: bold;
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+/* Footer */
+.consent-dialog-footer {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px 28px 28px;
+}
+
+.consent-dialog-button {
+  padding: 12px 28px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 140px;
+}
+
+.consent-dialog-button.decline {
+  background: white;
+  border: 2px solid #d1d5db;
+  color: #6b7280;
+}
+
+.consent-dialog-button.decline:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #9ca3af;
+  color: #374151;
+}
+
+.consent-dialog-button.accept {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border: none;
+  color: white;
+}
+
+.consent-dialog-button.accept:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
+}
+
+.consent-dialog-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .consent-dialog {
+    background: #1f2937;
+  }
+
+  .consent-dialog-title {
+    color: #f9fafb;
+  }
+
+  .consent-dialog-description {
+    color: #9ca3af;
+  }
+
+  .consent-dialog-section-title {
+    color: #d1d5db;
+  }
+
+  .consent-dialog-data-item {
+    background: #374151;
+  }
+
+  .consent-dialog-data-title {
+    color: #f9fafb;
+  }
+
+  .consent-dialog-data-description {
+    color: #9ca3af;
+  }
+
+  .consent-dialog-privacy-list {
+    background: rgba(16, 185, 129, 0.1);
+  }
+
+  .consent-dialog-privacy-item {
+    color: #34d399;
+  }
+
+  .consent-dialog-check-icon {
+    color: #34d399;
+  }
+
+  .consent-dialog-button.decline {
+    background: #374151;
+    border-color: #4b5563;
+    color: #d1d5db;
+  }
+
+  .consent-dialog-button.decline:hover:not(:disabled) {
+    background: #4b5563;
+    border-color: #6b7280;
+    color: #f9fafb;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .consent-dialog {
+    width: 95%;
+    max-height: 95vh;
+  }
+
+  .consent-dialog-header {
+    padding: 20px 20px 0;
+  }
+
+  .consent-dialog-body {
+    padding: 16px 20px;
+  }
+
+  .consent-dialog-footer {
+    flex-direction: column;
+    padding: 16px 20px 20px;
+  }
+
+  .consent-dialog-button {
+    width: 100%;
+  }
+}

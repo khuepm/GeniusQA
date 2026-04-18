@@ -1,0 +1,221 @@
+/**
+ * Styles for AITestCaseGeneratorDemo Component
+ */
+
+.ai-test-case-generator-demo {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.demo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.demo-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.config-button,
+.generate-button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid;
+}
+
+.config-button {
+  background-color: white;
+  color: #6b7280;
+  border-color: #d1d5db;
+}
+
+.config-button:hover {
+  background-color: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.generate-button {
+  background-color: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.generate-button:hover {
+  background-color: #2563eb;
+  border-color: #2563eb;
+}
+
+.generate-button.large {
+  padding: 12px 24px;
+  font-size: 1rem;
+}
+
+.test-cases-section {
+  margin-top: 24px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 16px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.section-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.bulk-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.action-button,
+.primary-action-button,
+.danger-action-button {
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid;
+}
+
+.action-button {
+  background-color: white;
+  color: #6b7280;
+  border-color: #d1d5db;
+}
+
+.action-button:hover {
+  background-color: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.primary-action-button {
+  background-color: #10b981;
+  color: white;
+  border-color: #10b981;
+}
+
+.primary-action-button:hover {
+  background-color: #059669;
+  border-color: #059669;
+}
+
+.danger-action-button {
+  background-color: #dc2626;
+  color: white;
+  border-color: #dc2626;
+}
+
+.danger-action-button:hover {
+  background-color: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.test-cases-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  background-color: #fafafa;
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  margin-top: 24px;
+}
+
+.empty-state-content {
+  text-align: center;
+  max-width: 400px;
+  padding: 32px;
+}
+
+.empty-state-content h3 {
+  margin: 0 0 12px 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.empty-state-content p {
+  margin: 0 0 24px 0;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .ai-test-case-generator-demo {
+    padding: 16px;
+  }
+  
+  .demo-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+  
+  .header-actions {
+    justify-content: center;
+  }
+  
+  .section-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+  
+  .bulk-actions {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .empty-state-content {
+    padding: 24px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .bulk-actions {
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  .action-button,
+  .primary-action-button,
+  .danger-action-button {
+    width: 100%;
+    text-align: center;
+  }
+}

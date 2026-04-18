@@ -11,7 +11,10 @@ use std::time::{Duration, Instant};
 use std::collections::HashMap;
 use tokio::sync::mpsc;
 use serde::{Serialize, Deserialize};
+use serde_json::Value;
 use serde_json::json;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::thread;
 
 /// Player for executing recorded scripts
@@ -216,6 +219,179 @@ pub enum PlaybackEventData {
         success_rate: f64,
         errors: Option<Vec<String>>,
     },
+    VisualAssertResult {
+        result: VisualTestResult,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VisualTestPerformanceMetrics {
+    pub capture_time_ms: u32,
+    pub comparison_time_ms: u32,
+    pub total_time_ms: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VisualTestResult {
+    pub action_id: String,
+    pub passed: bool,
+    pub difference_percentage: f32,
+    pub difference_type: String,
+    pub baseline_path: String,
+    pub actual_path: String,
+    pub diff_path: Option<String>,
+    pub performance_metrics: VisualTestPerformanceMetrics,
+    pub error_details: Option<String>,
+    pub retry_count: u32,
+}
+
+fn difference_type_to_string(diff_type: &crate::visual_testing::DifferenceType) -> String {
+    match diff_type {
+        crate::visual_testing::DifferenceType::NoChange => "no_change".to_string(),
+        crate::visual_testing::DifferenceType::LayoutShift => "layout_shift".to_string(),
+        crate::visual_testing::DifferenceType::ContentChange => "content_change".to_string(),
+        crate::visual_testing::DifferenceType::ColorVariation => "color_variation".to_string(),
+        crate::visual_testing::DifferenceType::DimensionMismatch => "dimension_mismatch".to_string(),
+    }
+}
+
+fn comparison_method_from_str(method: &str) -> crate::visual_testing::ComparisonMethod {
+    match method {
+        "pixel_match" => crate::visual_testing::ComparisonMethod::PixelMatch,
+        "ssim" => crate::visual_testing::ComparisonMethod::SSIM,
+        "layout_aware" => crate::visual_testing::ComparisonMethod::LayoutAware,
+        "hybrid" => crate::visual_testing::ComparisonMethod::Hybrid,
+        _ => crate::visual_testing::ComparisonMethod::default(),
+    }
+}
+
+fn sensitivity_profile_from_str(profile: &str) -> crate::visual_testing::SensitivityProfile {
+    match profile {
+        "strict" => crate::visual_testing::SensitivityProfile::Strict,
+        "moderate" => crate::visual_testing::SensitivityProfile::Moderate,
+        "flexible" => crate::visual_testing::SensitivityProfile::Flexible,
+        _ => crate::visual_testing::SensitivityProfile::default(),
+    }
+}
+
+fn value_as_f32(v: &Value) -> Option<f32> {
+    if let Some(n) = v.as_f64() {
+        return Some(n as f32);
+    }
+    v.as_i64().map(|n| n as f32)
+}
+
+fn value_as_u32(v: &Value) -> Option<u32> {
+    v.as_u64().map(|n| n as u32)
+}
+
+fn parse_region(v: &Value) -> Option<crate::visual_testing::Region> {
+    let x = v.get("x").and_then(value_as_u32)?;
+    let y = v.get("y").and_then(value_as_u32)?;
+    let width = v.get("width").and_then(value_as_u32)?;
+    let height = v.get("height").and_then(value_as_u32)?;
+    Some(crate::visual_testing::Region { x, y, width, height })
+}
+
+fn build_visual_assert_comparison_config(
+    additional_data: &HashMap<String, Value>,
+) -> Option<crate::visual_testing::ComparisonConfig> {
+    let mut config = crate::visual_testing::ComparisonConfig::default();
+
+    let cfg = additional_data.get("config")?;
+    if let Some(threshold) = cfg.get("threshold").and_then(value_as_f32) {
+        config.threshold = threshold;
+    }
+    if let Some(method) = cfg.get("comparison_method").and_then(|v| v.as_str()) {
+        config.method = comparison_method_from_str(method);
+    }
+    if let Some(profile) = cfg.get("sensitivity_profile").and_then(|v| v.as_str()) {
+        config.sensitivity_profile = sensitivity_profile_from_str(profile);
+    }
+    if let Some(aa) = cfg.get("anti_aliasing_tolerance").and_then(|v| v.as_bool()) {
+        config.anti_aliasing_tolerance = aa;
+    }
+    if let Some(tol) = cfg.get("layout_shift_tolerance").and_then(value_as_u32) {
+        config.layout_shift_tolerance = tol;
+    }
+
+    if let Some(regions) = additional_data.get("regions") {
+        if let Some(target_roi) = regions.get("target_roi") {
+            if !target_roi.is_null() {
+                if let Some(region) = parse_region(target_roi) {
+                    config.include_roi = Some(region);
+                }
+            }
+        }
+
+        if let Some(ignore_regions) = regions.get("ignore_regions").and_then(|v| v.as_array()) {
+            let mut parsed: Vec<crate::visual_testing::Region> = Vec::new();
+            for r in ignore_regions {
+                if let Some(region) = parse_region(r) {
+                    parsed.push(region);
+                }
+            }
+            config.ignore_regions = parsed;
+        }
+    }
+
+    Some(config)
+}
+
+fn resolve_visual_assert_baseline_path(script: &crate::script::ScriptData, baseline_path: &str) -> String {
+    let script_dir = script
+        .metadata
+        .additional_data
+        .get("script_dir")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    if baseline_path.is_empty() {
+        return baseline_path.to_string();
+    }
+
+    let baseline = Path::new(baseline_path);
+    if baseline.is_absolute() {
+        return baseline_path.to_string();
+    }
+
+    if script_dir.is_empty() {
+        return baseline_path.to_string();
+    }
+
+    Path::new(script_dir)
+        .join(baseline)
+        .to_string_lossy()
+        .to_string()
+}
+
+#[cfg(target_os = "macos")]
+fn capture_screenshot_to_temp_png(action_id: &str) -> std::result::Result<PathBuf, String> {
+    let mut path = std::env::temp_dir();
+    let file_name = format!(
+        "geniusqa_vrt_actual_{}_{}_{}.png",
+        std::process::id(),
+        action_id,
+        chrono::Utc::now().timestamp_millis()
+    );
+    path.push(file_name);
+
+    let status = Command::new("screencapture")
+        .arg("-x")
+        .arg(path.to_string_lossy().to_string())
+        .status()
+        .map_err(|e| format!("Failed to spawn screencapture: {}", e))?;
+
+    if !status.success() {
+        return Err(format!("screencapture failed with status: {}", status));
+    }
+
+    Ok(path)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn capture_screenshot_to_temp_png(_action_id: &str) -> std::result::Result<PathBuf, String> {
+    Err("Visual assert screenshot capture is currently only implemented on macOS".to_string())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1078,6 +1254,7 @@ impl Player {
                                 ActionType::Wait => "wait".to_string(),
                                 ActionType::Custom => "custom".to_string(),
                                 ActionType::AiVisionCapture => "ai_vision_capture".to_string(),
+                                ActionType::VisualAssert => "visual_assert".to_string(),
                             },
                             timestamp: action.timestamp,
                             x: action.x,
@@ -1238,8 +1415,110 @@ impl Player {
                         }
                     }
                     let actual_delay = actual_delay_start.elapsed();
-                    
-                    // Execute the action with retry logic for transient errors
+
+                    // Execute VisualAssert inside the playback loop so we can emit a dedicated event
+                    if action.action_type == ActionType::VisualAssert {
+                        let overall_start = Instant::now();
+
+                        let additional_data = action.additional_data.clone().unwrap_or_default();
+                        let action_id = additional_data
+                            .get("action_id")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| format!("visual_assert_{}", action_index));
+
+                        let baseline_path_rel = additional_data
+                            .get("assets")
+                            .and_then(|v| v.get("baseline_path"))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
+                        let baseline_path = resolve_visual_assert_baseline_path(&script, baseline_path_rel);
+
+                        let mut passed = false;
+                        let mut difference_percentage: f32 = 0.0;
+                        let mut difference_type: String = "no_change".to_string();
+                        let mut diff_path: Option<String> = None;
+                        let mut error_details: Option<String> = None;
+                        let mut actual_path: String = "".to_string();
+                        let mut capture_time_ms: u32 = 0;
+                        let mut comparison_time_ms: u32 = 0;
+
+                        match build_visual_assert_comparison_config(&additional_data) {
+                            None => {
+                                passed = false;
+                                error_details = Some("Missing visual_assert additional_data.config".to_string());
+                            }
+                            Some(compare_cfg) => {
+                                let capture_start = Instant::now();
+                                match capture_screenshot_to_temp_png(&action_id) {
+                                    Ok(actual_png_path) => {
+                                        capture_time_ms = capture_start.elapsed().as_millis() as u32;
+                                        actual_path = actual_png_path.to_string_lossy().to_string();
+
+                                        match crate::visual_testing::ImageLoader::load_image(&actual_path) {
+                                            Ok(actual_image) => {
+                                                let compare_start = Instant::now();
+                                                match crate::visual_testing::ImageComparator::compare_with_baseline_generation(
+                                                    &baseline_path,
+                                                    &actual_image,
+                                                    compare_cfg,
+                                                ) {
+                                                    Ok(compare_result) => {
+                                                        comparison_time_ms = compare_start.elapsed().as_millis() as u32;
+                                                        passed = compare_result.is_match;
+                                                        difference_percentage = compare_result.mismatch_percentage;
+                                                        difference_type = difference_type_to_string(&compare_result.difference_type);
+                                                        diff_path = compare_result.diff_image_path;
+                                                    }
+                                                    Err(e) => {
+                                                        comparison_time_ms = compare_start.elapsed().as_millis() as u32;
+                                                        passed = false;
+                                                        error_details = Some(e.to_string());
+                                                    }
+                                                }
+                                            }
+                                            Err(e) => {
+                                                passed = false;
+                                                error_details = Some(e.to_string());
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        capture_time_ms = capture_start.elapsed().as_millis() as u32;
+                                        passed = false;
+                                        error_details = Some(e);
+                                    }
+                                }
+                            }
+                        }
+
+                        let total_time_ms = overall_start.elapsed().as_millis() as u32;
+                        let visual_result = VisualTestResult {
+                            action_id: action_id.clone(),
+                            passed,
+                            difference_percentage,
+                            difference_type,
+                            baseline_path: baseline_path.clone(),
+                            actual_path: actual_path.clone(),
+                            diff_path,
+                            performance_metrics: VisualTestPerformanceMetrics {
+                                capture_time_ms,
+                                comparison_time_ms,
+                                total_time_ms,
+                            },
+                            error_details,
+                            retry_count: 0,
+                        };
+
+                        if let Some(ref sender) = event_sender {
+                            let _ = sender.send(PlaybackEvent {
+                                event_type: "visual_assert_result".to_string(),
+                                data: PlaybackEventData::VisualAssertResult { result: visual_result },
+                            });
+                        }
+                    }
+
+                    // Execute the action with retry logic for recoverable errors
                     let action_exec_start = Instant::now();
                     let mut action_result = Self::execute_action_sync(&*platform, action, action_index, &config);
                     let mut retry_count = 0usize;
@@ -1642,6 +1921,9 @@ impl Player {
             // Wait is always supported
             ActionType::Wait => true,
             
+            // Visual assert is supported (execution happens in the playback loop)
+            ActionType::VisualAssert => true,
+            
             // Screenshot and Custom are not supported during playback
             ActionType::Screenshot => false,
             ActionType::Custom => false,
@@ -1701,6 +1983,7 @@ impl Player {
                 ActionType::KeyType => "Missing required text parameter",
                 ActionType::Wait => "Wait action has invalid parameters",
                 ActionType::AiVisionCapture => "AI Vision Capture actions require separate handling via AIVisionCaptureAction struct",
+                ActionType::VisualAssert => "Visual assert action is not supported",
             };
             
             Self::log_action_skipped(action_index, action, reason);
@@ -1937,6 +2220,10 @@ impl Player {
                 }
                 Ok(())
             }
+            ActionType::VisualAssert => {
+                // Visual assert is handled in the playback loop so it can emit UI events.
+                Ok(())
+            }
             ActionType::Custom => {
                 // Custom actions would need specific handling based on additional_data
                 Ok(())
@@ -2025,6 +2312,13 @@ impl Player {
                         if let Some(ref errs) = errors {
                             metadata.insert("error_count".to_string(), json!(errs.len()));
                         }
+                    },
+                    PlaybackEventData::VisualAssertResult { result } => {
+                        metadata.insert("action_id".to_string(), json!(&result.action_id));
+                        metadata.insert("passed".to_string(), json!(result.passed));
+                        metadata.insert("difference_percentage".to_string(), json!(result.difference_percentage));
+                        metadata.insert("baseline_path".to_string(), json!(&result.baseline_path));
+                        metadata.insert("actual_path".to_string(), json!(&result.actual_path));
                     },
                 }
                 

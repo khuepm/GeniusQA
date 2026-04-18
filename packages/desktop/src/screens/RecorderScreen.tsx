@@ -1,24 +1,30 @@
 /**
  * RecorderScreen Component
  * Main UI for Desktop Recorder MVP
- * Requirements: 1.2, 1.5, 2.5, 4.1, 4.2, 4.3, 4.4, 4.5, 9.1, 9.2, 9.3, 9.5
+ * Requirements: 1.2, 1.5, 2.1, 2.2, 2.5, 4.1, 4.2, 4.3, 4.4, 4.5, 9.1, 9.2, 9.3, 9.5
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthButton } from '../components/AuthButton';
 import { CoreType, CoreStatus, PerformanceMetrics, PerformanceComparison } from '../components/CoreSelector';
 import { ScriptListItem } from '../components/ScriptListItem';
 import { ScriptFilter } from '../components/ScriptFilter';
 import { ClickCursorOverlay } from '../components/ClickCursorOverlay';
+import { RecorderStepSelector } from '../components/RecorderStepSelector';
+import DiffViewer from '../components/DiffViewer';
 import { getIPCBridge } from '../services/ipcBridgeService';
 import { scriptStorageService, StoredScriptInfo, ScriptFilter as ScriptFilterType, ScriptSource, TargetOS } from '../services/scriptStorageService';
+import { VisualTestResult } from '../types/visualTesting.types';
+import { invoke } from '@tauri-apps/api/tauri';
 import {
   RecorderStatus,
   IPCEvent,
   ActionData,
   ActionPreviewData,
 } from '../types/recorder.types';
+import { invoke } from '@tauri-apps/api/tauri';
+import { TestScript, TestStep } from '../types/testCaseDriven.types';
 import './RecorderScreen.css';
 
 /**
@@ -72,7 +78,22 @@ const RecorderScreen: React.FC = () => {
   const [coreLoading, setCoreLoading] = useState<boolean>(false);
   const [coreError, setCoreError] = useState<string | null>(null);
 
+  // Step-based recording state
+  // Requirements: 2.1, 2.2, 4.1
+  const [stepRecordingEnabled, setStepRecordingEnabled] = useState<boolean>(false);
+  const [activeRecordingScript, setActiveRecordingScript] = useState<TestScript | null>(null);
+  const [activeRecordingStepId, setActiveRecordingStepId] = useState<string | null>(null);
+  const [showScriptLoaderForRecording, setShowScriptLoaderForRecording] = useState<boolean>(false);
+
+  // Screenshot capture option
+  const [captureScreenshotOnClick, setCaptureScreenshotOnClick] = useState<boolean>(false);
+
+  // Visual Assert Result
+  const [showDiffViewer, setShowDiffViewer] = useState<boolean>(false);
+  const [latestVisualTestResult, setLatestVisualTestResult] = useState<VisualTestResult | null>(null);
+
   const navigate = useNavigate();
+  const location = useLocation();
   const ipcBridge = getIPCBridge();
 
   /**
@@ -85,18 +106,25 @@ const RecorderScreen: React.FC = () => {
         // Initialize core status first
         await initializeCoreStatus();
 
+        const requestedScriptPath = (location.state as { scriptPath?: string } | null)?.scriptPath;
+
         // Check for existing recordings
         const recordings = await ipcBridge.checkForRecordings();
-        setHasRecordings(recordings);
+        setHasRecordings(recordings || Boolean(requestedScriptPath));
 
-        if (recordings) {
-          // Get the latest recording path
-          const latestPath = await ipcBridge.getLatestRecording();
-          setLastRecordingPath(latestPath);
-          setSelectedScriptPath(latestPath);
-
+        if (recordings || requestedScriptPath) {
           // Load list of available scripts
           await loadAvailableScripts();
+
+          if (requestedScriptPath) {
+            setLastRecordingPath(requestedScriptPath);
+            setSelectedScriptPath(requestedScriptPath);
+          } else {
+            // Get the latest recording path
+            const latestPath = await ipcBridge.getLatestRecording();
+            setLastRecordingPath(latestPath);
+            setSelectedScriptPath(latestPath);
+          }
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to initialize recorder';
@@ -200,6 +228,18 @@ const RecorderScreen: React.FC = () => {
       setIsPaused(event.data?.isPaused ?? false);
     };
 
+    const handleVisualAssertResultEvent = (event: IPCEvent) => {
+      const result = (event.data as any)?.data?.result ?? (event.data as any)?.result ?? event.data;
+      if (!result) return;
+
+      setLatestVisualTestResult(result as VisualTestResult);
+
+      // Open DiffViewer on failures
+      if ((result as VisualTestResult).passed === false) {
+        setShowDiffViewer(true);
+      }
+    };
+
     ipcBridge.addEventListener('progress', handleProgressEvent);
     ipcBridge.addEventListener('action_preview', handleActionPreviewEvent);
     ipcBridge.addEventListener('complete', handleCompleteEvent);
@@ -207,6 +247,7 @@ const RecorderScreen: React.FC = () => {
     ipcBridge.addEventListener('recording_stopped', handleRecordingStoppedEvent);
     ipcBridge.addEventListener('playback_stopped', handlePlaybackStoppedEvent);
     ipcBridge.addEventListener('playback_paused', handlePlaybackPausedEvent);
+    ipcBridge.addEventListener('visual_assert_result', handleVisualAssertResultEvent);
 
     // Cleanup
     return () => {
@@ -217,8 +258,31 @@ const RecorderScreen: React.FC = () => {
       ipcBridge.removeEventListener('recording_stopped', handleRecordingStoppedEvent);
       ipcBridge.removeEventListener('playback_stopped', handlePlaybackStoppedEvent);
       ipcBridge.removeEventListener('playback_paused', handlePlaybackPausedEvent);
+      ipcBridge.removeEventListener('visual_assert_result', handleVisualAssertResultEvent);
     };
-  }, []);
+  }, [location.state]);
+
+  const handleApproveVisualDiff = async () => {
+    if (!latestVisualTestResult) return;
+
+    // Copy actual -> baseline
+    const base64 = await invoke<string>('load_asset', { assetPath: latestVisualTestResult.actual_path });
+    await invoke('save_asset', { assetPath: latestVisualTestResult.baseline_path, base64Data: base64 });
+
+    setShowDiffViewer(false);
+  };
+
+  const handleRejectVisualDiff = async () => {
+    setShowDiffViewer(false);
+  };
+
+  const handleRetryVisualTest = async () => {
+    // Quick retry: just run playback again with current settings
+    const scriptPath = selectedScriptPath || lastRecordingPath || undefined;
+    await ipcBridge.startPlayback(scriptPath, playbackSpeed, loopCount);
+    setStatus('playing');
+    setShowDiffViewer(false);
+  };
 
   /**
    * Update recording time while recording
@@ -439,7 +503,7 @@ const RecorderScreen: React.FC = () => {
     try {
       setError(null);
       setLoading(true);
-      await ipcBridge.startRecording();
+      await ipcBridge.startRecording(captureScreenshotOnClick);
       setStatus('recording');
       setRecordingStartTime(Date.now());
       setRecordingTime(0);
@@ -598,6 +662,100 @@ const RecorderScreen: React.FC = () => {
   };
 
   /**
+   * Handle step selection for recording
+   * Requirements: 2.1, 2.2
+   */
+  const handleRecordingStepSelect = useCallback((stepId: string | null) => {
+    setActiveRecordingStepId(stepId);
+    console.log('[RecorderScreen] Active recording step changed:', stepId);
+  }, []);
+
+  /**
+   * Handle creating a new step for recording
+   * Requirements: 2.1, 2.2
+   */
+  const handleCreateRecordingStep = useCallback((description: string, expectedResult: string) => {
+    if (!activeRecordingScript) return;
+
+    const newStepId = `step_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const newStep: TestStep = {
+      id: newStepId,
+      order: activeRecordingScript.steps.length + 1,
+      description,
+      expected_result: expectedResult,
+      action_ids: [],
+      continue_on_failure: false,
+    };
+
+    const updatedScript: TestScript = {
+      ...activeRecordingScript,
+      steps: [...activeRecordingScript.steps, newStep],
+    };
+
+    setActiveRecordingScript(updatedScript);
+    setActiveRecordingStepId(newStepId);
+    console.log('[RecorderScreen] Created new step for recording:', newStep);
+  }, [activeRecordingScript]);
+
+  /**
+   * Handle loading a script for step-based recording
+   * Requirements: 2.1, 4.1
+   */
+  const handleLoadScriptForRecording = useCallback(() => {
+    setShowScriptLoaderForRecording(true);
+  }, []);
+
+  /**
+   * Handle script selection for step-based recording
+   * Requirements: 2.1, 4.1
+   */
+  const handleSelectScriptForRecording = useCallback(async (scriptPath: string) => {
+    try {
+      setLoading(true);
+      const scriptData = await ipcBridge.loadScript(scriptPath);
+
+      // Check if it's a step-based script
+      if (scriptData && scriptData.steps && Array.isArray(scriptData.steps)) {
+        setActiveRecordingScript(scriptData as TestScript);
+        setStepRecordingEnabled(true);
+        // Select first step by default if available
+        if (scriptData.steps.length > 0) {
+          setActiveRecordingStepId(scriptData.steps[0].id);
+        }
+        console.log('[RecorderScreen] Loaded script for step-based recording:', scriptPath);
+      } else {
+        // Legacy script - migrate or show message
+        setError('Selected script is not in step-based format. Please use the Script Editor to convert it.');
+      }
+
+      setShowScriptLoaderForRecording(false);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load script';
+      setError(errorMessage);
+      console.error('[RecorderScreen] Failed to load script for recording:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [ipcBridge]);
+
+  /**
+   * Clear step-based recording mode
+   */
+  const handleClearStepRecording = useCallback(() => {
+    setStepRecordingEnabled(false);
+    setActiveRecordingScript(null);
+    setActiveRecordingStepId(null);
+  }, []);
+
+  /**
+   * Get active step for display
+   */
+  const activeRecordingStep = useMemo((): TestStep | null => {
+    if (!activeRecordingScript || !activeRecordingStepId) return null;
+    return activeRecordingScript.steps.find(step => step.id === activeRecordingStepId) || null;
+  }, [activeRecordingScript, activeRecordingStepId]);
+
+  /**
    * Filter scripts based on current filter settings
    * Requirements: 9.4
    */
@@ -733,18 +891,44 @@ const RecorderScreen: React.FC = () => {
       <ClickCursorOverlay isRecording={status === 'recording'} />
 
       <div className="recorder-content">
-        {/* Back Button */}
-        <button
-          className="back-button"
-          onClick={() => navigate(-1)}
-        >
-          ← Back to Dashboard
-        </button>
-
         {/* Header Section */}
-        <div className="header">
-          <h1 className="logo">GeniusQA Recorder</h1>
-          <p className="subtitle">Record and replay desktop interactions</p>
+        <div className="header-container">
+          <button
+            className="back-button"
+            onClick={() => navigate(-1)}
+            title="Back to Dashboard"
+          >
+            ←
+          </button>
+
+          {/* New Unified Interface Button */}
+          <button
+            className="unified-interface-button"
+            onClick={() => navigate('/unified-recorder')}
+            title="Switch to New Unified Interface"
+            style={{
+              marginLeft: '12px',
+              padding: '8px 16px',
+              backgroundColor: '#1976d2',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#1565c0';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#1976d2';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            🚀 Try New Interface
+          </button>
         </div>
 
         {/* Status Display */}
@@ -776,9 +960,33 @@ const RecorderScreen: React.FC = () => {
         )}
 
         {/* Error Message */}
+        {/* Error Message */}
         {error && (
-          <div className="error-container">
-            <p className="error-text">{error}</p>
+          <div className="error-container" style={{ padding: error.includes('macOS Accessibility permissions required') ? '0' : '12px' }}>
+            {error.includes('macOS Accessibility permissions required') ? (
+              <div className="permission-error-content" style={{ padding: '16px' }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: '#c5221f' }}>
+                  ⚠️ macOS Accessibility Permission Required
+                </h3>
+                <p style={{ margin: '0 0 12px 0', color: '#202124' }}>To record or play automations, this app needs control over your mouse and keyboard.</p>
+                <ol style={{ margin: '0 0 16px 20px', paddingLeft: '0', color: '#202124' }}>
+                  <li>Open <strong>System Settings</strong></li>
+                  <li>Go to <strong>Privacy & Security {'>'} Accessibility</strong></li>
+                  <li>Enable the toggle next to <strong>GeniusQA Desktop</strong></li>
+                </ol>
+                <p className="restart-note" style={{ fontStyle: 'italic', fontSize: '13px', margin: '0 0 16px 0', color: '#5f6368' }}>
+                  Note: You may need to restart the application after enabling permissions.
+                </p>
+                <button
+                  className="permission-button"
+                  onClick={() => invoke('request_accessibility_permissions')}
+                >
+                  Open System Settings
+                </button>
+              </div>
+            ) : (
+              <p className="error-text">{error}</p>
+            )}
           </div>
         )}
 
@@ -839,6 +1047,52 @@ const RecorderScreen: React.FC = () => {
           </div>
         )}
 
+        {/* Step-Based Recording Selector */}
+        {/* Requirements: 2.1, 2.2, 4.1 */}
+        <RecorderStepSelector
+          script={activeRecordingScript}
+          activeStepId={activeRecordingStepId}
+          isRecording={status === 'recording'}
+          onStepSelect={handleRecordingStepSelect}
+          onCreateStep={handleCreateRecordingStep}
+          onLoadScript={handleLoadScriptForRecording}
+          hasScript={stepRecordingEnabled && activeRecordingScript !== null}
+        />
+
+        {/* Step Recording Mode Toggle */}
+        {stepRecordingEnabled && status === 'idle' && (
+          <div className="step-recording-toggle">
+            <button
+              className="clear-step-recording-btn"
+              onClick={handleClearStepRecording}
+            >
+              Exit Step Recording Mode
+            </button>
+          </div>
+        )}
+
+        {/* Recording Options */}
+        <div className="recording-options-card">
+          <h2 className="recording-options-title">Recording Options</h2>
+          <div className="recording-options-content">
+            <label className="recording-option-item">
+              <input
+                type="checkbox"
+                checked={captureScreenshotOnClick}
+                onChange={(e) => setCaptureScreenshotOnClick(e.target.checked)}
+                disabled={status !== 'idle'}
+                className="recording-option-checkbox"
+              />
+              <div className="recording-option-label">
+                <span className="recording-option-title">Chụp màn hình mỗi khi nhấn chuột</span>
+                <span className="recording-option-description">
+                  AI sẽ phân tích vùng được chọn trước khi thực hiện hành động. Ví dụ: khi nhấn vào ô input, AI sẽ kiểm tra xem đó có phải là ô input trước khi nhập ký tự.
+                </span>
+              </div>
+            </label>
+          </div>
+        </div>
+
         {/* Recording Status */}
         {status === 'recording' && (
           <div className="recording-status-container">
@@ -856,6 +1110,16 @@ const RecorderScreen: React.FC = () => {
                 </span>
               </div>
             </div>
+
+            {/* Active Step Info During Recording */}
+            {stepRecordingEnabled && activeRecordingStep && (
+              <div className="recording-step-target">
+                <span className="recording-step-target-label">Recording to Step:</span>
+                <span className="recording-step-target-name">
+                  Step {activeRecordingStep.order}: {activeRecordingStep.description}
+                </span>
+              </div>
+            )}
 
             <div className="recording-info-text">
               <span>Capturing all mouse movements, clicks, and keyboard inputs</span>
@@ -1095,6 +1359,72 @@ const RecorderScreen: React.FC = () => {
           )}
         </div>
 
+        {/* Script Loader Modal for Step-Based Recording */}
+        {/* Requirements: 2.1, 4.1 */}
+        {showScriptLoaderForRecording && (
+          <div className="modal-overlay" onClick={() => setShowScriptLoaderForRecording(false)}>
+            <div className="modal-content script-selector-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2 className="modal-title">Select Script for Step Recording</h2>
+                <button
+                  className="modal-close-button"
+                  onClick={() => setShowScriptLoaderForRecording(false)}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="step-recording-info-banner">
+                <p>Select a step-based script to record actions for specific test steps.</p>
+                <p className="step-recording-info-note">
+                  Only scripts with test steps can be used for step-based recording.
+                </p>
+              </div>
+
+              {/* Script Filter */}
+              <div className="script-filter-wrapper">
+                <ScriptFilter
+                  filter={scriptFilter}
+                  onFilterChange={setScriptFilter}
+                  totalCount={availableScripts.length}
+                  filteredCount={filteredScripts.length}
+                  showOSFilter={hasAIScripts}
+                  showSearch={true}
+                  compact={true}
+                />
+              </div>
+
+              <div className="script-list">
+                {availableScripts.length === 0 ? (
+                  <p className="empty-text">No scripts available</p>
+                ) : filteredScripts.length === 0 ? (
+                  <p className="empty-text">No scripts match the current filter</p>
+                ) : (
+                  filteredScripts.map((item) => (
+                    <ScriptListItem
+                      key={item.path}
+                      script={{
+                        filename: item.filename,
+                        path: item.path,
+                        createdAt: item.created_at,
+                        duration: item.duration,
+                        actionCount: item.action_count,
+                        source: item.source,
+                        targetOS: item.targetOS,
+                        scriptName: item.scriptName,
+                      }}
+                      selected={false}
+                      onClick={(script) => handleSelectScriptForRecording(script.path)}
+                      showDelete={false}
+                      compact={true}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Script Selector Modal */}
         {/* Requirements: 9.1, 9.2, 9.3, 9.4, 9.5 */}
         {showScriptSelector && (
@@ -1159,6 +1489,23 @@ const RecorderScreen: React.FC = () => {
                   ))
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Visual Diff Viewer Modal */}
+        {showDiffViewer && latestVisualTestResult && (
+          <div className="modal-overlay" onClick={() => setShowDiffViewer(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <DiffViewer
+                testResult={latestVisualTestResult}
+                onApprove={handleApproveVisualDiff}
+                onReject={handleRejectVisualDiff}
+                onRetryTest={handleRetryVisualTest}
+                onAddIgnoreRegion={async () => {
+                  // Not wired yet
+                }}
+              />
             </div>
           </div>
         )}

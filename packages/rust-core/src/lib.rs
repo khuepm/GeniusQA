@@ -22,6 +22,7 @@ pub mod monitoring;
 pub mod debug;
 pub mod asset_manager;
 pub mod ai_vision_integration;
+pub mod visual_testing;
 
 #[cfg(test)]
 mod preferences_property_tests;
@@ -66,6 +67,7 @@ pub use monitoring::{CoreMonitor, MonitoringConfig, HealthStatus, CoreHealthInfo
 pub use asset_manager::{AssetManager, to_posix_path, to_native_path, generate_unique_filename, is_safe_path};
 pub use player::{scale_coordinates, scale_roi, ScreenDimensions, ScaledCoordinates, execute_ai_vision_capture, execute_dynamic_mode_with_ai, AIVisionExecutionResult, AIVisionExecutionMode, DynamicModeExecutionResult, CacheUpdate};
 pub use ai_vision_integration::{AIVisionAnalysisRequest, AIVisionAnalysisResponse, AIVisionProvider, DynamicModeResult, build_analysis_request, apply_cache_update, persist_cache_update, DEFAULT_AI_TIMEOUT_MS};
+pub use visual_testing::{Region, ComparisonConfig, ComparisonResult, ComparisonMethod, SensitivityProfile, DifferenceType, PerformanceMetrics as VRTPerformanceMetrics, VisualTestConfig, VisualError, VisualResult};
 
 /// Re-export commonly used types
 pub mod prelude {

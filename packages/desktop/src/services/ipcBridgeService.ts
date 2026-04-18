@@ -61,8 +61,8 @@ export class IPCBridgeService {
    */
   private async initializeEventListeners(): Promise<void> {
     try {
-      // Listen for all Python events (progress, action_preview, complete, error)
-      const eventTypes = ['progress', 'action_preview', 'complete', 'error'];
+      // Listen for all Python events (progress, action_preview, complete, error, visual_assert_result, recording_action, recording_stopped, playback_stopped, playback_paused)
+      const eventTypes = ['progress', 'action_preview', 'complete', 'error', 'visual_assert_result', 'recording_action', 'recording_stopped', 'playback_stopped', 'playback_paused'];
       
       for (const eventType of eventTypes) {
         const unlisten = await listen<any>(eventType, (event) => {
@@ -131,13 +131,14 @@ export class IPCBridgeService {
    * mouse movements, clicks, and keyboard inputs. The recording continues until
    * stopRecording() is called.
    * 
+   * @param captureScreenshotOnClick - Whether to capture screenshots on mouse clicks for AI analysis
    * @throws {Error} If Python Core is unavailable or recording fails to start
    * @throws {Error} If a recording is already in progress
    * @throws {Error} If permissions are insufficient (macOS Accessibility)
    * 
    * @example
    * try {
-   *   await ipcBridge.startRecording();
+   *   await ipcBridge.startRecording(true);
    *   console.log('Recording started');
    * } catch (error) {
    *   console.error('Failed to start recording:', error.message);
@@ -145,7 +146,7 @@ export class IPCBridgeService {
    * 
    * Requirements: 1.1, 5.1, 5.3
    */
-  public async startRecording(): Promise<void> {
+  public async startRecording(captureScreenshotOnClick: boolean = false): Promise<void> {
     try {
       // Get current core status for logging (gracefully handle failures)
       let coreType = 'unknown';
@@ -156,9 +157,9 @@ export class IPCBridgeService {
         // Ignore core status errors for logging purposes
       }
       
-      console.log(`[IPC Bridge] Invoking start_recording command with ${coreType} core...`);
+      console.log(`[IPC Bridge] Invoking start_recording command with ${coreType} core, captureScreenshotOnClick: ${captureScreenshotOnClick}...`);
       
-      await invoke('start_recording');
+      await invoke('start_recording', { captureScreenshotOnClick });
       console.log(`[IPC Bridge] start_recording command successful with ${coreType} core`);
     } catch (error) {
       console.error('[IPC Bridge] start_recording command failed:', error);
@@ -395,12 +396,52 @@ export class IPCBridgeService {
   /**
    * Format error message for user display
    */
-  private formatErrorMessage(error: Error): string {
-    const message = error.message;
+  private formatErrorMessage(error: unknown): string {
+    const message = (() => {
+      if (typeof error === 'string') return error;
+      if (error && typeof error === 'object') {
+        const maybeMessage = (error as { message?: unknown }).message;
+        if (typeof maybeMessage === 'string') return maybeMessage;
+        try {
+          const json = JSON.stringify(error);
+          if (json && json !== '{}' && json !== '[]') return json;
+        } catch {
+          // ignore
+        }
+      }
+      try {
+        return String(error);
+      } catch {
+        return '';
+      }
+    })();
     
     // Handle empty or missing error messages
     if (!message || message.trim() === '' || message === 'Unknown error') {
       return 'An unknown error occurred. Please try again.';
+    }
+
+    if (message.includes('Failed to capture screenshot')) {
+      const lower = message.toLowerCase();
+      const looksLikePermission =
+        lower.includes('permission') ||
+        lower.includes('not permitted') ||
+        lower.includes('not authorized') ||
+        lower.includes('screen recording') ||
+        lower.includes('accessibility') ||
+        lower.includes('denied');
+
+      if (looksLikePermission) {
+        return (
+          message +
+          '\n\nTo enable screenshot capture on macOS:\n' +
+          '1. System Settings → Privacy & Security → Screen Recording\n' +
+          '2. Enable GeniusQA (or the app name)\n' +
+          '3. Quit & reopen the app\n'
+        );
+      }
+
+      return message;
     }
     
     // Check for Rust core "not yet implemented" errors
@@ -577,6 +618,14 @@ export class IPCBridgeService {
   public async deleteScript(scriptPath: string): Promise<void> {
     try {
       await invoke('delete_script', { scriptPath });
+    } catch (error) {
+      throw new Error(this.formatErrorMessage(error as Error));
+    }
+  }
+
+  public async revealInFinder(scriptPath: string): Promise<void> {
+    try {
+      await invoke('reveal_in_finder', { scriptPath });
     } catch (error) {
       throw new Error(this.formatErrorMessage(error as Error));
     }

@@ -6,12 +6,22 @@
 
 import React from 'react';
 import { render, fireEvent, waitFor, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import * as fc from 'fast-check';
 import RecorderScreen from '../../screens/RecorderScreen';
 import { getIPCBridge } from '../../services/ipcBridgeService';
 
 // Mock IPC Bridge Service
 jest.mock('../../services/ipcBridgeService');
+
+// Helper to render with Router context
+const renderWithRouter = (component: React.ReactElement) => {
+  return render(
+    <MemoryRouter>
+      {component}
+    </MemoryRouter>
+  );
+};
 
 describe('Integration Property-Based Tests', () => {
   let mockIPCBridge: any;
@@ -55,7 +65,7 @@ describe('Integration Property-Based Tests', () => {
       const operationTypeArb = fc.constantFrom('recording', 'playback');
       const operationStateArb = fc.record({
         isActive: fc.boolean(),
-        progress: fc.float({ min: 0, max: 1 }),
+        progress: fc.double({ min: 0, max: 1, noNaN: true }),
         actionCount: fc.integer({ min: 0, max: 100 })
       });
 
@@ -93,7 +103,7 @@ describe('Integration Property-Based Tests', () => {
 
           mockIPCBridge.selectCore.mockResolvedValue(undefined);
 
-          render(<RecorderScreen />);
+          renderWithRouter(<RecorderScreen />);
 
           await waitFor(() => {
             expect(screen.getByTestId('core-selector')).toBeInTheDocument();
@@ -173,7 +183,7 @@ describe('Integration Property-Based Tests', () => {
       const operationProgressArb = fc.record({
         currentAction: fc.integer({ min: 0, max: 50 }),
         totalActions: fc.integer({ min: 1, max: 100 }),
-        elapsedTime: fc.float({ min: 0, max: 60 }),
+        elapsedTime: fc.double({ min: 0, max: 60, noNaN: true }),
         isPaused: fc.boolean()
       });
 
@@ -192,7 +202,7 @@ describe('Integration Property-Based Tests', () => {
           mockIPCBridge.stopPlayback.mockResolvedValue(undefined);
           mockIPCBridge.selectCore.mockResolvedValue(undefined);
 
-          render(<RecorderScreen />);
+          renderWithRouter(<RecorderScreen />);
 
           await waitFor(() => {
             expect(screen.getByText('Start Playback')).toBeInTheDocument();
@@ -250,7 +260,7 @@ describe('Integration Property-Based Tests', () => {
       // Test that operation data is preserved during core switches
       const scriptDataArb = fc.record({
         actionCount: fc.integer({ min: 1, max: 200 }),
-        duration: fc.float({ min: 0.1, max: 120 }),
+        duration: fc.double({ min: 0.1, max: 120, noNaN: true }),
         scriptPath: fc.string({ minLength: 10, maxLength: 50 }).map(s => `/recordings/${s}.json`),
         metadata: fc.record({
           platform: fc.constantFrom('windows', 'macos', 'linux'),
@@ -281,7 +291,7 @@ describe('Integration Property-Based Tests', () => {
           mockIPCBridge.selectCore.mockResolvedValue(undefined);
           mockIPCBridge.startPlayback.mockResolvedValue(undefined);
 
-          render(<RecorderScreen />);
+          renderWithRouter(<RecorderScreen />);
 
           await waitFor(() => {
             expect(screen.getByText('Record')).toBeInTheDocument();
@@ -359,7 +369,7 @@ describe('Integration Property-Based Tests', () => {
           );
           mockIPCBridge.checkForRecordings.mockResolvedValue(false);
 
-          render(<RecorderScreen />);
+          renderWithRouter(<RecorderScreen />);
 
           await waitFor(() => {
             expect(screen.getByTestId('core-selector')).toBeInTheDocument();

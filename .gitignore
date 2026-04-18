@@ -56,3 +56,4 @@ GoogleService-Info.plist
 packages/rust-core/target/debug/
 packages/rust-core/target/tmp/
 packages/rust-core/target/release/
+packages/rust-core/*.png

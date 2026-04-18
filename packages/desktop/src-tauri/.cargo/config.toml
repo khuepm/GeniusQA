@@ -1,0 +1,12 @@
+[build]
+# Set default test timeout to prevent hanging tests
+rustflags = []
+
+[env]
+# Set test timeout environment variable
+RUST_TEST_TIME_UNIT = "60000"  # 60 seconds in milliseconds
+RUST_TEST_TIME_INTEGRATION = "120000"  # 2 minutes for integration tests
+
+[test]
+# Test configuration
+timeout = 120  # 2 minutes timeout for all tests

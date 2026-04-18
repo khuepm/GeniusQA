@@ -13,6 +13,7 @@ import { TestCases } from './pages/TestCases';
 import { TestRuns } from './pages/TestRuns';
 import { AutoGenerate } from './pages/AutoGenerate';
 import { DesktopAgents } from './pages/DesktopAgents';
+import { ErrorLogs } from './pages/ErrorLogs';
 
 function App() {
   return (
@@ -75,6 +76,12 @@ function App() {
           <Route path="/desktop-agents" element={
             <ProtectedRoute>
               <DesktopAgents />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/error-logs" element={
+            <ProtectedRoute>
+              <ErrorLogs />
             </ProtectedRoute>
           } />
         </Routes>

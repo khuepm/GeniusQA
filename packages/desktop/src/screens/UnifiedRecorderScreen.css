@@ -1,0 +1,183 @@
+/**
+ * UnifiedRecorderScreen Styles
+ * Styles for the new unified recorder interface
+ * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.4, 2.5
+ */
+
+/* Main screen container */
+.unified-recorder-screen {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--primary-bg, #ffffff);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Error banner */
+.error-banner {
+  position: absolute;
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent-danger, #f44336);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 150;
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+  animation: errorSlideIn 0.3s ease;
+  max-width: 80%;
+}
+
+.error-text {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.error-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  transition: background 0.15s ease;
+}
+
+.error-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Override toolbar area positioning within unified interface - Requirements: 1.3, 4.1 */
+.unified-recorder-screen .toolbar-area {
+  position: relative;
+  z-index: 100;
+  flex-shrink: 0; /* Prevent toolbar from shrinking */
+}
+
+/* Override editor area positioning within unified interface - Requirements: 1.3, 6.1, 6.4 */
+.unified-recorder-screen .editor-area {
+  position: relative;
+  z-index: 50;
+  flex: 1; /* Takes remaining vertical space - Requirement 1.3 */
+  min-height: 200px; /* Minimum height constraint - Requirement 6.1 */
+  overflow: hidden; /* Ensure proper scrollable content areas */
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.unified-recorder-screen .editor-area.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.unified-recorder-screen .editor-area.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Ensure proper layering */
+.unified-recorder-screen .unified-interface {
+  position: relative;
+  z-index: 1;
+}
+
+/* Animations */
+@keyframes errorSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .back-button {
+    top: 4px;
+    left: 4px;
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+  
+  .error-banner {
+    top: 40px;
+    padding: 6px 12px;
+    max-width: 90%;
+  }
+  
+  .error-text {
+    font-size: 13px;
+  }
+}
+
+@media (max-height: 600px) {
+  .back-button {
+    top: 4px;
+    left: 4px;
+  }
+  
+  .error-banner {
+    top: 36px;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .back-button {
+    border: 2px solid #000000;
+    background: #ffffff;
+  }
+  
+  .error-banner {
+    border: 2px solid #ffffff;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .back-button {
+    transition: none;
+  }
+  
+  .back-button:hover {
+    transform: none;
+  }
+  
+  .back-button:active {
+    transform: none;
+  }
+  
+  .error-banner {
+    animation: none;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .back-button {
+    background: rgba(45, 45, 45, 0.9);
+    color: #ffffff;
+  }
+  
+  .back-button:hover {
+    background: rgba(45, 45, 45, 1);
+  }
+}

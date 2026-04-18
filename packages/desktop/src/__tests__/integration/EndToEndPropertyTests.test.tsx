@@ -6,12 +6,22 @@
 
 import React from 'react';
 import { render, fireEvent, waitFor, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import * as fc from 'fast-check';
 import RecorderScreen from '../../screens/RecorderScreen';
 import { getIPCBridge } from '../../services/ipcBridgeService';
 
 // Mock IPC Bridge Service
 jest.mock('../../services/ipcBridgeService');
+
+// Helper to render with Router context
+const renderWithRouter = (component: React.ReactElement) => {
+  return render(
+    <MemoryRouter>
+      {component}
+    </MemoryRouter>
+  );
+};
 
 describe('End-to-End Property-Based Tests', () => {
   let mockIPCBridge: any;
@@ -72,10 +82,10 @@ describe('End-to-End Property-Based Tests', () => {
       const workflowArb = fc.array(workflowStepArb, { minLength: 1, maxLength: 4 });
 
       const performanceMetricsArb = fc.record({
-        responseTime: fc.float({ min: 50, max: 1000 }),
-        successRate: fc.float({ min: 0.7, max: 1.0 }),
+        responseTime: fc.double({ min: 50, max: 1000, noNaN: true }),
+        successRate: fc.double({ min: 0.7, max: 1.0, noNaN: true }),
         operationCount: fc.integer({ min: 0, max: 500 }),
-        errorRate: fc.float({ min: 0, max: 0.1 })
+        errorRate: fc.double({ min: 0, max: 0.1, noNaN: true })
       });
 
       fc.assert(fc.property(
@@ -124,7 +134,7 @@ describe('End-to-End Property-Based Tests', () => {
             coreHealth: { python: true, rust: true }
           });
 
-          render(<RecorderScreen />);
+          renderWithRouter(<RecorderScreen />);
 
           await waitFor(() => {
             expect(screen.getByTestId('core-selector')).toBeInTheDocument();
@@ -266,7 +276,7 @@ describe('End-to-End Property-Based Tests', () => {
           mockIPCBridge.startPlayback.mockResolvedValue(undefined);
           mockIPCBridge.stopPlayback.mockResolvedValue(undefined);
 
-          render(<RecorderScreen />);
+          renderWithRouter(<RecorderScreen />);
 
           await waitFor(() => {
             expect(screen.getByTestId('core-selector')).toBeInTheDocument();
@@ -357,7 +367,7 @@ describe('End-to-End Property-Based Tests', () => {
       const concurrentOperationsArb = fc.array(
         fc.record({
           type: fc.constantFrom('recording', 'playback', 'script_management'),
-          duration: fc.float({ min: 0.1, max: 2.0 }),
+          duration: fc.double({ min: 0.1, max: 2.0, noNaN: true }),
           shouldSucceed: fc.boolean()
         }),
         { minLength: 1, maxLength: 3 }
@@ -416,7 +426,7 @@ describe('End-to-End Property-Based Tests', () => {
             }
           });
 
-          render(<RecorderScreen />);
+          renderWithRouter(<RecorderScreen />);
 
           await waitFor(() => {
             expect(screen.getByTestId('core-selector')).toBeInTheDocument();
@@ -495,19 +505,18 @@ describe('End-to-End Property-Based Tests', () => {
   describe('Cross-Platform Runtime Switching Properties', () => {
     it('should handle runtime core switching across different platforms', () => {
       const platformArb = fc.constantFrom('windows', 'macos', 'linux');
+      // Ensure at least one core is supported by filtering the arbitrary
       const platformCapabilitiesArb = fc.record({
         supportsRust: fc.boolean(),
         supportsPython: fc.boolean(),
         hasPermissions: fc.boolean(),
         performanceProfile: fc.constantFrom('high', 'medium', 'low')
-      });
+      }).filter(caps => caps.supportsRust || caps.supportsPython);
 
       fc.assert(fc.property(
         platformArb,
         platformCapabilitiesArb,
         async (platform, capabilities) => {
-          // Skip if no cores are supported
-          if (!capabilities.supportsRust && !capabilities.supportsPython) return;
 
           // Setup platform-specific core availability
           const availableCores = [];
@@ -536,7 +545,7 @@ describe('End-to-End Property-Based Tests', () => {
             mockIPCBridge.startRecording.mockRejectedValue(permissionError);
           }
 
-          render(<RecorderScreen />);
+          renderWithRouter(<RecorderScreen />);
 
           await waitFor(() => {
             expect(screen.getByTestId('core-selector')).toBeInTheDocument();

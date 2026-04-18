@@ -17,7 +17,7 @@ const DashboardScreen: React.FC = () => {
   };
 
   const handleNavigateToRecorder = () => {
-    navigate('/recorder');
+    navigate('/unified-recorder');
   };
 
   /**
@@ -44,13 +44,28 @@ const DashboardScreen: React.FC = () => {
     navigate('/scripts/builder');
   };
 
+  /**
+   * Navigate to Application-Focused Automation
+   */
+  const handleNavigateToAutomation = () => {
+    navigate('/automation');
+  };
+
+  const handleNavigateToApplicationManagement = () => {
+    navigate('/automation/applications');
+  };
+
+  const handleNavigateToAutomationSettings = () => {
+    navigate('/automation/settings');
+  };
+
   return (
     <div className="dashboard-container">
       <div className="dashboard-content">
         {/* Header Section */}
         <div className="dashboard-header">
           <h1 className="dashboard-logo">GeniusQA</h1>
-          <h2 className="dashboard-welcome-text">Chào mừng trở lại!</h2>
+          <h2 className="dashboard-welcome-text">Welcome back!</h2>
           {user?.email && (
             <p className="dashboard-email-text">{user.email}</p>
           )}
@@ -61,7 +76,7 @@ const DashboardScreen: React.FC = () => {
           <div className="dashboard-placeholder-card">
             <h3 className="dashboard-placeholder-title">Dashboard</h3>
             <p className="dashboard-placeholder-text">
-              Nội dung dashboard sẽ được thêm vào trong các phiên bản tiếp theo.
+              Dashboard content will be added in future versions.
             </p>
           </div>
 
@@ -116,21 +131,55 @@ const DashboardScreen: React.FC = () => {
             </div>
           </div>
 
-          <div className="dashboard-placeholder-card">
-            <h3 className="dashboard-placeholder-title">Tính năng sắp ra mắt</h3>
-            <p className="dashboard-placeholder-text">
-              • Quản lý API keys<br />
-              • Lịch sử automation<br />
-              • Cài đặt hệ thống<br />
-              • Báo cáo và phân tích
+          {/* Application-Focused Automation Feature Card */}
+          <div className="dashboard-feature-card">
+            <h3 className="dashboard-feature-title">Application-Focused Automation</h3>
+            <p className="dashboard-feature-description">
+              Register applications and run automation scripts constrained to specific applications with focus monitoring
             </p>
+            <div className="dashboard-feature-button-container">
+              <AuthButton
+                title="Open Automation Control"
+                onPress={handleNavigateToAutomation}
+                loading={false}
+                disabled={false}
+                variant="primary"
+              />
+            </div>
+            {/* Quick access buttons for specific features */}
+            <div className="dashboard-quick-access">
+              <button
+                className="dashboard-quick-button"
+                onClick={handleNavigateToApplicationManagement}
+                title="Manage registered applications"
+              >
+                📱 Applications
+              </button>
+              <button
+                className="dashboard-quick-button"
+                onClick={handleNavigateToAutomationSettings}
+                title="Configure automation settings"
+              >
+                ⚙️ Settings
+              </button>
+            </div>
           </div>
+
+          {/*<div className="dashboard-placeholder-card hidden">
+            <h3 className="dashboard-placeholder-title">Coming soon</h3>
+            <p className="dashboard-placeholder-text">
+              • API Key Management<br />
+              • Automation History<br />
+              • System Settings<br />
+              • Reports and Analytics
+            </p>
+          </div>*/}
         </div>
 
         {/* Sign Out Button */}
         <div className="dashboard-footer">
           <AuthButton
-            title="Đăng xuất"
+            title="Sign Out"
             onPress={handleSignOut}
             loading={loading}
             disabled={loading}

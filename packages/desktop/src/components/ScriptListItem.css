@@ -59,6 +59,22 @@
   flex-shrink: 0;
 }
 
+.script-list-item-reveal {
+  padding: 4px 8px;
+  background-color: #1a73e8;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #ffffff;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.script-list-item-reveal:hover {
+  background-color: #1557b0;
+}
+
 .script-list-item-delete {
   padding: 4px 8px;
   background-color: #d93025;
