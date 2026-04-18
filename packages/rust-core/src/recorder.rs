@@ -123,6 +123,11 @@ impl Recorder {
         self.event_sender = Some(sender);
     }
 
+    /// Set whether to capture screenshots on mouse clicks
+    pub fn set_capture_screenshot_on_click(&mut self, enabled: bool) {
+        self.config.capture_screenshot_on_click = enabled;
+    }
+
     /// Start recording user interactions
     pub fn start_recording(&mut self) -> Result<()> {
         let operation_id = format!("start_recording_{}", chrono::Utc::now().timestamp());

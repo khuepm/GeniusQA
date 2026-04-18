@@ -10,7 +10,9 @@
     "build": "npm run build --workspace=packages/web",
     "preview": "npm run preview --workspace=packages/web",
     "lint": "npm run lint --workspace=packages/web",
-    "type-check": "npm run type-check --workspace=packages/web"
+    "type-check": "npm run type-check --workspace=packages/web",
+    "test": "npm run test --workspace=packages/web",
+    "install:web": "npm install --workspace=packages/web"
   },
   "packageManager": "pnpm@9.16.6"
 }

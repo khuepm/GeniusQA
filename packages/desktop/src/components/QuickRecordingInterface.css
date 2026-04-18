@@ -1,0 +1,241 @@
+/**
+ * Quick Recording Interface Styles
+ */
+
+.quick-recording-interface {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 24px;
+}
+
+.quick-recording-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.quick-recording-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 8px 0;
+}
+
+.quick-recording-subtitle {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+}
+
+.quick-recording-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffebee;
+  border: 1px solid #ffcdd2;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.error-icon {
+  font-size: 16px;
+}
+
+.error-text {
+  color: #c62828;
+  font-size: 14px;
+}
+
+.quick-recording-success {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #e8f5e8;
+  border: 1px solid #c8e6c9;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.success-icon {
+  font-size: 16px;
+}
+
+.success-text {
+  color: #2e7d32;
+  font-size: 14px;
+}
+
+/* Recording Active State */
+.recording-active {
+  text-align: center;
+}
+
+.recording-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.recording-pulse {
+  width: 12px;
+  height: 12px;
+  background: #f44336;
+  border-radius: 50%;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.recording-text {
+  font-size: 16px;
+  font-weight: 500;
+  color: #f44336;
+}
+
+.recording-timer {
+  margin-bottom: 20px;
+}
+
+.timer-display {
+  font-size: 32px;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+}
+
+.timer-goal {
+  display: block;
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+}
+
+.recording-instructions {
+  background: #f5f5f5;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.recording-instructions p {
+  margin: 4px 0;
+  font-size: 14px;
+  color: #555;
+}
+
+.stop-recording-btn {
+  background: #f44336;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-bottom: 12px;
+}
+
+.stop-recording-btn:hover {
+  background: #d32f2f;
+}
+
+.recording-hint {
+  font-size: 12px;
+  color: #666;
+}
+
+.recording-hint kbd {
+  background: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-family: monospace;
+  font-size: 11px;
+}
+
+/* Recording Ready State */
+.recording-ready {
+  text-align: center;
+}
+
+.recording-features {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
+.feature-icon {
+  font-size: 20px;
+  width: 24px;
+  text-align: center;
+}
+
+.feature-text {
+  font-size: 14px;
+  color: #333;
+}
+
+.start-recording-btn {
+  background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+  color: white;
+  border: none;
+  padding: 16px 32px;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+}
+
+.start-recording-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(244, 67, 54, 0.4);
+}
+
+.start-recording-btn:active {
+  transform: translateY(0);
+}
+
+.start-recording-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.limit-message {
+  font-size: 14px;
+  color: #f57c00;
+  margin-top: 16px;
+  line-height: 1.4;
+}

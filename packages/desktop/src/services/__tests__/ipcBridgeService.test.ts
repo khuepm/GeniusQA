@@ -232,6 +232,7 @@ describe('IPCBridgeService', () => {
       expect(mockListen).toHaveBeenCalledWith('action_preview', expect.any(Function));
       expect(mockListen).toHaveBeenCalledWith('complete', expect.any(Function));
       expect(mockListen).toHaveBeenCalledWith('error', expect.any(Function));
+      expect(mockListen).toHaveBeenCalledWith('visual_assert_result', expect.any(Function));
     });
 
     it('should forward Tauri events to registered listeners', async () => {

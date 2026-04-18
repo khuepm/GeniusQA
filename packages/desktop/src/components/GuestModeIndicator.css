@@ -1,0 +1,99 @@
+/**
+ * Guest Mode Indicator Styles
+ */
+
+.guest-mode-indicator {
+  background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+  border: 1px solid #bbdefb;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.guest-mode-indicator.compact {
+  padding: 8px 12px;
+  margin-bottom: 8px;
+}
+
+.guest-mode-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.guest-mode-info {
+  flex: 1;
+}
+
+.guest-mode-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.guest-mode-badge {
+  background: #1976d2;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.local-storage-indicator {
+  color: #1565c0;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.guest-mode-details {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.script-count {
+  color: #424242;
+  font-size: 13px;
+}
+
+.limit-warning {
+  color: #f57c00;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.create-account-btn {
+  background: #1976d2;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.create-account-btn:hover {
+  background: #1565c0;
+}
+
+.create-account-btn:active {
+  background: #0d47a1;
+}
+
+/* Compact variant */
+.guest-mode-indicator.compact .guest-mode-content {
+  gap: 8px;
+}
+
+.guest-mode-indicator.compact .guest-mode-header {
+  margin-bottom: 0;
+}
+
+.guest-mode-indicator.compact .guest-mode-details {
+  display: none;
+}

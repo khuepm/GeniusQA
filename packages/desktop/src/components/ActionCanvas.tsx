@@ -12,6 +12,8 @@ import { ActionWithId, TestStep } from '../types/testCaseDriven.types';
 import { VisionEditor } from './VisionEditor';
 import { ReferenceImageManager } from './ReferenceImageManager';
 import { AIVisionCaptureAction } from '../types/aiVisionCapture.types';
+import { VisualAssertionEditor } from './VisualAssertionEditor';
+import { VisualAssertAction, createVisualAssertAction } from '../types/visualTesting.types';
 import './ActionCanvas.css';
 
 interface ActionCanvasProps {
@@ -56,6 +58,41 @@ export const ActionCanvas: React.FC<ActionCanvasProps> = ({
     value: null,
   });
   const [showInsertForm, setShowInsertForm] = useState<number | null>(null);
+
+  const toVisualAssertAction = useCallback((action: ActionWithId): VisualAssertAction | null => {
+    if (action.type !== 'visual_assert') return null;
+
+    const config = action.config;
+    const regions = action.regions;
+    const assets = action.assets;
+    const context = action.context;
+
+    if (!config || !regions || !assets || !context) return null;
+
+    return {
+      type: 'visual_assert',
+      id: action.id,
+      timestamp: action.timestamp,
+      config,
+      regions,
+      assets,
+      context,
+    } as VisualAssertAction;
+  }, []);
+
+  const getDefaultVisualAssertContext = useCallback(() => {
+    const w = typeof window !== 'undefined' ? window : null;
+    const screenW = w?.screen?.width ?? 0;
+    const screenH = w?.screen?.height ?? 0;
+    const devicePixelRatio = w?.devicePixelRatio ?? 1;
+
+    return {
+      screen_resolution: `${screenW}x${screenH}`,
+      os_scaling_factor: devicePixelRatio,
+      browser_zoom: 100,
+      execution_environment: 'desktop' as const,
+    };
+  }, []);
 
   /**
    * Get filtered actions for the selected step
@@ -186,11 +223,38 @@ export const ActionCanvas: React.FC<ActionCanvasProps> = ({
   const handleSaveInsertedAction = useCallback((position: number, actionType: string) => {
     if (!editMode || !selectedStep) return;
 
+    const actionId = `action_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const timestamp = Date.now() / 1000;
+
+    if (actionType === 'visual_assert') {
+      const baselinePath = `assets/visual_baseline_${actionId}.png`;
+      const visualAction = createVisualAssertAction(actionId, timestamp, baselinePath, getDefaultVisualAssertContext());
+
+      const newAction: ActionWithId = {
+        id: visualAction.id,
+        type: 'visual_assert',
+        timestamp: visualAction.timestamp,
+        x: null,
+        y: null,
+        button: null,
+        key: null,
+        screenshot: null,
+        config: visualAction.config,
+        regions: visualAction.regions,
+        assets: visualAction.assets,
+        context: visualAction.context,
+      };
+
+      onActionInsert(selectedStep.id, position, newAction);
+      setShowInsertForm(null);
+      return;
+    }
+
     // Create a new action based on type
     const newAction: ActionWithId = {
-      id: `action_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: actionId,
       type: actionType as any,
-      timestamp: Date.now() / 1000,
+      timestamp,
       x: actionType.includes('mouse') ? 0 : null,
       y: actionType.includes('mouse') ? 0 : null,
       button: actionType === 'mouse_click' ? 'left' : null,
@@ -200,7 +264,7 @@ export const ActionCanvas: React.FC<ActionCanvasProps> = ({
 
     onActionInsert(selectedStep.id, position, newAction);
     setShowInsertForm(null);
-  }, [editMode, selectedStep, onActionInsert]);
+  }, [editMode, selectedStep, onActionInsert, getDefaultVisualAssertContext]);
 
   /**
    * Render editable field
@@ -268,6 +332,7 @@ export const ActionCanvas: React.FC<ActionCanvasProps> = ({
   const renderActionItem = useCallback((action: ActionWithId, index: number) => {
     const isExpanded = expandedActionId === action.id;
     const isVisionAction = action.type === 'ai_vision_capture';
+    const isVisualAssertAction = action.type === 'visual_assert';
 
     return (
       <div key={action.id} className={`action-item ${isExpanded ? 'expanded' : ''}`}>
@@ -284,19 +349,47 @@ export const ActionCanvas: React.FC<ActionCanvasProps> = ({
           </div>
         )}
 
+        {isVisualAssertAction && isExpanded && (
+          <div className="vision-editor-container">
+            {(() => {
+              const visualAction = toVisualAssertAction(action);
+              if (!visualAction) return null;
+
+              return (
+                <VisualAssertionEditor
+                  action={visualAction}
+                  onUpdate={(updated) => {
+                    const updatedAction: ActionWithId = {
+                      ...action,
+                      type: 'visual_assert',
+                      timestamp: updated.timestamp,
+                      config: updated.config,
+                      regions: updated.regions,
+                      assets: updated.assets,
+                      context: updated.context,
+                    };
+                    onActionUpdate(action.id, updatedAction);
+                  }}
+                  assetsBasePath={assetsBasePath}
+                />
+              );
+            })()}
+          </div>
+        )}
+
         {/* Action header */}
         <div className="action-header">
           <div className="action-info">
             <span className="action-index">#{index + 1}</span>
             <span className={`action-type ${isVisionAction ? 'vision-action' : ''}`}>
-              {isVisionAction ? '🔍 AI Vision Capture' : action.type}
+              {isVisionAction ? '🔍 AI Vision Capture' : (isVisualAssertAction ? '🧪 Visual Assert' : action.type)}
             </span>
             {action.is_assertion && (
               <span className="assertion-badge">Assertion</span>
             )}
           </div>
           <div className="action-controls">
-            {isVisionAction && (
+            {(isVisionAction || isVisualAssertAction) && (
               <button
                 onClick={() => handleActionToggle(action.id)}
                 className="expand-btn"
@@ -439,6 +532,9 @@ export const ActionCanvas: React.FC<ActionCanvasProps> = ({
               <button onClick={() => handleSaveInsertedAction(index, 'ai_vision_capture')}>
                 AI Vision Capture
               </button>
+              <button onClick={() => handleSaveInsertedAction(index, 'visual_assert')}>
+                Visual Assert
+              </button>
             </div>
             <button onClick={() => setShowInsertForm(null)} className="cancel-insert">
               Cancel
@@ -455,11 +551,13 @@ export const ActionCanvas: React.FC<ActionCanvasProps> = ({
     handleActionDelete,
     renderEditableField,
     toVisionCaptureAction,
+    toVisualAssertAction,
     handleVisionActionUpdate,
     assetsBasePath,
     onSaveReferenceImage,
     showInsertForm,
     handleSaveInsertedAction,
+    onActionUpdate,
   ]);
 
   /**

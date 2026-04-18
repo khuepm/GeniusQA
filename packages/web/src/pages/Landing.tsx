@@ -10,6 +10,9 @@ import {
   Sparkles,
   Target,
   TrendingUp,
+  Download,
+  Monitor,
+  Apple,
   Github
 } from 'lucide-react';
 
@@ -79,16 +82,22 @@ export const Landing: React.FC = () => {
                 <Github className="w-6 h-6" />
               </a>
               <Link
+                to="/download"
+                className="text-slate-600 hover:text-slate-900 font-medium transition-colors"
+              >
+                Download
+              </Link>
+              <Link
                 to="/login"
                 className="text-slate-600 hover:text-slate-900 font-medium transition-colors"
               >
                 Sign In
               </Link>
               <Link
-                to="/register"
+                to="/dashboard"
                 className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-all shadow-md hover:shadow-lg"
               >
-                Get Started
+                Try Now
               </Link>
             </div>
           </div>
@@ -120,7 +129,7 @@ export const Landing: React.FC = () => {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
             <Link
-              to="/register"
+              to="/dashboard"
               className="group bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-blue-700 transition-all shadow-xl hover:shadow-2xl flex items-center space-x-2"
             >
               <span>Start Testing for Free</span>
@@ -260,6 +269,75 @@ export const Landing: React.FC = () => {
       </section>
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+          <div className="text-center p-8 md:p-12">
+            <div className="inline-flex items-center space-x-2 bg-blue-100 text-blue-700 px-4 py-2 rounded-full mb-6 font-medium">
+              <Download className="w-4 h-4" />
+              <span>Desktop Application</span>
+            </div>
+
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
+              Download GeniusQA Desktop
+            </h2>
+            <p className="text-lg text-slate-600 mb-8 max-w-2xl mx-auto">
+              Powerful automation testing for Windows and macOS.
+              <br />
+              Record, edit, and run tests directly on your desktop.
+            </p>
+
+            <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+              <Link
+                to="/download"
+                className="group bg-gradient-to-br from-blue-600 to-blue-700 text-white p-6 rounded-xl hover:shadow-xl transition-all"
+              >
+                <div className="flex items-center justify-center space-x-3 mb-3">
+                  <Monitor className="w-8 h-8" />
+                  <span className="text-2xl font-bold">Windows</span>
+                </div>
+                <p className="text-blue-100 mb-4">Windows 10 or later</p>
+                <div className="flex items-center justify-center space-x-2 text-sm font-semibold">
+                  <Download className="w-4 h-4" />
+                  <span>Download for Windows</span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </Link>
+
+              <Link
+                to="/download"
+                className="group bg-gradient-to-br from-slate-800 to-slate-900 text-white p-6 rounded-xl hover:shadow-xl transition-all"
+              >
+                <div className="flex items-center justify-center space-x-3 mb-3">
+                  <Apple className="w-8 h-8" />
+                  <span className="text-2xl font-bold">macOS</span>
+                </div>
+                <p className="text-slate-300 mb-4">macOS 11 or later</p>
+                <div className="flex items-center justify-center space-x-2 text-sm font-semibold">
+                  <Download className="w-4 h-4" />
+                  <span>Download for macOS</span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </Link>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-6 mt-8 text-sm text-slate-500">
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                <span>Free to download</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                <span>Code signed & secure</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                <span>Auto-updates</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="bg-slate-900 rounded-2xl shadow-2xl p-8 md:p-12 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
             Ready to Level Up Your Testing?
@@ -268,7 +346,7 @@ export const Landing: React.FC = () => {
             Join solo developers who are shipping faster and sleeping better.
           </p>
           <Link
-            to="/register"
+            to="/dashboard"
             className="inline-flex items-center space-x-2 bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-blue-700 transition-all shadow-xl hover:shadow-2xl"
           >
             <span>Start Your Free Account</span>
@@ -295,7 +373,7 @@ export const Landing: React.FC = () => {
               <h3 className="font-semibold text-slate-900 mb-4">Product</h3>
               <ul className="space-y-2 text-slate-600">
                 <li><a href="#features" className="hover:text-blue-600">Features</a></li>
-                <li><a href="#" className="hover:text-blue-600">Pricing</a></li>
+                <li><Link to="/download" className="hover:text-blue-600">Download</Link></li>
                 <li><a href="#" className="hover:text-blue-600">Documentation</a></li>
               </ul>
             </div>
