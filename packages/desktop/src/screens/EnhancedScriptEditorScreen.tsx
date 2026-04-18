@@ -21,6 +21,7 @@ import { getIPCBridge } from '../services/ipcBridgeService';
 import { AssetManager } from '../services/assetManager';
 import { mergeTestSteps, validateStepMerging } from '../utils/stepMerging';
 import { splitTestStep, StepSplitConfig } from '../utils/stepSplitting';
+import { useAnalytics } from '../hooks/useAnalytics';
 import {
   createCleanEditorState,
   createCleanScriptCopy,
@@ -44,6 +45,9 @@ export const EnhancedScriptEditorScreen: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<ScriptFilterType>({ source: 'all' });
   const [assetManager, setAssetManager] = useState<AssetManager | null>(null);
+
+  // Analytics hook
+  const { trackEvent, trackFeatureUsed, trackError } = useAnalytics();
 
   // Step-based editor state
   const [editorState, setEditorState] = useState<StepEditorState>({
@@ -163,6 +167,9 @@ export const EnhancedScriptEditorScreen: React.FC = () => {
       setLoading(true);
       setError(null);
 
+      // Track feature usage for script editor
+      trackFeatureUsed('script_editor', { action: 'load' });
+
       const rawData = await ipcBridge.loadScript(script.path);
       let testScript: TestScript;
 
@@ -192,6 +199,20 @@ export const EnhancedScriptEditorScreen: React.FC = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load script';
       setError(errorMessage);
       console.error('Load script error:', err);
+
+      // Track script_load_error event
+      trackEvent('script_load_error', {
+        scriptPath: script.path,
+        error: errorMessage,
+      });
+
+      // Track error for error tracking
+      if (err instanceof Error) {
+        trackError(err, {
+          component: 'EnhancedScriptEditorScreen',
+          action: 'loadStoredScript',
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -222,6 +243,13 @@ export const EnhancedScriptEditorScreen: React.FC = () => {
 
       await ipcBridge.saveScript(selectedStoredScript.path, legacyData);
 
+      // Track script_edited event
+      trackEvent('script_edited', {
+        scriptPath: selectedStoredScript.path,
+        stepCount: editorState.script.steps.length,
+        actionCount: Object.keys(editorState.script.action_pool).length,
+      });
+
       setEditorState(prev => ({ ...prev, modified: false }));
       setEditMode(false);
       alert('Script saved successfully');
@@ -231,6 +259,14 @@ export const EnhancedScriptEditorScreen: React.FC = () => {
       setError(errorMessage);
       alert(`Error: ${errorMessage}`);
       console.error('Save script error:', err);
+
+      // Track error for error tracking
+      if (err instanceof Error) {
+        trackError(err, {
+          component: 'EnhancedScriptEditorScreen',
+          action: 'saveScript',
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -248,6 +284,12 @@ export const EnhancedScriptEditorScreen: React.FC = () => {
       setLoading(true);
       setError(null);
       await ipcBridge.deleteScript(script.path);
+
+      // Track script_deleted event
+      trackEvent('script_deleted', {
+        scriptPath: script.path,
+        scriptSource: script.source,
+      });
 
       if (selectedStoredScript?.path === script.path) {
         setSelectedStoredScript(null);
@@ -271,6 +313,14 @@ export const EnhancedScriptEditorScreen: React.FC = () => {
       setError(errorMessage);
       alert(`Error: ${errorMessage}`);
       console.error('Delete script error:', err);
+
+      // Track error for error tracking
+      if (err instanceof Error) {
+        trackError(err, {
+          component: 'EnhancedScriptEditorScreen',
+          action: 'deleteStoredScript',
+        });
+      }
     } finally {
       setLoading(false);
     }

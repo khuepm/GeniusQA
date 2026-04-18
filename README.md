@@ -138,6 +138,29 @@ cd packages/python-core
 pytest
 ```
 
+### Release (GitHub)
+
+1.  **Tag a new version**:
+    ```bash
+    git tag v1.0.0
+    git push origin v1.0.0
+    ```
+2.  **GitHub Action**: A workflow will automatically build the application and create a release with the downloadable assets (dmg, app, exe).
+
+### Local Build
+
+To build the desktop application locally:
+
+```bash
+# Using the helper script
+./scripts/build-desktop.sh
+
+# Or manually
+cd packages/desktop
+pnpm tauri build
+```
+The output will be in `packages/desktop/src-tauri/target/release/bundle/`.
+
 ## 🧪 Testing Strategy
 
 GeniusQA employs a comprehensive dual testing approach:

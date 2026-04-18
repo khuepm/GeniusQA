@@ -61,8 +61,8 @@ export class IPCBridgeService {
    */
   private async initializeEventListeners(): Promise<void> {
     try {
-      // Listen for all Python events (progress, action_preview, complete, error)
-      const eventTypes = ['progress', 'action_preview', 'complete', 'error', 'visual_assert_result'];
+      // Listen for all Python events (progress, action_preview, complete, error, visual_assert_result, recording_action, recording_stopped, playback_stopped, playback_paused)
+      const eventTypes = ['progress', 'action_preview', 'complete', 'error', 'visual_assert_result', 'recording_action', 'recording_stopped', 'playback_stopped', 'playback_paused'];
       
       for (const eventType of eventTypes) {
         const unlisten = await listen<any>(eventType, (event) => {

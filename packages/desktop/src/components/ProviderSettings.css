@@ -793,3 +793,15 @@
     text-align: center;
   }
 }
+
+
+/* ============================================================================
+   Analytics Settings Section Styles
+   Requirements: 6.3
+   ============================================================================ */
+
+.analytics-settings-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e8eaed;
+}

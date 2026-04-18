@@ -1,0 +1,233 @@
+.playback-controls {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.controls-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.controls-header h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.session-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.session-id {
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.session-state {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.session-state.running {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.session-state.paused {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.session-state.completed {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.session-state.failed {
+  background-color: #fef2f2;
+  color: #dc2626;
+}
+
+.session-state.aborted {
+  background-color: #f3f4f6;
+  color: #6b7280;
+}
+
+.setup-section {
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.form-group select,
+.form-group input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.form-group select:focus,
+.form-group input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.input-with-button {
+  display: flex;
+  gap: 8px;
+}
+
+.input-with-button input {
+  flex: 1;
+}
+
+.browse-button {
+  padding: 10px 16px;
+  background-color: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.browse-button:hover {
+  background-color: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+.no-apps-message {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: 8px 0 0 0;
+  font-style: italic;
+}
+
+.control-buttons {
+  margin-bottom: 20px;
+}
+
+.control-button {
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 140px;
+  justify-content: center;
+}
+
+.control-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.control-button.start {
+  background-color: #10b981;
+  color: white;
+}
+
+.control-button.start:hover:not(:disabled) {
+  background-color: #059669;
+}
+
+.control-button.pause {
+  background-color: #f59e0b;
+  color: white;
+}
+
+.control-button.pause:hover:not(:disabled) {
+  background-color: #d97706;
+}
+
+.control-button.resume {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.control-button.resume:hover:not(:disabled) {
+  background-color: #2563eb;
+}
+
+.control-button.stop {
+  background-color: #ef4444;
+  color: white;
+}
+
+.control-button.stop:hover:not(:disabled) {
+  background-color: #dc2626;
+}
+
+.active-controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.session-details {
+  border-top: 1px solid #f3f4f6;
+  padding-top: 16px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.detail-row .label {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.detail-row .value {
+  font-size: 0.85rem;
+  color: #374151;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+@media (max-width: 768px) {
+  .active-controls {
+    flex-direction: column;
+  }
+  
+  .control-button {
+    width: 100%;
+  }
+}

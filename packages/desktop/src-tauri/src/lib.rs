@@ -4,6 +4,7 @@
 //! for use in integration tests and other library consumers.
 
 pub mod ai_test_case;
+pub mod application_focused_automation;
 pub mod core_router;
 pub mod python_process;
 

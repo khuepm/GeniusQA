@@ -33,7 +33,7 @@ import { getIPCBridge } from '../services/ipcBridgeService';
 // Types
 import { ScriptData, ValidationResult, Action } from '../types/aiScriptBuilder.types';
 import { AIProvider, ProviderInfo, ProviderModel, SessionStatistics } from '../types/providerAdapter.types';
-import { save } from '@tauri-apps/api/dialog';
+import { save, open } from '@tauri-apps/api/dialog';
 
 import './UnifiedScriptManager.css';
 
@@ -656,6 +656,48 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
   }, [allScripts]);
 
   /**
+   * Handle opening a script file
+   */
+  const handleOpenScript = useCallback(async () => {
+    try {
+      const selected = await open({
+        filters: [{
+          name: 'Script Files',
+          extensions: ['json']
+        }]
+      });
+
+      if (selected && typeof selected === 'string') {
+        const data = await ipcBridge.loadScript(selected) as ScriptData;
+
+        // Create script info for the list/selection
+        const scriptInfo: StoredScriptInfo = {
+          filename: selected.split(/[\\/]/).pop() || 'script.json',
+          path: selected,
+          createdAt: data.metadata?.created_at || new Date().toISOString(),
+          duration: data.metadata?.duration || 0,
+          actionCount: data.actions?.length || 0,
+          source: (data.metadata?.core_type as any) === 'ai_generated' ? 'ai_generated' : 'recorded',
+        };
+
+        // Add to list if not present
+        setAllScripts(prev => {
+          if (prev.some(s => s.path === selected)) return prev;
+          return [...prev, scriptInfo];
+        });
+
+        // Select and switch to editor
+        setSelectedScript(scriptInfo);
+        setScriptData(data);
+        setActiveTab('editor');
+      }
+    } catch (err) {
+      console.error('Failed to open script:', err);
+      setError(err instanceof Error ? err.message : 'Failed to open script');
+    }
+  }, [ipcBridge]);
+
+  /**
    * Render Script List Tab
    * Requirements: 10.2
    */
@@ -663,9 +705,14 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
     <div className="unified-tab-content script-list-tab">
       <div className="script-list-header">
         <h2 className="tab-section-title">All Scripts</h2>
-        <button className="refresh-button" onClick={loadScripts}>
-          🔄 Refresh
-        </button>
+        <div className="script-list-actions">
+          <button className="open-script-button" onClick={handleOpenScript}>
+            📂 Open Script
+          </button>
+          <button className="refresh-button" onClick={loadScripts}>
+            🔄 Refresh
+          </button>
+        </div>
       </div>
 
       <ScriptFilter
@@ -797,6 +844,12 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
             onClick={() => setActiveTab('list')}
           >
             📋 Go to Script List
+          </button>
+          <button
+            className="open-script-button placeholder-action"
+            onClick={handleOpenScript}
+          >
+            📂 Open Script File
           </button>
         </div>
       ) : (
