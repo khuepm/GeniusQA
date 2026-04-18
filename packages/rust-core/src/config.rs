@@ -18,6 +18,9 @@ pub struct AutomationConfig {
     /// Whether to capture screenshots during recording
     pub capture_screenshots: bool,
     
+    /// Whether to capture screenshots on mouse clicks for AI analysis
+    pub capture_screenshot_on_click: bool,
+    
     /// Screenshot capture interval in milliseconds
     pub screenshot_interval: u64,
     
@@ -119,6 +122,7 @@ impl Default for AutomationConfig {
             default_playback_speed: 1.0,
             default_loops: 1,
             capture_screenshots: false,
+            capture_screenshot_on_click: false,
             screenshot_interval: 1000,
             max_recording_duration: 0,
             platform_config: PlatformConfig::default(),

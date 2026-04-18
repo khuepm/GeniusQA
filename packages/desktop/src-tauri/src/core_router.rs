@@ -961,6 +961,64 @@ impl CoreRouter {
         }
     }
 
+    /// Route automation command with options to the appropriate core
+    pub async fn route_command_with_options(
+        &self,
+        command: AutomationCommand,
+        app_handle: &AppHandle,
+        capture_screenshot_on_click: bool,
+    ) -> Result<serde_json::Value, String> {
+        let active_core = self.active_core.lock().unwrap().clone();
+        let operation = format!("{:?}", command);
+        let start_time = std::time::Instant::now();
+
+        let result = match active_core.clone() {
+            CoreType::Python => self.route_to_python_with_options(command.clone(), app_handle, capture_screenshot_on_click),
+            CoreType::Rust => self.route_to_rust_with_options(command.clone(), app_handle, capture_screenshot_on_click),
+        };
+
+        let operation_duration = start_time.elapsed();
+
+        // Handle routing errors with enhanced error reporting
+        match result {
+            Ok(value) => {
+                self.reset_failure_count(&active_core).await;
+                self.update_performance_metrics(active_core.clone(), operation_duration, true).await;
+                
+                if let Some(performance_warning) = self.detect_performance_degradation(&active_core).await {
+                    self.report_error_with_attribution(
+                        active_core,
+                        operation.clone(),
+                        performance_warning,
+                        ErrorSeverity::Warning,
+                    ).await;
+                }
+                
+                Ok(value)
+            }
+            Err(error) => {
+                self.update_performance_metrics(active_core.clone(), operation_duration, false).await;
+                
+                let severity = if error.contains("critical") || error.contains("permission") {
+                    ErrorSeverity::Critical
+                } else if error.contains("timeout") || error.contains("failed") {
+                    ErrorSeverity::Error
+                } else {
+                    ErrorSeverity::Warning
+                };
+
+                self.report_error_with_attribution(
+                    active_core.clone(),
+                    operation.clone(),
+                    error.clone(),
+                    severity,
+                ).await;
+
+                Err(error)
+            }
+        }
+    }
+
     /// Route automation command to the appropriate core with enhanced error handling
     pub async fn route_command(
         &self,
@@ -1091,6 +1149,109 @@ impl CoreRouter {
         #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
         {
             false
+        }
+    }
+
+    /// Route command to Python core with options
+    fn route_to_python_with_options(
+        &self,
+        command: AutomationCommand,
+        app_handle: &AppHandle,
+        capture_screenshot_on_click: bool,
+    ) -> Result<serde_json::Value, String> {
+        self.python_manager.ensure_process_running(app_handle.clone())?;
+
+        match command {
+            AutomationCommand::StartRecording => {
+                let params = serde_json::json!({
+                    "captureScreenshotOnClick": capture_screenshot_on_click
+                });
+                let response = self.python_manager.send_command("start_recording", params, app_handle)?;
+                Ok(response)
+            }
+            _ => self.route_to_python(command, app_handle)
+        }
+    }
+
+    /// Route command to Rust core with options
+    fn route_to_rust_with_options(
+        &self,
+        command: AutomationCommand,
+        app_handle: &AppHandle,
+        capture_screenshot_on_click: bool,
+    ) -> Result<serde_json::Value, String> {
+        match command {
+            AutomationCommand::StartRecording => {
+                let mut recorder_lock = self.rust_recorder.lock().unwrap();
+                if recorder_lock.is_none() {
+                    let mut config = AutomationConfig::default();
+                    config.capture_screenshot_on_click = capture_screenshot_on_click;
+                    match Recorder::new(config) {
+                        Ok(recorder) => {
+                            *recorder_lock = Some(recorder);
+                        }
+                        Err(e) => {
+                            return Err(format!("Failed to initialize Rust recorder: {:?}", e));
+                        }
+                    }
+                } else if let Some(recorder) = recorder_lock.as_mut() {
+                    recorder.set_capture_screenshot_on_click(capture_screenshot_on_click);
+                }
+
+                let app_handle_clone = app_handle.clone();
+                let (event_tx, mut event_rx) = mpsc::unbounded_channel::<rust_automation_core::recorder::RecordingEvent>();
+                
+                tauri::async_runtime::spawn(async move {
+                    while let Some(event) = event_rx.recv().await {
+                        let event_name = event.event_type.clone();
+                        
+                        if let Err(e) = app_handle_clone.emit_all(&event_name, &event) {
+                            eprintln!("[Rust Recorder] Failed to emit event '{}': {:?}", event_name, e);
+                        }
+                        
+                        if event_name == "action_recorded" {
+                            if let rust_automation_core::recorder::RecordingEventData::ActionRecorded { ref action } = event.data {
+                                if action.action_type == "mouse_click" {
+                                    if let (Some(x), Some(y)) = (action.x, action.y) {
+                                        let click_event = serde_json::json!({
+                                            "x": x,
+                                            "y": y,
+                                            "button": action.button.clone().unwrap_or_else(|| "left".to_string())
+                                        });
+                                        if let Err(e) = app_handle_clone.emit_all("recording_click", &click_event) {
+                                            eprintln!("[Rust Recorder] Failed to emit recording_click event: {:?}", e);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                if let Some(recorder) = recorder_lock.as_mut() {
+                    recorder.set_event_sender(event_tx);
+                    
+                    match recorder.start_recording() {
+                        Ok(_) => {
+                            eprintln!("[Rust Recorder] Recording started with captureScreenshotOnClick: {}", capture_screenshot_on_click);
+                            Ok(serde_json::json!({
+                                "success": true,
+                                "data": {
+                                    "message": "Recording started with Rust core",
+                                    "captureScreenshotOnClick": capture_screenshot_on_click
+                                }
+                            }))
+                        }
+                        Err(e) => {
+                            eprintln!("[Rust Recorder] Failed to start recording: {:?}", e);
+                            Err(format!("Failed to start recording: {:?}", e))
+                        }
+                    }
+                } else {
+                    Err("Recorder not initialized".to_string())
+                }
+            }
+            _ => self.route_to_rust(command, app_handle)
         }
     }
 
@@ -1340,9 +1501,62 @@ impl CoreRouter {
                 // Load the script file
                 let script_content = std::fs::read_to_string(&path_to_load)
                     .map_err(|e| format!("Failed to read script file '{}'. Please ensure the file exists and is readable. Error: {}", path_to_load, e))?;
-                
-                let script_data: ScriptData = serde_json::from_str(&script_content)
+
+                // Preprocess script JSON to support extra action fields (e.g., visual_assert)
+                // Rust core ScriptData::Action only has `additional_data`, so we move known
+                // extra keys into `additional_data` for compatibility.
+                let mut script_json: serde_json::Value = serde_json::from_str(&script_content)
                     .map_err(|e| format!("Failed to parse script file '{}'. The file may be corrupted or in an invalid format. Error: {}", path_to_load, e))?;
+
+                if let Some(actions) = script_json.get_mut("actions").and_then(|v| v.as_array_mut()) {
+                    for action in actions.iter_mut() {
+                        let action_type = action.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                        if action_type == "visual_assert" {
+                            // Ensure additional_data is an object
+                            let has_additional_data = action.get("additional_data").and_then(|v| v.as_object()).is_some();
+                            if !has_additional_data {
+                                action["additional_data"] = serde_json::Value::Object(serde_json::Map::new());
+                            }
+
+                            // Provide action_id for Rust core (Action struct doesn't have id field)
+                            if let Some(action_id) = action.get("id").and_then(|v| v.as_str()).map(|s| s.to_string()) {
+                                if action.get("additional_data").and_then(|v| v.as_object()).is_some() {
+                                    action["additional_data"]["action_id"] = serde_json::Value::String(action_id);
+                                }
+                            }
+
+                            // Move known keys into additional_data (but keep top-level keys as-is)
+                            let keys = ["config", "regions", "assets", "context"];
+                            for key in keys {
+                                if let Some(value) = action.get(key).cloned() {
+                                    if action.get("additional_data").and_then(|v| v.as_object()).is_some() {
+                                        action["additional_data"][key] = value;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Inject script directory for resolving relative asset paths (e.g. assets/*.png)
+                let script_dir = std::path::Path::new(&path_to_load)
+                    .parent()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "".to_string());
+                if let Some(metadata) = script_json.get_mut("metadata").and_then(|v| v.as_object_mut()) {
+                    // Ensure metadata.additional_data is an object
+                    let has_additional_data = metadata.get("additional_data").and_then(|v| v.as_object()).is_some();
+                    if !has_additional_data {
+                        metadata.insert("additional_data".to_string(), serde_json::Value::Object(serde_json::Map::new()));
+                    }
+
+                    if let Some(additional_data) = metadata.get_mut("additional_data").and_then(|v| v.as_object_mut()) {
+                        additional_data.insert("script_dir".to_string(), serde_json::Value::String(script_dir));
+                    }
+                }
+
+                let script_data: ScriptData = serde_json::from_value(script_json)
+                    .map_err(|e| format!("Failed to deserialize script file '{}'. The file may be corrupted or in an invalid format. Error: {}", path_to_load, e))?;
 
                 eprintln!("[Rust Player] Script loaded successfully: {} actions", script_data.actions.len());
 

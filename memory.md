@@ -33,3 +33,18 @@
   - Fix: Added Tauri command `reveal_in_finder` in `packages/desktop/src-tauri/src/main.rs` (macOS uses `open -R`, Windows uses `explorer /select,`, Linux opens parent dir via `xdg-open`).
   - Fix: Added `IPCBridgeService.revealInFinder()` invoking `reveal_in_finder` + unit test.
   - Fix: Added `Reveal in Finder` button next to `Delete` in `ScriptListItem` and wired in `UnifiedScriptManager`, `ScriptEditorScreen`, `EnhancedScriptEditorScreen`.
+
+## Recorder Options
+
+- Screenshot capture on mouse click
+  - Status: implemented
+  - Feature: Added checkbox option in RecorderScreen to capture screenshots on every mouse click for AI analysis.
+  - Implementation:
+    - Added `captureScreenshotOnClick` state in `RecorderScreen.tsx` with checkbox UI in new "Recording Options" card
+    - Updated `IPCBridgeService.startRecording()` to accept `captureScreenshotOnClick` parameter
+    - Modified Tauri `start_recording` command in `main.rs` to accept `capture_screenshot_on_click` parameter
+    - Added `route_command_with_options()` method in `core_router.rs` to pass options to cores
+    - Added `route_to_python_with_options()` and `route_to_rust_with_options()` methods
+    - Added `capture_screenshot_on_click` field to `AutomationConfig` in `rust-core/src/config.rs`
+    - Added `set_capture_screenshot_on_click()` method to `Recorder` in `rust-core/src/recorder.rs`
+  - Use case: AI can verify element type before executing actions (e.g., check if clicked element is an input field before typing)
