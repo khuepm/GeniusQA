@@ -203,11 +203,11 @@
   - Define universal/cross-platform mappings
   - _Requirements: 8.3, 8.4, 8.5_
 
-- [ ] 12.3 Write property test for OS Context in Prompt
+- [x] 12.3 Write property test for OS Context in Prompt
   - **Property 14: OS Context in Prompt**
   - **Validates: Requirements 8.2**
 
-- [ ] 12.4 Write property test for OS-Specific Key Code Validation
+- [x] 12.4 Write property test for OS-Specific Key Code Validation
   - **Property 13: OS-Specific Key Code Validation**
   - **Validates: Requirements 8.3, 8.4, 8.5**
 
@@ -215,13 +215,13 @@
 
 - [ ] 13. Update Gemini Service for OS-Specific Generation
 
-- [ ] 13.1 Update prompt templates with OS context
+- [x] 13.1 Update prompt templates with OS context
   - Modify `packages/desktop/src/services/promptTemplates.ts`
   - Add OS-specific system prompts
   - Include OS key mappings in prompt context
   - _Requirements: 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 13.2 Update Gemini Service to accept target OS
+- [x] 13.2 Update Gemini Service to accept target OS
   - Modify `packages/desktop/src/services/geminiService.ts`
   - Add targetOS parameter to generateScript function
   - Include OS context in API calls
@@ -231,32 +231,32 @@
 
 - [ ] 14. Implement Save and Play Functionality
 
-- [ ] 14.1 Update Script Preview with Play button
+- [x] 14.1 Update Script Preview with Play button
   - Modify `packages/desktop/src/components/ScriptPreview.tsx`
   - Add Play button (visible after save)
   - Add playback progress indicator
   - Display playback errors with edit option
   - _Requirements: 7.1, 7.4, 7.5, 7.6_
 
-- [ ] 14.2 Create Playback Service
+- [~] 14.2 Create Playback Service
   - Create `packages/desktop/src/services/playbackService.ts`
   - Implement startPlayback, stopPlayback, togglePause
   - Implement progress event subscription
   - Connect to IPC bridge for playback control
   - _Requirements: 7.5_
 
-- [ ] 14.3 Update Script Storage Service for AI metadata
+- [~] 14.3 Update Script Storage Service for AI metadata
   - Modify `packages/desktop/src/services/scriptStorageService.ts`
   - Add source='ai_generated' to saved scripts
   - Add target_os to metadata
   - Add generated_at timestamp
   - _Requirements: 7.3, 8.6_
 
-- [ ] 14.4 Write property test for Save and Play Button State
+- [~] 14.4 Write property test for Save and Play Button State
   - **Property 11: Save and Play Button State**
   - **Validates: Requirements 7.1, 7.4**
 
-- [ ] 14.5 Write property test for AI Script Metadata Consistency
+- [~] 14.5 Write property test for AI Script Metadata Consistency
   - **Property 12: AI Script Metadata Consistency**
   - **Validates: Requirements 7.3, 8.6**
 
@@ -286,11 +286,11 @@
   - Display target OS for AI scripts
   - _Requirements: 9.2, 9.5_
 
-- [ ]* 16.4 Write property test for Script List Completeness
+- [~] 16.4 Write property test for Script List Completeness
   - **Property 15: Script List Completeness**
   - **Validates: Requirements 9.1, 9.2, 10.2**
 
-- [ ]* 16.5 Write property test for Script Filter Correctness
+- [~] 16.5 Write property test for Script Filter Correctness
   - **Property 16: Script Filter Correctness**
   - **Validates: Requirements 9.4**
 
@@ -310,7 +310,7 @@
   - Test playback controls work with AI scripts
   - _Requirements: 9.3_
 
-- [ ]* 17.3 Write property test for AI Script Playback Compatibility
+- [~] 17.3 Write property test for AI Script Playback Compatibility
   - **Property 17: AI Script Playback Compatibility**
   - **Validates: Requirements 9.3**
 
@@ -343,11 +343,11 @@
   - Handle save and update script list
   - _Requirements: 10.3, 10.6_
 
-- [ ]* 18.5 Write property test for Unified Editor Consistency
+- [~] 18.5 Write property test for Unified Editor Consistency
   - **Property 18: Unified Editor Consistency**
   - **Validates: Requirements 10.3, 10.6**
 
-- [ ]* 18.6 Write property test for Tab Navigation Workflow
+- [~] 18.6 Write property test for Tab Navigation Workflow
   - **Property 19: Tab Navigation Workflow**
   - **Validates: Requirements 10.5**
 
@@ -416,11 +416,11 @@
   - Implement `validateCustomModel` function for API connection testing
   - _Requirements: 11.3, 11.4, 11.7, 11.8, 11.9_
 
-- [ ]* 22.3 Write property test for Custom Model Storage Round-Trip
+- [~] 22.3 Write property test for Custom Model Storage Round-Trip
   - **Property 20: Custom Model Storage Round-Trip**
   - **Validates: Requirements 11.3**
 
-- [ ]* 22.4 Write property test for Custom Model CRUD Operations
+- [~] 22.4 Write property test for Custom Model CRUD Operations
   - **Property 23: Custom Model CRUD Operations**
   - **Validates: Requirements 11.7, 11.8**
 
@@ -443,7 +443,7 @@
   - Enable save only after successful validation
   - _Requirements: 11.4, 11.9_
 
-- [ ]* 23.3 Write property test for Custom Model Validation Before Save
+- [~] 23.3 Write property test for Custom Model Validation Before Save
   - **Property 22: Custom Model Validation Before Save**
   - **Validates: Requirements 11.4, 11.9**
 
@@ -464,7 +464,7 @@
   - Handle custom model selection for API calls
   - _Requirements: 11.5, 11.6_
 
-- [ ]* 24.3 Write property test for Custom Model List Completeness
+- [~] 24.3 Write property test for Custom Model List Completeness
   - **Property 21: Custom Model List Completeness**
   - **Validates: Requirements 11.5**
 

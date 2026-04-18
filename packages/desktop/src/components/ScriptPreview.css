@@ -24,7 +24,7 @@
   justify-content: center;
   height: 100%;
   text-align: center;
-  padding: 40px 20px;
+  padding: 12px 16px; /* Match OS selector padding */
 }
 
 .script-preview-empty-icon {
@@ -335,6 +335,7 @@
 }
 
 .script-save-button,
+.script-play-button,
 .script-discard-button {
   flex: 1;
   padding: 12px 20px;
@@ -361,13 +362,104 @@
   cursor: not-allowed;
 }
 
+.script-play-button {
+  background-color: #137333;
+  color: #ffffff;
+}
+
+.script-play-button:hover:not(:disabled) {
+  background-color: #0d5a28;
+}
+
+.script-play-button:disabled {
+  background-color: #dadce0;
+  color: #9aa0a6;
+  cursor: not-allowed;
+}
+
 .script-discard-button {
   background-color: #ffffff;
   color: #c5221f;
   border: 1px solid #dadce0;
 }
 
-.script-discard-button:hover {
+.script-discard-button:hover:not(:disabled) {
   background-color: #fce8e6;
   border-color: #f5c6cb;
+}
+
+.script-discard-button:disabled {
+  background-color: #f1f3f4;
+  color: #9aa0a6;
+  cursor: not-allowed;
+}
+
+/* Playback Progress */
+.playback-progress-container {
+  padding: 16px 20px;
+  background-color: #e8f0fe;
+  border-top: 1px solid #d2e3fc;
+  border-bottom: 1px solid #d2e3fc;
+}
+
+.playback-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.playback-status {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a73e8;
+}
+
+.playback-progress-text {
+  font-size: 13px;
+  color: #5f6368;
+}
+
+.playback-progress-bar {
+  width: 100%;
+  height: 8px;
+  background-color: #d2e3fc;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.playback-progress-fill {
+  height: 100%;
+  background-color: #1a73e8;
+  transition: width 0.3s ease;
+}
+
+.playback-error {
+  margin-top: 12px;
+  padding: 12px;
+  background-color: #fce8e6;
+  border: 1px solid #f5c6cb;
+  border-radius: 6px;
+}
+
+.playback-error-message {
+  font-size: 13px;
+  color: #c5221f;
+  margin-bottom: 8px;
+}
+
+.playback-error-edit-button {
+  padding: 6px 12px;
+  background-color: #ffffff;
+  color: #1a73e8;
+  border: 1px solid #1a73e8;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.playback-error-edit-button:hover {
+  background-color: #e8f0fe;
 }

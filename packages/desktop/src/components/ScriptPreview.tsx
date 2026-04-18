@@ -7,18 +7,17 @@
  * Requirements: 3.5, 4.1, 4.2, 4.3, 4.5
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
-import {
-  ScriptData,
-  Action,
-  ActionType,
-  ValidationResult,
-  ValidationError,
-  ValidationWarning,
-  ACTION_TYPE_DESCRIPTIONS,
-  ScriptPreviewProps,
-} from '../types/aiScriptBuilder.types';
+import React, { useCallback, useMemo, useState } from 'react';
 import { validateAction, validateScript } from '../services/scriptValidationService';
+import {
+  Action,
+  ACTION_TYPE_DESCRIPTIONS,
+  ScriptData,
+  ScriptPreviewProps,
+  ValidationError,
+  ValidationResult,
+  ValidationWarning
+} from '../types/aiScriptBuilder.types';
 import './ScriptPreview.css';
 
 /**
@@ -287,7 +286,11 @@ export const ScriptPreview: React.FC<ScriptPreviewProps> = ({
   onEdit,
   onSave,
   onDiscard,
+  onPlay,
   validationResult,
+  isSaved = false,
+  isPlaying = false,
+  playbackProgress,
 }) => {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [localScript, setLocalScript] = useState<ScriptData | null>(script);
@@ -353,6 +356,12 @@ export const ScriptPreview: React.FC<ScriptPreviewProps> = ({
     setEditingIndex(null);
     onDiscard();
   }, [onDiscard]);
+
+  const handlePlay = useCallback(() => {
+    if (localScript && onPlay && isSaved) {
+      onPlay(localScript);
+    }
+  }, [localScript, onPlay, isSaved]);
 
   // Empty state
   if (!localScript) {
@@ -448,19 +457,87 @@ export const ScriptPreview: React.FC<ScriptPreviewProps> = ({
         </div>
       </div>
 
+      {/* Playback Progress Indicator */}
+      {isPlaying && playbackProgress && (
+        <div className="playback-progress-container" data-testid="playback-progress">
+          <div className="playback-progress-header">
+            <span className="playback-status">
+              {playbackProgress.status === 'playing' && '▶️ Playing...'}
+              {playbackProgress.status === 'paused' && '⏸️ Paused'}
+              {playbackProgress.status === 'completed' && '✅ Completed'}
+              {playbackProgress.status === 'error' && '❌ Error'}
+            </span>
+            <span className="playback-progress-text">
+              Action {playbackProgress.currentAction} of {playbackProgress.totalActions}
+            </span>
+          </div>
+          <div className="playback-progress-bar">
+            <div
+              className="playback-progress-fill"
+              style={{
+                width: `${(playbackProgress.currentAction / playbackProgress.totalActions) * 100}%`,
+              }}
+            />
+          </div>
+          {playbackProgress.status === 'error' && playbackProgress.error && (
+            <div className="playback-error" data-testid="playback-error">
+              <div className="playback-error-message">
+                ❌ {playbackProgress.error}
+              </div>
+              <button
+                className="playback-error-edit-button"
+                onClick={() => {
+                  // Find the action that failed and open it for editing
+                  const failedActionIndex = playbackProgress.currentAction - 1;
+                  if (failedActionIndex >= 0 && failedActionIndex < (localScript?.actions.length || 0)) {
+                    handleEditAction(failedActionIndex);
+                  }
+                }}
+              >
+                ✏️ Edit Failed Action
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div className="script-preview-buttons">
         <button
           className="script-save-button"
           onClick={handleSave}
-          disabled={!localValidation.valid}
-          title={!localValidation.valid ? 'Fix validation errors before saving' : 'Save script'}
+          disabled={!localValidation.valid || isSaved}
+          title={
+            isSaved
+              ? 'Script already saved'
+              : !localValidation.valid
+                ? 'Fix validation errors before saving'
+                : 'Save script'
+          }
         >
-          💾 Save Script
+          💾 {isSaved ? 'Saved' : 'Save Script'}
         </button>
+        {isSaved && onPlay && (
+          <button
+            className="script-play-button"
+            onClick={handlePlay}
+            disabled={isPlaying || !localValidation.valid}
+            title={
+              isPlaying
+                ? 'Playback in progress'
+                : !localValidation.valid
+                  ? 'Fix validation errors before playing'
+                  : 'Play script'
+            }
+            data-testid="script-play-button"
+          >
+            ▶️ {isPlaying ? 'Playing...' : 'Play'}
+          </button>
+        )}
         <button
           className="script-discard-button"
           onClick={handleDiscard}
+          disabled={isPlaying}
         >
           🗑️ Discard
         </button>

@@ -131,6 +131,7 @@ export interface RecordingResult {
   actionCount?: number;
   duration?: number;
   error?: string;
+  warning?: string;
 }
 
 /**

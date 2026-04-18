@@ -7,20 +7,91 @@
  * Requirements: 3.1, 5.1
  */
 
+import { TargetOS } from '../components/OSSelector';
 import {
-  ScriptData,
-  ActionType,
-  ChatMessage,
-  ConversationContext,
-  PromptTemplate,
-  ExamplePrompt,
-  AVAILABLE_ACTION_TYPES,
-  ACTION_TYPE_DESCRIPTIONS,
+    ACTION_TYPE_DESCRIPTIONS,
+    AVAILABLE_ACTION_TYPES,
+    ActionType,
+    ChatMessage,
+    ConversationContext,
+    ExamplePrompt,
+    PromptTemplate,
+    ScriptData,
 } from '../types/aiScriptBuilder.types';
+import {
+    ShortcutAction,
+    getOSKeyMappings,
+    getPrimaryModifier
+} from '../utils/osKeyMappings';
 
 // ============================================================================
 // System Prompt
 // ============================================================================
+
+/**
+ * Builds OS-specific system prompt section
+ * Requirements: 8.2, 8.3, 8.4, 8.5
+ */
+export function buildOSSpecificPrompt(targetOS: TargetOS): string {
+  const osKeyMappings = getOSKeyMappings(targetOS);
+  const primaryModifier = getPrimaryModifier(targetOS);
+  
+  let osSection = `\n## Target Operating System: ${targetOS.toUpperCase()}\n`;
+  
+  if (targetOS === 'macos') {
+    osSection += `
+You are generating scripts for **macOS**. Follow these guidelines:
+
+### macOS-Specific Rules
+1. **Primary Modifier**: Use 'meta' modifier for Command (⌘) key
+2. **Keyboard Shortcuts**: Use macOS-standard shortcuts (Cmd-based)
+3. **Key Names**: Use macOS key names (e.g., 'meta' for Cmd, 'alt' for Option)
+
+### Common macOS Shortcuts
+`;
+  } else if (targetOS === 'windows') {
+    osSection += `
+You are generating scripts for **Windows**. Follow these guidelines:
+
+### Windows-Specific Rules
+1. **Primary Modifier**: Use 'ctrl' modifier for Control key
+2. **Keyboard Shortcuts**: Use Windows-standard shortcuts (Ctrl-based)
+3. **Key Names**: Use Windows key names (e.g., 'ctrl' for Control, 'meta' for Win key)
+
+### Common Windows Shortcuts
+`;
+  } else {
+    osSection += `
+You are generating **Universal/Cross-Platform** scripts. Follow these guidelines:
+
+### Universal Script Rules
+1. **Generic Actions**: Use generic action names that work across platforms
+2. **Avoid OS-Specific Keys**: Don't use OS-specific modifiers or shortcuts
+3. **Compatibility**: Only use actions that are universally supported
+
+### Common Universal Actions
+`;
+  }
+  
+  // Add key mapping table
+  const shortcuts: ShortcutAction[] = [
+    'copy', 'paste', 'cut', 'selectAll', 'save', 'undo', 'redo',
+    'find', 'new', 'open', 'close', 'print', 'refresh'
+  ];
+  
+  for (const action of shortcuts) {
+    const mapping = osKeyMappings[action];
+    osSection += `- **${mapping.displayName}**: ${mapping.keys}\n`;
+  }
+  
+  osSection += `\n### Important Notes for ${targetOS.toUpperCase()}
+- Always use the correct modifier keys for this OS
+- Ensure all keyboard shortcuts follow ${targetOS} conventions
+- Test that key combinations are valid for ${targetOS}
+`;
+  
+  return osSection;
+}
 
 /**
  * Builds the action schema documentation for the system prompt
@@ -70,14 +141,20 @@ export function buildActionSchemaDoc(): string {
 /**
  * Main system prompt for Gemini API
  * Requirements: 3.1 - Include context about available script actions and parameters
+ * Requirements: 8.2 - Include OS context in AI prompt
  */
-export const SYSTEM_PROMPT = `You are an automation script generator for GeniusQA desktop application. Your task is to generate automation test scripts in JSON format based on user descriptions in natural language.
+export function buildSystemPrompt(targetOS?: TargetOS): string {
+  const osSpecificSection = targetOS ? buildOSSpecificPrompt(targetOS) : '';
+  
+  return `You are an automation script generator for GeniusQA desktop application. Your task is to generate automation test scripts in JSON format based on user descriptions in natural language.
 
 ## Your Role
 - Convert natural language descriptions into executable automation scripts
 - Generate valid, well-structured scripts compatible with the rust-core playback engine
 - Ask clarifying questions when the user's request is ambiguous
 - Provide helpful suggestions for improving automation scenarios
+
+${osSpecificSection}
 
 ## Available Action Types and Required Fields
 ${buildActionSchemaDoc()}
@@ -117,6 +194,13 @@ Every script must follow this exact structure:
 - If clarification is needed, ask specific questions
 - Explain what the script does in plain language before the JSON
 - Suggest improvements or alternatives when appropriate`;
+}
+
+/**
+ * Legacy system prompt (without OS context)
+ * Kept for backward compatibility
+ */
+export const SYSTEM_PROMPT = buildSystemPrompt();
 
 // ============================================================================
 // Example Scripts for Few-Shot Learning
@@ -263,10 +347,12 @@ export const EXAMPLE_PROMPTS: ExamplePrompt[] = [
 /**
  * Builds a complete prompt template with all context
  * Requirements: 3.1 - Include context about available actions
+ * Requirements: 8.2 - Include OS context in prompt
  */
 export function buildPromptTemplate(
   userContext: string = '',
-  includeExamples: boolean = true
+  includeExamples: boolean = true,
+  targetOS?: TargetOS
 ): PromptTemplate {
   let exampleSection = '';
   
@@ -277,8 +363,10 @@ export function buildPromptTemplate(
     ).join('\n\n');
   }
 
+  const systemPrompt = buildSystemPrompt(targetOS);
+
   return {
-    systemPrompt: SYSTEM_PROMPT + exampleSection,
+    systemPrompt: systemPrompt + exampleSection,
     actionSchema: buildActionSchemaDoc(),
     exampleScripts: EXAMPLE_SCRIPTS,
     userContext,
@@ -423,6 +511,8 @@ export function getSuggestedActions(input: string): ActionType[] {
 
 export default {
   SYSTEM_PROMPT,
+  buildSystemPrompt,
+  buildOSSpecificPrompt,
   EXAMPLE_SCRIPTS,
   EXAMPLE_PROMPTS,
   buildPromptTemplate,

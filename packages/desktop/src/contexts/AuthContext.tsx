@@ -141,13 +141,51 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (err: any) {
       console.error('Google sign in failed:', err);
 
-      // Don't show error if redirect is in progress
-      if (err.message === 'REDIRECT_IN_PROGRESS') {
-        // Keep loading state while redirecting
+      // Check if manual flow is required (desktop app)
+      if (err.message === 'MANUAL_FLOW_REQUIRED') {
+        // Show error to indicate manual flow needed
+        setError('Vui lòng sử dụng nút "Đăng nhập với Browser" bên dưới');
+        setLoading(false);
         return;
       }
 
       setError(err.message || 'Đăng nhập Google thất bại');
+      setLoading(false);
+      throw err;
+    }
+  };
+
+  /**
+   * Start Google OAuth flow with external browser
+   * Returns the OAuth URL for user to open
+   */
+  const signInWithGoogleExternalBrowser = async (): Promise<string> => {
+    try {
+      setLoading(true);
+      setError(null);
+      const authUrl = await firebaseService.signInWithGoogleExternalBrowser();
+      // Keep loading - waiting for user to complete OAuth
+      return authUrl;
+    } catch (err: any) {
+      console.error('Failed to generate auth URL:', err);
+      setError(err.message || 'Không thể tạo link đăng nhập');
+      setLoading(false);
+      throw err;
+    }
+  };
+
+  /**
+   * Complete Google OAuth with authorization code
+   */
+  const signInWithGoogleCode = async (code: string): Promise<void> => {
+    try {
+      setLoading(true);
+      setError(null);
+      await firebaseService.signInWithGoogleCode(code);
+      // User state will be updated by onAuthStateChanged listener
+    } catch (err: any) {
+      console.error('Failed to complete OAuth:', err);
+      setError(err.message || 'Mã xác thực không hợp lệ');
       setLoading(false);
       throw err;
     }
@@ -229,6 +267,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     loading,
     error,
     signInWithGoogle,
+    signInWithGoogleExternalBrowser,
+    signInWithGoogleCode,
     signInWithEmail,
     signUpWithEmail,
     signOut,
