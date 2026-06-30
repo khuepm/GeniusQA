@@ -19,6 +19,13 @@ from .image_utils import (
     encode_image_base64,
     decode_image_base64,
 )
+from .local_ocr_service import (
+    LocalOCRService,
+    LocalOCRResult,
+    OCRMatch,
+    normalize_text,
+    text_match_score,
+)
 
 __all__ = [
     'AIVisionService',
@@ -29,4 +36,9 @@ __all__ = [
     'scale_roi',
     'encode_image_base64',
     'decode_image_base64',
+    'LocalOCRService',
+    'LocalOCRResult',
+    'OCRMatch',
+    'normalize_text',
+    'text_match_score',
 ]

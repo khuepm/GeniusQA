@@ -238,25 +238,25 @@
   - Display playback errors with edit option
   - _Requirements: 7.1, 7.4, 7.5, 7.6_
 
-- [~] 14.2 Create Playback Service
+- [x] 14.2 Create Playback Service
   - Create `packages/desktop/src/services/playbackService.ts`
   - Implement startPlayback, stopPlayback, togglePause
   - Implement progress event subscription
   - Connect to IPC bridge for playback control
   - _Requirements: 7.5_
 
-- [~] 14.3 Update Script Storage Service for AI metadata
+- [x] 14.3 Update Script Storage Service for AI metadata
   - Modify `packages/desktop/src/services/scriptStorageService.ts`
   - Add source='ai_generated' to saved scripts
   - Add target_os to metadata
   - Add generated_at timestamp
   - _Requirements: 7.3, 8.6_
 
-- [~] 14.4 Write property test for Save and Play Button State
+- [x] 14.4 Write property test for Save and Play Button State
   - **Property 11: Save and Play Button State**
   - **Validates: Requirements 7.1, 7.4**
 
-- [~] 14.5 Write property test for AI Script Metadata Consistency
+- [x] 14.5 Write property test for AI Script Metadata Consistency
   - **Property 12: AI Script Metadata Consistency**
   - **Validates: Requirements 7.3, 8.6**
 
@@ -286,11 +286,11 @@
   - Display target OS for AI scripts
   - _Requirements: 9.2, 9.5_
 
-- [~] 16.4 Write property test for Script List Completeness
+- [x] 16.4 Write property test for Script List Completeness
   - **Property 15: Script List Completeness**
   - **Validates: Requirements 9.1, 9.2, 10.2**
 
-- [~] 16.5 Write property test for Script Filter Correctness
+- [x] 16.5 Write property test for Script Filter Correctness
   - **Property 16: Script Filter Correctness**
   - **Validates: Requirements 9.4**
 
@@ -310,7 +310,7 @@
   - Test playback controls work with AI scripts
   - _Requirements: 9.3_
 
-- [~] 17.3 Write property test for AI Script Playback Compatibility
+- [x] 17.3 Write property test for AI Script Playback Compatibility
   - **Property 17: AI Script Playback Compatibility**
   - **Validates: Requirements 9.3**
 
@@ -343,7 +343,7 @@
   - Handle save and update script list
   - _Requirements: 10.3, 10.6_
 
-- [~] 18.5 Write property test for Unified Editor Consistency
+- [-] 18.5 Write property test for Unified Editor Consistency
   - **Property 18: Unified Editor Consistency**
   - **Validates: Requirements 10.3, 10.6**
 
