@@ -25,6 +25,16 @@ jest.mock('../../components/UnifiedInterface.css', () => ({}));
 jest.mock('../../components/TopToolbar.css', () => ({}));
 jest.mock('../../components/EditorArea.css', () => ({}));
 
+// Mock contexts/hooks that deep tab content depends on (manual mocks exist)
+jest.mock('../../contexts/AuthContext');
+jest.mock('../../hooks/useAnalytics');
+
+// Mock tab content components so the internal TabBar + active tab chain does not
+// pull in AnalyticsProvider-dependent components (e.g. AIChatInterface)
+jest.mock('../../components/tabs/ScriptListTabContent', () => ({ ScriptListTabContent: () => <div data-testid="script-list-tab-content" /> }));
+jest.mock('../../components/tabs/AIBuilderTabContent', () => ({ AIBuilderTabContent: () => <div data-testid="ai-builder-tab-content" /> }));
+jest.mock('../../components/tabs/EditorTabContent', () => ({ EditorTabContent: () => <div data-testid="editor-tab-content" /> }));
+
 // Mock IPC bridge service
 jest.mock('../../services/ipcBridgeService', () => ({
   getIPCBridge: () => ({
@@ -62,7 +72,7 @@ const applicationStateArb = fc.record({
     actions: fc.array(fc.record({
       id: fc.string({ minLength: 1, maxLength: 20 }),
       type: fc.constantFrom('mouse_click', 'mouse_move', 'key_press', 'delay'),
-      timestamp: fc.float({ min: 0, max: 10000 }),
+      timestamp: fc.float({ min: 0, max: 10000, noNaN: true }),
     }), { minLength: 0, maxLength: 10 })
   }), { nil: null }),
 });
@@ -76,7 +86,7 @@ const recordingSessionArb = fc.option(fc.record({
   actions: fc.array(fc.record({
     id: fc.string({ minLength: 1, maxLength: 20 }),
     type: fc.constantFrom('mouse_click', 'mouse_move', 'key_press', 'delay'),
-    timestamp: fc.float({ min: 0, max: 10000 }),
+    timestamp: fc.float({ min: 0, max: 10000, noNaN: true }),
   }), { minLength: 0, maxLength: 5 })
 }), { nil: null });
 
@@ -205,13 +215,13 @@ function validateUnifiedInterfaceStructure(container: HTMLElement): boolean {
   if (!toolbarArea) return false;
 
   // Should have editor area
-  const editorArea = unifiedInterface.querySelector('.editor-area');
+  const editorArea = unifiedInterface.querySelector('.editor-area-container');
   if (!editorArea) return false;
 
   // Toolbar should be positioned before editor in DOM order
   const children = Array.from(unifiedInterface.children);
   const toolbarIndex = children.findIndex(child => child.classList.contains('toolbar-area'));
-  const editorIndex = children.findIndex(child => child.classList.contains('editor-area'));
+  const editorIndex = children.findIndex(child => child.classList.contains('editor-area-container'));
 
   if (toolbarIndex === -1 || editorIndex === -1) return false;
   if (toolbarIndex >= editorIndex) return false;
@@ -249,12 +259,12 @@ function validateLayoutConsistency(container: HTMLElement, previousLayout?: any)
   const currentLayout = {
     hasUnifiedInterface: !!unifiedInterface,
     hasToolbarArea: !!unifiedInterface.querySelector('.toolbar-area'),
-    hasEditorArea: !!unifiedInterface.querySelector('.editor-area'),
+    hasEditorArea: !!unifiedInterface.querySelector('.editor-area-container'),
     childrenCount: unifiedInterface.children.length,
     toolbarPosition: Array.from(unifiedInterface.children).findIndex(child =>
       child.classList.contains('toolbar-area')),
     editorPosition: Array.from(unifiedInterface.children).findIndex(child =>
-      child.classList.contains('editor-area')),
+      child.classList.contains('editor-area-container')),
   };
 
   // If we have a previous layout, ensure structure hasn't changed
@@ -331,12 +341,20 @@ describe('Unified Interface Consistency Property Tests', () => {
             editorVisible: true
           });
 
-          // Capture initial layout
-          const initialLayout = {
-            hasUnifiedInterface: !!container.querySelector('.unified-interface'),
-            hasToolbarArea: !!container.querySelector('.toolbar-area'),
-            hasEditorArea: !!container.querySelector('.editor-area'),
+          // Capture initial layout in the same shape validateLayoutConsistency()
+          // produces, so the before/after comparison includes DOM positions.
+          const captureLayout = () => {
+            const ui = container.querySelector('.unified-interface');
+            const children = ui ? Array.from(ui.children) : [];
+            return {
+              hasUnifiedInterface: !!ui,
+              hasToolbarArea: !!ui?.querySelector('.toolbar-area'),
+              hasEditorArea: !!ui?.querySelector('.editor-area-container'),
+              toolbarPosition: children.findIndex(child => child.classList.contains('toolbar-area')),
+              editorPosition: children.findIndex(child => child.classList.contains('editor-area-container')),
+            };
           };
+          const initialLayout = captureLayout();
 
           // Simulate state transitions by clicking buttons
           const recordButton = container.querySelector('[data-testid="button-record"]');
@@ -351,7 +369,7 @@ describe('Unified Interface Consistency Property Tests', () => {
             const layoutAfterRecord = {
               hasUnifiedInterface: !!container.querySelector('.unified-interface'),
               hasToolbarArea: !!container.querySelector('.toolbar-area'),
-              hasEditorArea: !!container.querySelector('.editor-area'),
+              hasEditorArea: !!container.querySelector('.editor-area-container'),
             };
 
             if (!validateLayoutConsistency(container, initialLayout)) return false;
@@ -381,7 +399,7 @@ describe('Unified Interface Consistency Property Tests', () => {
           if (!unifiedInterface) return false;
 
           const toolbarArea = unifiedInterface.querySelector('.toolbar-area');
-          const editorArea = unifiedInterface.querySelector('.editor-area');
+          const editorArea = unifiedInterface.querySelector('.editor-area-container');
 
           if (!toolbarArea || !editorArea) return false;
 
@@ -469,9 +487,9 @@ describe('Unified Interface Consistency Property Tests', () => {
             const initialStructure = {
               unifiedInterfaceExists: !!container.querySelector('.unified-interface'),
               toolbarAreaExists: !!container.querySelector('.toolbar-area'),
-              editorAreaExists: !!container.querySelector('.editor-area'),
+              editorAreaExists: !!container.querySelector('.editor-area-container'),
               toolbarExists: !!container.querySelector('.top-toolbar'),
-              editorContainerExists: !!container.querySelector('.editor-area-container'),
+              editorContainerExists: !!container.querySelector('[data-testid="editor-area-container"]'),
             };
 
             // All core elements should exist
@@ -492,9 +510,9 @@ describe('Unified Interface Consistency Property Tests', () => {
             const updatedStructure = {
               unifiedInterfaceExists: !!container.querySelector('.unified-interface'),
               toolbarAreaExists: !!container.querySelector('.toolbar-area'),
-              editorAreaExists: !!container.querySelector('.editor-area'),
+              editorAreaExists: !!container.querySelector('.editor-area-container'),
               toolbarExists: !!container.querySelector('.top-toolbar'),
-              editorContainerExists: !!container.querySelector('.editor-area-container'),
+              editorContainerExists: !!container.querySelector('[data-testid="editor-area-container"]'),
             };
 
             // Structure should remain unchanged
@@ -527,8 +545,9 @@ describe('Unified Interface Consistency Property Tests', () => {
             const toolbarArea = container.querySelector('.toolbar-area');
             if (!toolbarArea) return false;
 
-            // Should always have editor area (even if hidden)
-            const editorArea = container.querySelector('.editor-area');
+            // Should always have editor area (even if hidden).
+            // The EditorArea root (carrying visible/hidden) has data-testid="editor-area-container".
+            const editorArea = container.querySelector('[data-testid="editor-area-container"]');
             if (!editorArea) return false;
 
             // Toolbar should always be present
@@ -569,7 +588,8 @@ describe('Unified Interface Consistency Property Tests', () => {
           if (!hasValidModeClass) return false;
 
           // Should have correct visibility classes
-          const editorArea = container.querySelector('.editor-area');
+          // The EditorArea root (carrying visible/hidden) has data-testid="editor-area-container".
+          const editorArea = container.querySelector('[data-testid="editor-area-container"]');
           if (!editorArea) return false;
 
           const hasCorrectVisibilityClass = state.editorVisible ?

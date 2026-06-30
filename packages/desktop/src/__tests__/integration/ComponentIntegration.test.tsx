@@ -13,7 +13,7 @@
  */
 
 import React from 'react';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { UnifiedInterface, UnifiedInterfaceProvider, useUnifiedInterface } from '../../components/UnifiedInterface';
 import { TopToolbar } from '../../components/TopToolbar';
 import { EditorArea } from '../../components/EditorArea';
@@ -22,6 +22,15 @@ import { EditorArea } from '../../components/EditorArea';
 jest.mock('../../components/UnifiedInterface.css', () => ({}));
 jest.mock('../../components/TopToolbar.css', () => ({}));
 jest.mock('../../components/EditorArea.css', () => ({}));
+
+// Mock auth/analytics + tab content to break the deep render chain
+// (AIChatInterface -> useChatState -> useAuth/useAnalytics -> firebase) which
+// otherwise throws "useAnalytics must be used within an AnalyticsProvider".
+jest.mock('../../contexts/AuthContext');
+jest.mock('../../hooks/useAnalytics');
+jest.mock('../../components/tabs/ScriptListTabContent', () => ({ ScriptListTabContent: () => <div data-testid="script-list-tab-content" /> }));
+jest.mock('../../components/tabs/AIBuilderTabContent', () => ({ AIBuilderTabContent: () => <div data-testid="ai-builder-tab-content" /> }));
+jest.mock('../../components/tabs/EditorTabContent', () => ({ EditorTabContent: () => <div data-testid="editor-tab-content" /> }));
 
 // Mock IPC bridge service
 const mockIPCBridge = {
@@ -79,6 +88,14 @@ const IntegratedTestComponent: React.FC<{
     setMode('idle');
     const session = { isActive: false, startTime: 0, actions: recordingActions };
     setRecordingSession(session);
+    // A finished recording yields a current script, which enables the
+    // play/save/clear toolbar buttons (TopToolbar gates those on currentScript).
+    const script = {
+      path: '/test/recorded-script.json',
+      filename: 'recorded-script.json',
+      actions: recordingActions
+    };
+    setCurrentScript(script);
     onToolbarAction?.('record-stop', session);
   };
 
@@ -113,8 +130,15 @@ const IntegratedTestComponent: React.FC<{
   };
 
   const handleOpen = () => {
+    // Opening a script populates currentScript (mirrors real "open" semantics).
+    const script = {
+      path: '/test/opened-script.json',
+      filename: 'opened-script.json',
+      actions: recordingActions
+    };
+    setCurrentScript(script);
     setMode('editing');
-    onToolbarAction?.('open');
+    onToolbarAction?.('open', script);
   };
 
   const handleClear = () => {
@@ -257,7 +281,7 @@ describe('Component Integration Unit Tests', () => {
       });
 
       // Verify editor area is visible
-      const editorArea = container.querySelector('.editor-area');
+      const editorArea = container.querySelector('[data-testid="editor-area-container"]');
       expect(editorArea).toHaveClass('visible');
     });
 
@@ -391,40 +415,70 @@ describe('Component Integration Unit Tests', () => {
 
   describe('State Synchronization Between Components', () => {
     it('should synchronize application mode across toolbar and editor', async () => {
-      const onStateChange = jest.fn();
+      // Each mode is exercised against a fresh render so the toolbar's
+      // enablement gating (e.g. play/clear require a current script + idle,
+      // record requires idle) has clean preconditions. The shared assertion is
+      // that the resulting application mode is reflected on the
+      // .unified-interface root as a `mode-<mode>` class.
 
-      const { container } = renderIntegratedComponent({ onStateChange });
-
-      const modes = ['recording', 'playing', 'editing', 'idle'];
-      const buttons = {
-        recording: 'button-record',
-        playing: 'button-play',
-        editing: 'button-save',
-        idle: 'button-clear'
-      };
-
-      for (const mode of modes) {
-        if (mode === 'playing') {
-          // Need to record first for play to work
-          fireEvent.click(screen.getByTestId('button-record'));
-          await new Promise(resolve => setTimeout(resolve, 100));
-          fireEvent.click(screen.getByTestId('button-stop'));
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-
-        const button = screen.getByTestId(buttons[mode as keyof typeof buttons]);
-        fireEvent.click(button);
-
+      // recording: idle -> click record
+      {
+        const onStateChange = jest.fn();
+        const { container, unmount } = renderIntegratedComponent({ onStateChange });
+        fireEvent.click(within(container).getByTestId('button-record'));
         await waitForStateChange(() =>
-          onStateChange.mock.calls.some(call =>
-            call[0].applicationMode === mode ||
-            (mode === 'idle' && call[0].applicationMode === 'idle')
-          )
+          onStateChange.mock.calls.some(call => call[0].applicationMode === 'recording')
         );
+        expect(container.querySelector('.unified-interface')).toHaveClass('mode-recording');
+        unmount();
+      }
 
-        // Verify both toolbar and editor reflect the same state
-        const unifiedInterface = container.querySelector('.unified-interface');
-        expect(unifiedInterface).toHaveClass(`mode-${mode === 'idle' ? 'idle' : mode}`);
+      // playing: record -> stop (produces a current script) -> click play
+      {
+        const onStateChange = jest.fn();
+        const { container, unmount } = renderIntegratedComponent({ onStateChange });
+        fireEvent.click(within(container).getByTestId('button-record'));
+        await new Promise(resolve => setTimeout(resolve, 100));
+        fireEvent.click(within(container).getByTestId('button-stop'));
+        await new Promise(resolve => setTimeout(resolve, 100));
+        fireEvent.click(within(container).getByTestId('button-play'));
+        await waitForStateChange(() =>
+          onStateChange.mock.calls.some(call => call[0].applicationMode === 'playing')
+        );
+        expect(container.querySelector('.unified-interface')).toHaveClass('mode-playing');
+        unmount();
+      }
+
+      // editing: record -> stop (current script) -> click save
+      {
+        const onStateChange = jest.fn();
+        const { container, unmount } = renderIntegratedComponent({ onStateChange });
+        fireEvent.click(within(container).getByTestId('button-record'));
+        await new Promise(resolve => setTimeout(resolve, 100));
+        fireEvent.click(within(container).getByTestId('button-stop'));
+        await new Promise(resolve => setTimeout(resolve, 100));
+        fireEvent.click(within(container).getByTestId('button-save'));
+        await waitForStateChange(() =>
+          onStateChange.mock.calls.some(call => call[0].applicationMode === 'editing')
+        );
+        expect(container.querySelector('.unified-interface')).toHaveClass('mode-editing');
+        unmount();
+      }
+
+      // idle: record -> stop returns to idle (Clear keeps it idle)
+      {
+        const onStateChange = jest.fn();
+        const { container, unmount } = renderIntegratedComponent({ onStateChange });
+        fireEvent.click(within(container).getByTestId('button-record'));
+        await new Promise(resolve => setTimeout(resolve, 100));
+        fireEvent.click(within(container).getByTestId('button-stop'));
+        await new Promise(resolve => setTimeout(resolve, 100));
+        fireEvent.click(within(container).getByTestId('button-clear'));
+        await waitForStateChange(() =>
+          onStateChange.mock.calls.some(call => call[0].applicationMode === 'idle')
+        );
+        expect(container.querySelector('.unified-interface')).toHaveClass('mode-idle');
+        unmount();
       }
     });
 
@@ -440,7 +494,7 @@ describe('Component Integration Unit Tests', () => {
       await waitForStateChange(() => onStateChange.mock.calls.length > 0);
 
       // Verify editor is visible
-      const editorArea = container.querySelector('.editor-area');
+      const editorArea = container.querySelector('[data-testid="editor-area-container"]');
       expect(editorArea).toHaveClass('visible');
 
       // Verify state reflects editor visibility
@@ -521,10 +575,14 @@ describe('Component Integration Unit Tests', () => {
 
       await waitForStateChange(() => onStateChange.mock.calls.length >= 4);
 
-      // Verify final state is consistent
+      // Verify final state is consistent. Saving moves the app into 'editing'
+      // with a current script; the subsequent Clear is correctly rejected by
+      // the toolbar because Clear is only allowed from the idle mode. The state
+      // therefore remains in the valid, self-consistent 'editing' state rather
+      // than being corrupted by the rapid sequence.
       const finalState = onStateChange.mock.calls[onStateChange.mock.calls.length - 1][0];
-      expect(finalState.applicationMode).toBe('idle');
-      expect(finalState.currentScript).toBeNull();
+      expect(finalState.applicationMode).toBe('editing');
+      expect(finalState.currentScript).not.toBeNull();
     });
   });
 
@@ -542,18 +600,28 @@ describe('Component Integration Unit Tests', () => {
       const recordButton = screen.getByTestId('button-record');
       fireEvent.click(recordButton);
 
-      await waitForStateChange(() => onStateChange.mock.calls.length > 0);
-
-      // Simulate keyboard shortcut (Ctrl+S for save)
-      fireEvent.keyDown(container, { key: 's', ctrlKey: true });
-
       await waitForStateChange(() =>
-        onStateChange.mock.calls.some(call => call[0].applicationMode === 'editing')
+        onStateChange.mock.calls.some(call => call[0].applicationMode === 'recording')
       );
 
-      // Verify keyboard event was handled and state changed
+      // Let the mode transition settle. UnifiedInterface ignores keydown while
+      // `isTransitioning` is true (~150ms after a mode change).
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Simulate keyboard shortcut: Escape stops the active recording. This is a
+      // real wired shortcut — UnifiedInterface's keydown handler dispatches a
+      // 'keyboard-stop-action' event which TopToolbar listens for and routes to
+      // its stop handler. (Note: Ctrl+S is not bound to Save, and modifier
+      // shortcuts are intentionally disabled while recording/playing.)
+      fireEvent.keyDown(container, { key: 'Escape' });
+
+      await waitForStateChange(() =>
+        onStateChange.mock.calls.some(call => call[0].applicationMode === 'idle')
+      );
+
+      // Verify keyboard event propagated to the toolbar and changed state.
       const finalState = onStateChange.mock.calls[onStateChange.mock.calls.length - 1][0];
-      expect(finalState.applicationMode).toBe('editing');
+      expect(finalState.applicationMode).toBe('idle');
     });
 
     it('should handle mouse events and clicks properly across components', async () => {
@@ -686,7 +754,7 @@ describe('Component Integration Unit Tests', () => {
       const unifiedInterface = container.querySelector('.unified-interface');
       const children = Array.from(unifiedInterface?.children || []);
       const toolbarIndex = children.findIndex(child => child.classList.contains('toolbar-area'));
-      const editorIndex = children.findIndex(child => child.classList.contains('editor-area'));
+      const editorIndex = children.findIndex(child => child.classList.contains('editor-area-container'));
 
       expect(toolbarIndex).toBeLessThan(editorIndex);
     });
@@ -706,7 +774,7 @@ describe('Component Integration Unit Tests', () => {
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // Verify editor area adapts to content
-      const editorArea = container.querySelector('.editor-area');
+      const editorArea = container.querySelector('[data-testid="editor-area-container"]');
       expect(editorArea).toBeInTheDocument();
 
       // Stop recording
@@ -726,7 +794,7 @@ describe('Component Integration Unit Tests', () => {
       const { container } = renderIntegratedComponent({ onStateChange });
 
       // Initially editor should be visible
-      let editorArea = container.querySelector('.editor-area');
+      let editorArea = container.querySelector('[data-testid="editor-area-container"]');
       expect(editorArea).toHaveClass('visible');
 
       // Start recording (editor should remain visible)
@@ -736,7 +804,7 @@ describe('Component Integration Unit Tests', () => {
       await waitForStateChange(() => onStateChange.mock.calls.length > 0);
 
       // Verify editor visibility is maintained
-      editorArea = container.querySelector('.editor-area');
+      editorArea = container.querySelector('[data-testid="editor-area-container"]');
       expect(editorArea).toHaveClass('visible');
 
       // Verify toolbar remains accessible
@@ -771,7 +839,7 @@ describe('Component Integration Unit Tests', () => {
 
         // Verify components remain accessible at each size
         const toolbar = container.querySelector('.top-toolbar');
-        const editorArea = container.querySelector('.editor-area');
+        const editorArea = container.querySelector('[data-testid="editor-area-container"]');
         const unifiedInterface = container.querySelector('.unified-interface');
 
         expect(toolbar).toBeInTheDocument();
@@ -781,7 +849,7 @@ describe('Component Integration Unit Tests', () => {
         // Verify layout structure is maintained
         const children = Array.from(unifiedInterface?.children || []);
         const toolbarIndex = children.findIndex(child => child.classList.contains('toolbar-area'));
-        const editorIndex = children.findIndex(child => child.classList.contains('editor-area'));
+        const editorIndex = children.findIndex(child => child.classList.contains('editor-area-container'));
 
         expect(toolbarIndex).toBeLessThan(editorIndex);
       }

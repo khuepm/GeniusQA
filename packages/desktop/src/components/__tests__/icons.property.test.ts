@@ -62,7 +62,7 @@ const colorArb = fc.oneof(
 /**
  * Arbitrary for opacity values (0 to 1, avoiding NaN and invalid values)
  */
-const opacityArb = fc.float({ min: Math.fround(0.01), max: Math.fround(1) });
+const opacityArb = fc.float({ min: Math.fround(0.01), max: Math.fround(1), noNaN: true });
 
 /**
  * Arbitrary for CSS class names

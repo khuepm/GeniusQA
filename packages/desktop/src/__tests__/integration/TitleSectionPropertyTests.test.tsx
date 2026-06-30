@@ -14,8 +14,10 @@ import { UnifiedInterfaceProvider } from '../../components/UnifiedInterface';
 // Mock IPC Bridge Service
 jest.mock('../../services/ipcBridgeService', () => ({
   getIPCBridge: () => ({
+    getCoreStatus: jest.fn().mockResolvedValue({ ready: true }),
     checkForRecordings: jest.fn().mockResolvedValue(false),
     getLatestRecording: jest.fn().mockResolvedValue(null),
+    listScripts: jest.fn().mockResolvedValue([]),
     addEventListener: jest.fn(),
     removeEventListener: jest.fn(),
     startRecording: jest.fn().mockResolvedValue(undefined),
@@ -26,6 +28,14 @@ jest.mock('../../services/ipcBridgeService', () => ({
     loadScript: jest.fn().mockResolvedValue({}),
   }),
 }));
+
+// Break the deep dependency chain pulled in by UnifiedInterface's tab content
+// (AIChatInterface -> useChatState -> useAuth/useAnalytics -> firebase).
+jest.mock('../../contexts/AuthContext');
+jest.mock('../../hooks/useAnalytics');
+jest.mock('../../components/tabs/ScriptListTabContent', () => ({ ScriptListTabContent: () => <div data-testid="script-list-tab-content" /> }));
+jest.mock('../../components/tabs/AIBuilderTabContent', () => ({ AIBuilderTabContent: () => <div data-testid="ai-builder-tab-content" /> }));
+jest.mock('../../components/tabs/EditorTabContent', () => ({ EditorTabContent: () => <div data-testid="editor-tab-content" /> }));
 
 // Mock CSS imports
 jest.mock('../../screens/UnifiedRecorderScreen.css', () => ({}));
