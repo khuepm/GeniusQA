@@ -11,7 +11,8 @@ import * as fc from 'fast-check';
 import RecorderScreen from '../../screens/RecorderScreen';
 import { getIPCBridge } from '../../services/ipcBridgeService';
 
-// Mock IPC Bridge Service
+// Mock IPC Bridge Service (manual mock at src/services/__mocks__/ipcBridgeService.ts).
+// getIPCBridge() returns a shared bridge whose methods are jest.fns.
 jest.mock('../../services/ipcBridgeService');
 
 // Helper to render with Router context
@@ -29,29 +30,9 @@ describe('End-to-End Property-Based Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Create comprehensive mock IPC bridge
-    mockIPCBridge = {
-      getAvailableCores: jest.fn(),
-      getCoreStatus: jest.fn(),
-      selectCore: jest.fn(),
-      checkForRecordings: jest.fn(),
-      startRecording: jest.fn(),
-      stopRecording: jest.fn(),
-      startPlayback: jest.fn(),
-      stopPlayback: jest.fn(),
-      pausePlayback: jest.fn(),
-      getLatestRecording: jest.fn(),
-      getCorePerformanceMetrics: jest.fn(),
-      getPerformanceComparison: jest.fn(),
-      addEventListener: jest.fn(),
-      removeEventListener: jest.fn(),
-      listScripts: jest.fn(),
-      loadScript: jest.fn(),
-      saveScript: jest.fn(),
-      deleteScript: jest.fn(),
-    };
-
-    (getIPCBridge as jest.Mock).mockReturnValue(mockIPCBridge);
+    // The manual mock's getIPCBridge() returns a shared bridge of jest.fns;
+    // configure that bridge directly (it is what the component invokes).
+    mockIPCBridge = getIPCBridge();
   });
 
   describe('Property 17: Runtime core switching', () => {
@@ -63,7 +44,10 @@ describe('End-to-End Property-Based Tests', () => {
      * 
      * Validates: Requirements 4.5
      */
-    it('should allow runtime core switching across all workflow scenarios', () => {
+    // REMOVED: runtime core switching. RecorderScreen no longer exposes a core
+    // selector — it forces the Rust core (the dual-core UI was removed), so this
+    // property can no longer be exercised through the UI.
+    it.skip('should allow runtime core switching across all workflow scenarios', () => {
       // Generate comprehensive test scenarios
       const coreSequenceArb = fc.array(
         fc.constantFrom('python', 'rust'),
@@ -228,7 +212,8 @@ describe('End-to-End Property-Based Tests', () => {
       ), { numRuns: 15 }); // Run 15 comprehensive test cases
     });
 
-    it('should maintain workflow state consistency during core switches', () => {
+    // REMOVED: runtime core switching (see note above) — dual-core UI removed.
+    it.skip('should maintain workflow state consistency during core switches', () => {
       // Test that workflow state is preserved during runtime core switching
       const workflowStateArb = fc.record({
         hasRecordings: fc.boolean(),
@@ -362,7 +347,8 @@ describe('End-to-End Property-Based Tests', () => {
       ), { numRuns: 20 });
     });
 
-    it('should handle concurrent operations during runtime core switching', () => {
+    // REMOVED: runtime core switching (see note above) — dual-core UI removed.
+    it.skip('should handle concurrent operations during runtime core switching', () => {
       // Test runtime core switching with concurrent/overlapping operations
       const concurrentOperationsArb = fc.array(
         fc.record({
@@ -503,7 +489,8 @@ describe('End-to-End Property-Based Tests', () => {
   });
 
   describe('Cross-Platform Runtime Switching Properties', () => {
-    it('should handle runtime core switching across different platforms', () => {
+    // REMOVED: runtime core switching (see note above) — dual-core UI removed.
+    it.skip('should handle runtime core switching across different platforms', () => {
       const platformArb = fc.constantFrom('windows', 'macos', 'linux');
       // Ensure at least one core is supported by filtering the arbitrary
       const platformCapabilitiesArb = fc.record({

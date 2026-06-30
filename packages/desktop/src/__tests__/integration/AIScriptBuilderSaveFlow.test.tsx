@@ -285,7 +285,6 @@ describe('AI Script Builder Save Flow Integration Tests', () => {
         checkForRecordings: jest.fn().mockResolvedValue(true),
       };
 
-      (ipcBridgeService.getIPCBridge as jest.Mock).mockReturnValue(mockIPCBridge);
 
       // Reset modules to get fresh instance with new mock
       jest.resetModules();
@@ -322,7 +321,6 @@ describe('AI Script Builder Save Flow Integration Tests', () => {
         checkForRecordings: jest.fn().mockResolvedValue(false),
       };
 
-      (ipcBridgeService.getIPCBridge as jest.Mock).mockReturnValue(mockIPCBridge);
 
       jest.resetModules();
       jest.doMock('../../services/ipcBridgeService', () => ({
@@ -357,7 +355,6 @@ describe('AI Script Builder Save Flow Integration Tests', () => {
         checkForRecordings: jest.fn().mockResolvedValue(true),
       };
 
-      (ipcBridgeService.getIPCBridge as jest.Mock).mockReturnValue(mockIPCBridge);
 
       jest.resetModules();
       jest.doMock('../../services/ipcBridgeService', () => ({
@@ -383,7 +380,6 @@ describe('AI Script Builder Save Flow Integration Tests', () => {
         checkForRecordings: jest.fn().mockResolvedValue(true),
       };
 
-      (ipcBridgeService.getIPCBridge as jest.Mock).mockReturnValue(mockIPCBridge);
 
       jest.resetModules();
       jest.doMock('../../services/ipcBridgeService', () => ({

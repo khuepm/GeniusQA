@@ -103,7 +103,9 @@ export class IPCBridgeService {
 
 // Plain functions (NOT jest.fn) so the `react` project's resetMocks:true cannot
 // strip their implementation between tests — components rely on getIPCBridge()
-// returning the bridge during render.
+// returning the bridge during render. Tests that want their OWN bridge should
+// configure the shared bridge's methods (the named exports) rather than trying
+// to call getIPCBridge.mockReturnValue (it is not a jest.fn).
 export const getIPCBridge = () => bridge;
 export const resetIPCBridge = () => {};
 
