@@ -1,273 +1,184 @@
 /**
- * Unit tests for Firebase Authentication Service
+ * Unit tests for Firebase Authentication Service (Firebase Web SDK / Tauri)
+ *
+ * The service under test uses the Firebase Web SDK (`firebase/auth`), NOT the
+ * React Native Firebase packages. These tests mock the Web SDK functions and
+ * the supporting modules (config, oauthService, env util).
  */
 
-// Mock the env utility first
-jest.mock('../../../utils/env', () => ({
-  getEnvVar: jest.fn((key, fallback) => {
-    const mockEnv = {
-      VITE_FIREBASE_API_KEY: 'test-api-key',
-      VITE_FIREBASE_AUTH_DOMAIN: 'test-auth-domain',
-      VITE_FIREBASE_PROJECT_ID: 'test-project-id',
-      VITE_FIREBASE_STORAGE_BUCKET: 'test-storage-bucket',
-      VITE_FIREBASE_MESSAGING_SENDER_ID: 'test-sender-id',
-      VITE_FIREBASE_APP_ID: 'test-app-id',
-      VITE_GOOGLE_WEB_CLIENT_ID: 'test-google-client-id'
+// --- Mocks must be declared before importing the service under test ---
+
+// env util lives at src/utils/env (two levels up from this __tests__ dir).
+// It uses import.meta.env which Jest cannot parse, so it must be mocked.
+jest.mock('../../utils/env', () => ({
+  getEnvVar: jest.fn((key: string, fallback?: string) => {
+    const mockEnv: Record<string, string> = {
+      GOOGLE_CLIENT_ID: 'test-google-client-id',
+      VITE_GOOGLE_CLIENT_ID: 'test-google-client-id',
     };
-    const viteKey = key.startsWith('VITE_') ? key : `VITE_${key}`;
-    return mockEnv[viteKey] || fallback || '';
+    return mockEnv[key] ?? fallback ?? '';
   }),
-  getRequiredEnvVar: jest.fn((key) => {
-    const mockEnv = {
-      VITE_FIREBASE_API_KEY: 'test-api-key',
-      VITE_FIREBASE_AUTH_DOMAIN: 'test-auth-domain',
-      VITE_FIREBASE_PROJECT_ID: 'test-project-id',
-      VITE_FIREBASE_STORAGE_BUCKET: 'test-storage-bucket',
-      VITE_FIREBASE_MESSAGING_SENDER_ID: 'test-sender-id',
-      VITE_FIREBASE_APP_ID: 'test-app-id',
-      VITE_GOOGLE_WEB_CLIENT_ID: 'test-google-client-id'
-    };
-    const viteKey = key.startsWith('VITE_') ? key : `VITE_${key}`;
-    return mockEnv[viteKey] || 'test-value';
-  })
+  getRequiredEnvVar: jest.fn((key: string) => key),
+  hasEnvVar: jest.fn(() => true),
 }));
 
-// Mock Firebase modules
-jest.mock('firebase/app', () => ({
-  initializeApp: jest.fn(() => ({ name: 'test-app' }))
+// Firebase config — avoid real Firebase initialization.
+jest.mock('../../config/firebase.config', () => ({
+  app: { name: 'test-app' },
 }));
 
-jest.mock('firebase/auth', () => ({
-  getAuth: jest.fn(() => ({
-    currentUser: null,
+// oauthService used by Google sign-in helpers.
+jest.mock('../oauthService', () => ({
+  __esModule: true,
+  default: {
+    generateGoogleOAuthUrl: jest.fn(() => 'https://accounts.google.com/o/oauth2/auth?test'),
+    openOAuthInBrowser: jest.fn(async () => undefined),
+  },
+}));
+
+// Firebase Web SDK auth functions.
+// The mock auth instance must be created INSIDE the factory because jest.mock
+// is hoisted above all module-scope declarations; we read it back after import.
+jest.mock('firebase/auth', () => {
+  const authInstance = { currentUser: null as any };
+  return {
+    __mockAuthInstance: authInstance,
+    getAuth: jest.fn(() => authInstance),
     signInWithEmailAndPassword: jest.fn(),
     createUserWithEmailAndPassword: jest.fn(),
+    signInWithPopup: jest.fn(),
     signInWithCredential: jest.fn(),
     signOut: jest.fn(),
-    onAuthStateChanged: jest.fn()
-  })),
-  GoogleAuthProvider: jest.fn().mockImplementation(() => ({
-    credential: jest.fn()
-  }))
-}));
+    onAuthStateChanged: jest.fn(),
+    GoogleAuthProvider: class {
+      static credential = jest.fn((idToken: string) => ({ idToken, providerId: 'google.com' }));
+    },
+  };
+});
+
+// This suite runs under the "services" jest project (testEnvironment: node),
+// so localStorage is not provided by the runtime — supply a minimal polyfill
+// because signOut() calls localStorage.clear().
+const localStoragePolyfill = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: (k: string) => (k in store ? store[k] : null),
+    setItem: (k: string, v: string) => {
+      store[k] = String(v);
+    },
+    removeItem: (k: string) => {
+      delete store[k];
+    },
+    clear: () => {
+      store = {};
+    },
+  };
+})();
+(globalThis as any).localStorage = localStoragePolyfill;
 
 import firebaseService from '../firebaseService';
-import auth from '@react-native-firebase/auth';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as firebaseAuth from 'firebase/auth';
+import oauthService from '../oauthService';
 
-// Mock Firebase Auth
-jest.mock('@react-native-firebase/auth');
-jest.mock('@react-native-google-signin/google-signin');
-jest.mock('@react-native-async-storage/async-storage');
+const mockedAuth = firebaseAuth as jest.Mocked<typeof firebaseAuth>;
+const mockAuthInstance = (firebaseAuth as any).__mockAuthInstance as { currentUser: any };
 
-describe('FirebaseAuthService', () => {
+describe('FirebaseAuthService (Web SDK)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockAuthInstance.currentUser = null;
+    localStorage.clear();
   });
 
   describe('initialize', () => {
-    it('should configure Google Sign-In successfully', async () => {
-      await firebaseService.initialize();
-      
-      expect(GoogleSignin.configure).toHaveBeenCalledWith({
-        webClientId: expect.any(String),
-      });
-    });
-
-    it('should not reinitialize if already initialized', async () => {
-      await firebaseService.initialize();
-      await firebaseService.initialize();
-      
-      expect(GoogleSignin.configure).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('signInWithEmail', () => {
-    it('should sign in successfully with valid credentials', async () => {
-      const mockUserCredential = {
-        user: { uid: '123', email: 'test@example.com' },
-      };
-      
-      (auth as any).mockReturnValue({
-        signInWithEmailAndPassword: jest.fn().mockResolvedValue(mockUserCredential),
-      });
-
-      const result = await firebaseService.signInWithEmail('test@example.com', 'password123');
-      
-      expect(result).toEqual(mockUserCredential);
-    });
-
-    it('should throw error with invalid credentials', async () => {
-      const mockError = { code: 'auth/wrong-password' };
-      
-      (auth as any).mockReturnValue({
-        signInWithEmailAndPassword: jest.fn().mockRejectedValue(mockError),
-      });
-
-      await expect(
-        firebaseService.signInWithEmail('test@example.com', 'wrongpassword')
-      ).rejects.toThrow();
-    });
-
-    it('should throw error with invalid email format', async () => {
-      const mockError = { code: 'auth/invalid-email' };
-      
-      (auth as any).mockReturnValue({
-        signInWithEmailAndPassword: jest.fn().mockRejectedValue(mockError),
-      });
-
-      await expect(
-        firebaseService.signInWithEmail('invalid-email', 'password123')
-      ).rejects.toThrow();
-    });
-  });
-
-  describe('signUpWithEmail', () => {
-    it('should create account successfully with valid data', async () => {
-      const mockUserCredential = {
-        user: { uid: '456', email: 'newuser@example.com' },
-      };
-      
-      (auth as any).mockReturnValue({
-        createUserWithEmailAndPassword: jest.fn().mockResolvedValue(mockUserCredential),
-      });
-
-      const result = await firebaseService.signUpWithEmail('newuser@example.com', 'password123');
-      
-      expect(result).toEqual(mockUserCredential);
-    });
-
-    it('should throw error when email already exists', async () => {
-      const mockError = { code: 'auth/email-already-in-use' };
-      
-      (auth as any).mockReturnValue({
-        createUserWithEmailAndPassword: jest.fn().mockRejectedValue(mockError),
-      });
-
-      await expect(
-        firebaseService.signUpWithEmail('existing@example.com', 'password123')
-      ).rejects.toThrow();
-    });
-
-    it('should throw error with weak password', async () => {
-      const mockError = { code: 'auth/weak-password' };
-      
-      (auth as any).mockReturnValue({
-        createUserWithEmailAndPassword: jest.fn().mockRejectedValue(mockError),
-      });
-
-      await expect(
-        firebaseService.signUpWithEmail('test@example.com', '123')
-      ).rejects.toThrow();
-    });
-  });
-
-  describe('signInWithGoogle', () => {
-    it('should sign in successfully with Google', async () => {
-      const mockIdToken = 'mock-id-token';
-      const mockCredential = { token: 'mock-credential' };
-      const mockUserCredential = {
-        user: { uid: '789', email: 'google@example.com' },
-      };
-
-      (GoogleSignin.hasPlayServices as jest.Mock).mockResolvedValue(true);
-      (GoogleSignin.signIn as jest.Mock).mockResolvedValue({ idToken: mockIdToken });
-      (auth.GoogleAuthProvider.credential as jest.Mock).mockReturnValue(mockCredential);
-      (auth as any).mockReturnValue({
-        signInWithCredential: jest.fn().mockResolvedValue(mockUserCredential),
-      });
-
-      const result = await firebaseService.signInWithGoogle();
-      
-      expect(GoogleSignin.hasPlayServices).toHaveBeenCalled();
-      expect(GoogleSignin.signIn).toHaveBeenCalled();
-      expect(result).toEqual(mockUserCredential);
-    });
-
-    it('should throw error when sign in is cancelled', async () => {
-      const mockError = { code: 'SIGN_IN_CANCELLED' };
-
-      (GoogleSignin.hasPlayServices as jest.Mock).mockResolvedValue(true);
-      (GoogleSignin.signIn as jest.Mock).mockRejectedValue(mockError);
-
-      await expect(firebaseService.signInWithGoogle()).rejects.toThrow();
-    });
-
-    it('should throw error when Play Services not available', async () => {
-      const mockError = { code: 'PLAY_SERVICES_NOT_AVAILABLE' };
-
-      (GoogleSignin.hasPlayServices as jest.Mock).mockRejectedValue(mockError);
-
-      await expect(firebaseService.signInWithGoogle()).rejects.toThrow();
-    });
-  });
-
-  describe('signOut', () => {
-    it('should sign out successfully', async () => {
-      (GoogleSignin.isSignedIn as jest.Mock).mockResolvedValue(true);
-      (GoogleSignin.signOut as jest.Mock).mockResolvedValue(undefined);
-      (auth as any).mockReturnValue({
-        signOut: jest.fn().mockResolvedValue(undefined),
-      });
-      (AsyncStorage.clear as jest.Mock).mockResolvedValue(undefined);
-
-      await firebaseService.signOut();
-      
-      expect(GoogleSignin.signOut).toHaveBeenCalled();
-      expect(AsyncStorage.clear).toHaveBeenCalled();
-    });
-
-    it('should clear storage even if Google sign out fails', async () => {
-      (GoogleSignin.isSignedIn as jest.Mock).mockResolvedValue(false);
-      (auth as any).mockReturnValue({
-        signOut: jest.fn().mockResolvedValue(undefined),
-      });
-      (AsyncStorage.clear as jest.Mock).mockResolvedValue(undefined);
-
-      await firebaseService.signOut();
-      
-      expect(GoogleSignin.signOut).not.toHaveBeenCalled();
-      expect(AsyncStorage.clear).toHaveBeenCalled();
+    it('initializes successfully and is idempotent', async () => {
+      await expect(firebaseService.initialize()).resolves.toBeUndefined();
+      // Second call returns early without throwing
+      await expect(firebaseService.initialize()).resolves.toBeUndefined();
     });
   });
 
   describe('getCurrentUser', () => {
-    it('should return current user when authenticated', () => {
-      const mockUser = { uid: '123', email: 'test@example.com' };
-      (auth as any).mockReturnValue({
-        currentUser: mockUser,
-      });
-
-      const user = firebaseService.getCurrentUser();
-      
-      expect(user).toEqual(mockUser);
+    it('returns null when no user is signed in', () => {
+      expect(firebaseService.getCurrentUser()).toBeNull();
     });
 
-    it('should return null when not authenticated', () => {
-      (auth as any).mockReturnValue({
-        currentUser: null,
-      });
-
-      const user = firebaseService.getCurrentUser();
-      
-      expect(user).toBeNull();
+    it('returns the current Firebase user when signed in', () => {
+      const fakeUser = { uid: 'abc', email: 'a@b.com' };
+      mockAuthInstance.currentUser = fakeUser;
+      expect(firebaseService.getCurrentUser()).toBe(fakeUser);
     });
   });
 
   describe('onAuthStateChanged', () => {
-    it('should setup auth state listener', () => {
-      const mockCallback = jest.fn();
-      const mockUnsubscribe = jest.fn();
-      
-      (auth as any).mockReturnValue({
-        onAuthStateChanged: jest.fn().mockReturnValue(mockUnsubscribe),
-      });
+    it('registers a listener and returns the unsubscribe fn', () => {
+      const unsub = jest.fn();
+      mockedAuth.onAuthStateChanged.mockReturnValue(unsub as any);
+      const cb = jest.fn();
+      const result = firebaseService.onAuthStateChanged(cb);
+      expect(mockedAuth.onAuthStateChanged).toHaveBeenCalledWith(mockAuthInstance, cb);
+      expect(result).toBe(unsub);
+    });
+  });
 
-      const unsubscribe = firebaseService.onAuthStateChanged(mockCallback);
-      
-      expect(auth().onAuthStateChanged).toHaveBeenCalledWith(mockCallback);
-      expect(unsubscribe).toBe(mockUnsubscribe);
+  describe('signInWithEmail', () => {
+    it('returns the user credential on success', async () => {
+      const cred = { user: { uid: 'u1' } };
+      mockedAuth.signInWithEmailAndPassword.mockResolvedValue(cred as any);
+      await expect(firebaseService.signInWithEmail('a@b.com', 'pw')).resolves.toBe(cred);
+      expect(mockedAuth.signInWithEmailAndPassword).toHaveBeenCalledWith(
+        mockAuthInstance,
+        'a@b.com',
+        'pw'
+      );
+    });
+
+    it('throws a mapped error on failure', async () => {
+      mockedAuth.signInWithEmailAndPassword.mockRejectedValue({ code: 'auth/wrong-password' });
+      await expect(firebaseService.signInWithEmail('a@b.com', 'pw')).rejects.toThrow();
+    });
+  });
+
+  describe('signUpWithEmail', () => {
+    it('returns the user credential on success', async () => {
+      const cred = { user: { uid: 'u2' } };
+      mockedAuth.createUserWithEmailAndPassword.mockResolvedValue(cred as any);
+      await expect(firebaseService.signUpWithEmail('a@b.com', 'pw')).resolves.toBe(cred);
+    });
+
+    it('throws a mapped error on failure', async () => {
+      mockedAuth.createUserWithEmailAndPassword.mockRejectedValue({ code: 'auth/email-already-in-use' });
+      await expect(firebaseService.signUpWithEmail('a@b.com', 'pw')).rejects.toThrow();
+    });
+  });
+
+  describe('signInWithGoogleExternalBrowser', () => {
+    it('returns the generated OAuth URL', async () => {
+      const url = await firebaseService.signInWithGoogleExternalBrowser();
+      expect(url).toContain('accounts.google.com');
+      expect(oauthService.generateGoogleOAuthUrl).toHaveBeenCalledWith('test-google-client-id');
+      expect(oauthService.openOAuthInBrowser).toHaveBeenCalledWith(url);
+    });
+
+    it('still returns the URL if opening the browser fails', async () => {
+      (oauthService.openOAuthInBrowser as jest.Mock).mockRejectedValueOnce(new Error('no browser'));
+      const url = await firebaseService.signInWithGoogleExternalBrowser();
+      expect(url).toContain('accounts.google.com');
+    });
+  });
+
+  describe('signOut', () => {
+    it('signs out from Firebase and clears local storage', async () => {
+      mockedAuth.signOut.mockResolvedValue(undefined as any);
+      localStorage.setItem('foo', 'bar');
+      await firebaseService.signOut();
+      expect(mockedAuth.signOut).toHaveBeenCalledWith(mockAuthInstance);
+      expect(localStorage.getItem('foo')).toBeNull();
+    });
+
+    it('throws a mapped error on failure', async () => {
+      mockedAuth.signOut.mockRejectedValue({ code: 'auth/network-request-failed' });
+      await expect(firebaseService.signOut()).rejects.toThrow();
     });
   });
 });

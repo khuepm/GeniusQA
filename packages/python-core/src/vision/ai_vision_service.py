@@ -15,6 +15,7 @@ from typing import Optional, List
 import aiohttp
 
 from .image_utils import crop_to_roi, encode_image_base64
+from .local_ocr_service import LocalOCRService
 
 
 # ============================================================================
@@ -215,11 +216,29 @@ class AIVisionService:
         ...     print(f"Found at ({response.x}, {response.y})")
     """
     
-    def __init__(self):
-        """Initialize the AI Vision Service."""
+    def __init__(self, local_ocr: Optional[LocalOCRService] = None,
+                 enable_local_ocr: bool = True):
+        """
+        Initialize the AI Vision Service.
+
+        Args:
+            local_ocr: Optional LocalOCRService instance (injectable for tests).
+            enable_local_ocr: When True (default), attempt a zero-token local OCR
+                lookup before falling back to the cloud Vision LLM. This is the
+                primary token-saving path for plain-text targets.
+        """
         self._api_key: Optional[str] = None
         self._initialized: bool = False
         self._timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
+        self._enable_local_ocr: bool = enable_local_ocr
+        self._local_ocr: LocalOCRService = local_ocr or LocalOCRService()
+        # Lightweight telemetry so callers can quantify token savings.
+        self.local_ocr_hits: int = 0
+        self.llm_calls: int = 0
+
+    def set_local_ocr_enabled(self, enabled: bool) -> None:
+        """Enable or disable the local-OCR token-saving fast path."""
+        self._enable_local_ocr = enabled
     
     async def initialize(self, api_key: str) -> None:
         """
@@ -321,6 +340,22 @@ class AIVisionService:
                     # Continue with full image if cropping fails
                     print(f"Warning: Failed to crop image to ROI: {crop_error}")
             
+            # ----------------------------------------------------------------
+            # Token-saving fast path: try LOCAL OCR before the cloud LLM.
+            #
+            # If the prompt names a concrete text target (e.g. a quoted label)
+            # and a local Tesseract pass locates it confidently, we return that
+            # result at ZERO token cost and skip the LLM entirely. Reference
+            # images imply visual (non-text) matching, so we skip OCR for those.
+            # ----------------------------------------------------------------
+            if self._enable_local_ocr and not request.reference_images:
+                local_response = self._try_local_ocr(
+                    screenshot_base64, request.prompt, roi_offset_x, roi_offset_y
+                )
+                if local_response is not None:
+                    self.local_ocr_hits += 1
+                    return local_response
+
             # Prepare reference images
             reference_images_base64: List[str] = []
             for ref_image in request.reference_images:
@@ -329,8 +364,9 @@ class AIVisionService:
                     reference_images_base64.append(base64_data)
                 except Exception:
                     print("Warning: Failed to process reference image, skipping")
-            
+
             # Make API request with timeout
+            self.llm_calls += 1
             response = await self._call_gemini_vision_api(
                 screenshot_base64,
                 request.prompt,
@@ -365,6 +401,43 @@ class AIVisionService:
                 error=f"AI analysis failed: {error_message}"
             )
     
+    def _try_local_ocr(
+        self,
+        screenshot_base64: str,
+        prompt: str,
+        roi_offset_x: int,
+        roi_offset_y: int,
+    ) -> Optional[AIVisionResponse]:
+        """
+        Attempt a zero-token local OCR lookup for a text target in the prompt.
+
+        Returns:
+            AIVisionResponse on a confident local hit (ROI offset already
+            applied), or None to signal "fall back to the cloud LLM".
+        """
+        if not self._local_ocr.is_available():
+            return None
+
+        query = LocalOCRService.extract_query_from_prompt(prompt)
+        if not query:
+            return None
+
+        try:
+            result = self._local_ocr.locate_text(screenshot_base64, query)
+        except Exception:
+            # Any OCR failure must never break analysis — defer to the LLM.
+            return None
+
+        if not result.success or result.x is None or result.y is None:
+            return None
+
+        return AIVisionResponse(
+            success=True,
+            x=result.x + roi_offset_x,
+            y=result.y + roi_offset_y,
+            confidence=result.confidence,
+        )
+
     async def _call_gemini_vision_api(
         self,
         screenshot_base64: str,

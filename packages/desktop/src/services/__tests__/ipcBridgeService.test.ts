@@ -950,12 +950,16 @@ describe('IPCBridgeService', () => {
     });
 
     it('should format corrupted script file errors', async () => {
+      // startPlayback first calls getCoreStatus (for logging); mock it to succeed,
+      // then make the actual start_playback invoke fail.
+      mockInvoke.mockResolvedValueOnce({ activeCoreType: 'python', availableCores: ['python'] });
       mockInvoke.mockRejectedValueOnce(new Error('Script file corrupted: Invalid JSON format'));
 
       await expect(service.startPlayback()).rejects.toThrow('corrupted');
     });
 
     it('should format no recordings found errors', async () => {
+      mockInvoke.mockResolvedValueOnce({ activeCoreType: 'python', availableCores: ['python'] });
       mockInvoke.mockRejectedValueOnce(new Error('No recordings found'));
 
       await expect(service.startPlayback()).rejects.toThrow('No recordings found');
@@ -994,7 +998,8 @@ describe('IPCBridgeService', () => {
       const result1 = await service.stopRecording();
       expect(result1.success).toBe(false);
 
-      // Error 2: No recordings found
+      // Error 2: No recordings found (startPlayback calls getCoreStatus first)
+      mockInvoke.mockResolvedValueOnce({ activeCoreType: 'python', availableCores: ['python'] });
       mockInvoke.mockRejectedValueOnce(new Error('No recordings found'));
       await expect(service.startPlayback()).rejects.toThrow();
 

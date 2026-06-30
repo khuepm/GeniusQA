@@ -206,13 +206,15 @@ impl MacOSAutomation {
     #[cfg(target_os = "macos")]
     fn check_accessibility_permissions(&self) -> Result<bool> {
         if let Some(logger) = get_logger() {
+            let mut metadata = HashMap::new();
+            metadata.insert("platform".to_string(), json!("macos"));
             logger.log_operation(
                 LogLevel::Info,
                 CoreType::Rust,
                 OperationType::Playback,
                 "permission_check".to_string(),
                 "Checking macOS accessibility permissions".to_string(),
-                None,
+                Some(metadata),
             );
         }
 
@@ -229,7 +231,8 @@ impl MacOSAutomation {
         if let Some(logger) = get_logger() {
             let mut metadata = HashMap::new();
             metadata.insert("has_permissions".to_string(), json!(trusted));
-            
+            metadata.insert("platform".to_string(), json!("macos"));
+
             logger.log_operation(
                 if trusted { LogLevel::Info } else { LogLevel::Warn },
                 CoreType::Rust,
@@ -334,23 +337,22 @@ impl PlatformAutomation for MacOSAutomation {
     }
     
     fn check_permissions(&self) -> Result<bool> {
-        // Check if we have accessibility permissions
+        // Report permission STATUS as a boolean. A status query must not fail
+        // with an error just because permission is currently absent — that
+        // conflates "could not check" with "permission denied" and matches the
+        // Linux/Windows implementations which return Ok(false)/Ok(true).
+        //
+        // Callers (player.rs / recorder.rs) act on Ok(false) by invoking
+        // request_permissions(), which surfaces the detailed instructions and
+        // the System Preferences deep link.
         let has_permissions = self.check_accessibility_permissions()?;
-        
+
         if !has_permissions {
+            // Still log the denial with actionable instructions for diagnostics.
             self.log_permission_denial();
-            
-            return Err(AutomationError::PermissionDenied {
-                operation: format!(
-                    "macOS Accessibility permissions required.\n\n{}\n\n\
-                    You can also open System Preferences directly using this link:\n\
-                    x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
-                    self.get_permission_instructions()
-                ),
-            });
         }
-        
-        Ok(true)
+
+        Ok(has_permissions)
     }
     
     fn request_permissions(&self) -> Result<bool> {
@@ -363,8 +365,13 @@ impl PlatformAutomation for MacOSAutomation {
         if !has_permissions {
             if let Some(logger) = get_logger() {
                 let mut metadata = HashMap::new();
+                // Include platform metadata so diagnostics/consumers can attribute
+                // the message to the correct OS (kept consistent with
+                // log_permission_denial).
+                metadata.insert("platform".to_string(), json!("macos"));
+                metadata.insert("required_permission".to_string(), json!("Accessibility"));
                 metadata.insert("instructions".to_string(), json!(self.get_permission_instructions()));
-                
+
                 logger.log_operation(
                     LogLevel::Warn,
                     CoreType::Rust,

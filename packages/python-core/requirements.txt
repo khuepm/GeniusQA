@@ -10,3 +10,8 @@ pydantic==2.5.0
 aiohttp==3.9.0
 Pillow==10.1.0
 jinja2==3.1.2
+
+# Optional: local OCR fallback (token-saving text targeting). The service
+# degrades gracefully if this or the tesseract binary is absent.
+# Requires the system `tesseract` binary (macOS: `brew install tesseract`).
+pytesseract==0.3.13

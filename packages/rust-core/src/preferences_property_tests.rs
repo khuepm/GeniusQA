@@ -747,13 +747,14 @@ mod unit_tests {
     fn test_property_test_setup() {
         // Verify that our test setup works correctly
         let (manager, _temp_dir) = create_temp_preference_manager();
-        
-        // Default should be Python core
-        assert_eq!(manager.get_preferred_core(), CoreType::Python);
-        
+
+        // Default is the Rust core (see CoreType::default in preferences.rs —
+        // chosen for better performance on the macOS automation path).
+        assert_eq!(manager.get_preferred_core(), CoreType::Rust);
+
         // Should be able to create multiple managers
         let (manager2, _temp_dir2) = create_temp_preference_manager();
-        assert_eq!(manager2.get_preferred_core(), CoreType::Python);
+        assert_eq!(manager2.get_preferred_core(), CoreType::Rust);
     }
     
     #[test]

@@ -13,6 +13,29 @@ Tính năng bao gồm:
 - AI service integration để phân tích ảnh và trả về tọa độ
 - Hybrid playback logic cho cả Static và Dynamic mode
 
+### Token Optimization: Local OCR Fast Path
+
+Để tiết kiệm token (và hoạt động offline), `AIVisionService.analyze()` thử một
+bước **OCR cục bộ bằng Tesseract trước khi gọi LLM**:
+
+1. Nếu prompt chứa một text target cụ thể (ví dụ nhãn trong dấu ngoặc kép:
+   `Find the "Submit" button`), service trích xuất chuỗi `Submit`.
+2. Chạy OCR cục bộ (pytesseract) trên screenshot (đã crop theo ROI nếu có) để
+   định vị text đó. Bước này **tốn 0 token và không cần mạng**.
+3. Chỉ khi OCR cục bộ không tìm thấy với độ tin cậy đủ cao (kết hợp confidence
+   của OCR và độ khớp text), service mới fallback sang LLM (Gemini Vision).
+
+Quy tắc an toàn:
+- Bỏ qua OCR khi request có `reference_images` (ngụ ý so khớp hình ảnh, không
+  phải text).
+- pytesseract/binary `tesseract` là **optional**: nếu thiếu, `is_available()`
+  trả về False và service tự động dùng LLM (degrade gracefully).
+- Matcher cố tình bảo thủ (exact/whole-word/substring) để không click nhầm khi
+  khớp gần đúng — trường hợp mơ hồ luôn nhường cho LLM.
+
+Telemetry: `AIVisionService.local_ocr_hits` và `.llm_calls` cho phép định lượng
+lượng token tiết kiệm được. Module: `python-core/src/vision/local_ocr_service.py`.
+
 ## Architecture
 
 ### System Architecture

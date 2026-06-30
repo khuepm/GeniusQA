@@ -9,31 +9,31 @@
  * Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 // Components
+import { AIChatInterface } from '../components/AIChatInterface';
+import { OSSelector } from '../components/OSSelector';
+import { ProviderSettings } from '../components/ProviderSettings';
 import { ScriptFilter } from '../components/ScriptFilter';
 import { ScriptListItem } from '../components/ScriptListItem';
-import { AIChatInterface } from '../components/AIChatInterface';
-import { ScriptPreview } from '../components/ScriptPreview';
 import { ScriptNameDialog } from '../components/ScriptNameDialog';
-import { ProviderSettings } from '../components/ProviderSettings';
+import { ScriptPreview } from '../components/ScriptPreview';
 import { UsageStatistics } from '../components/UsageStatistics';
-import { OSSelector } from '../components/OSSelector';
 
 // Services
-import { scriptStorageService, StoredScriptInfo, ScriptFilter as ScriptFilterType, TargetOS } from '../services/scriptStorageService';
-import { unifiedAIService } from '../services/unifiedAIService';
-import { providerManager } from '../services/providerManager';
-import { validateScript } from '../services/scriptValidationService';
 import { getIPCBridge } from '../services/ipcBridgeService';
+import { providerManager } from '../services/providerManager';
+import { ScriptFilter as ScriptFilterType, scriptStorageService, StoredScriptInfo, TargetOS } from '../services/scriptStorageService';
+import { validateScript } from '../services/scriptValidationService';
+import { unifiedAIService } from '../services/unifiedAIService';
 
 // Types
-import { ScriptData, ValidationResult, Action } from '../types/aiScriptBuilder.types';
+import { open, save } from '@tauri-apps/api/dialog';
+import { Action, ScriptData, ValidationResult } from '../types/aiScriptBuilder.types';
 import { AIProvider, ProviderInfo, ProviderModel, SessionStatistics } from '../types/providerAdapter.types';
-import { save, open } from '@tauri-apps/api/dialog';
 
 import './UnifiedScriptManager.css';
 
@@ -349,7 +349,7 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
 
   /**
    * Handle actual script save with name
-   * Requirements: 10.5
+   * Requirements: 10.5, 7.3, 8.6
    */
   const handleSaveWithName = useCallback(async (scriptName: string) => {
     if (!generatedScript) {
@@ -361,7 +361,7 @@ const UnifiedScriptManager: React.FC<UnifiedScriptManagerProps> = ({
     setSaveError(null);
 
     try {
-      const result = await scriptStorageService.saveScript(generatedScript, scriptName);
+      const result = await scriptStorageService.saveScript(generatedScript, scriptName, targetOS);
 
       if (result.success) {
         console.log('[UnifiedScriptManager] Script saved successfully:', result.scriptPath);

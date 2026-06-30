@@ -7,31 +7,30 @@
  * Requirements: 4.3, 5.5, 5.6, 6.5, 9.1, 9.4
  */
 
-import { getIPCBridge } from './ipcBridgeService';
-import { ScriptData, Action } from '../types/aiScriptBuilder.types';
-import { 
-  AIVisionCaptureAction, 
-  InteractionType, 
-  SearchScope,
+import { Action, ScriptData } from '../types/aiScriptBuilder.types';
+import {
+    AIVisionCaptureAction,
+    InteractionType,
+    SearchScope,
 } from '../types/aiVisionCapture.types';
-import { toPosixPath } from './assetManager';
-import { 
-  TestScript, 
-  TestStep, 
-  ActionWithId, 
-  EnhancedScriptMetadata,
-  MigrationResult 
+import {
+    ActionWithId,
+    MigrationResult,
+    TestScript,
+    TestStep
 } from '../types/testCaseDriven.types';
-import { TestScriptMigrationService } from './testScriptMigrationService';
-import { 
-  validateTestScript as validateTestScriptStructure, 
-  repairTestScript, 
-  createFallbackScript,
-  formatStepErrors,
-  canSafelyLoadScript,
-  StepValidationResult,
-  RecoveryResult,
+import {
+    canSafelyLoadScript,
+    createFallbackScript,
+    formatStepErrors,
+    RecoveryResult,
+    repairTestScript,
+    StepValidationResult,
+    validateTestScript as validateTestScriptStructure,
 } from '../utils/stepErrorHandling';
+import { toPosixPath } from './assetManager';
+import { getIPCBridge } from './ipcBridgeService';
+import { TestScriptMigrationService } from './testScriptMigrationService';
 
 /**
  * Extended action type that includes AI Vision Capture actions
@@ -126,9 +125,16 @@ export function generateScriptPath(scriptName: string): string {
  * Ensures all required fields are present and properly formatted
  * @param script - The script data to prepare
  * @param scriptName - The name for the script
+ * @param targetOS - The target operating system for the script (optional)
  * @returns Prepared script data
+ * 
+ * Requirements: 7.3, 8.6
  */
-export function prepareScriptForSave(script: ScriptData, scriptName: string): ScriptData {
+export function prepareScriptForSave(
+  script: ScriptData, 
+  scriptName: string,
+  targetOS?: TargetOS
+): ScriptData {
   const now = new Date().toISOString();
   
   return {
@@ -143,8 +149,10 @@ export function prepareScriptForSave(script: ScriptData, scriptName: string): Sc
       additional_data: {
         ...script.metadata.additional_data,
         script_name: scriptName,
+        source: 'ai_generated',
         generated_by: 'ai_script_builder',
         generated_at: now,
+        ...(targetOS && { target_os: targetOS }),
       },
     },
   };
@@ -249,14 +257,19 @@ class ScriptStorageService {
    * 
    * @param script - The script data to save
    * @param scriptName - The name for the script
+   * @param targetOS - The target operating system for the script (optional)
    * @returns Result of the save operation
    * 
-   * Requirements: 5.5
+   * Requirements: 5.5, 7.3, 8.6
    */
-  async saveScript(script: ScriptData, scriptName: string): Promise<ScriptSaveResult> {
+  async saveScript(
+    script: ScriptData, 
+    scriptName: string,
+    targetOS?: TargetOS
+  ): Promise<ScriptSaveResult> {
     try {
-      // Prepare the script data
-      const preparedScript = prepareScriptForSave(script, scriptName);
+      // Prepare the script data with AI metadata
+      const preparedScript = prepareScriptForSave(script, scriptName, targetOS);
       
       // Generate the filename
       const filename = generateScriptPath(scriptName);
@@ -279,6 +292,8 @@ class ScriptStorageService {
         scriptPath,
         actionCount: processedScript.actions.length,
         hasVisionActions,
+        source: 'ai_generated',
+        targetOS: targetOS || 'not specified',
       });
 
       // Ensure assets folder exists if there are vision actions
@@ -1675,5 +1690,6 @@ export default scriptStorageService;
 
 // Export additional utility functions for external use
 export {
-  TestScriptMigrationService,
+    TestScriptMigrationService
 };
+

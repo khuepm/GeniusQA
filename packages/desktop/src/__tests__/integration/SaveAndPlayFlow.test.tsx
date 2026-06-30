@@ -5,17 +5,17 @@
  * Requirements: 7.1, 7.2, 7.3, 7.4, 7.5
  */
 
-import { ScriptData } from '../../types/aiScriptBuilder.types';
 import {
-  validateScriptName,
-  generateFilename,
   generateDefaultName,
+  generateFilename,
+  validateScriptName,
 } from '../../components/ScriptNameDialog';
 import {
   generateScriptPath,
   prepareScriptForSave,
 } from '../../services/scriptStorageService';
 import { validateScript } from '../../services/scriptValidationService';
+import { ScriptData } from '../../types/aiScriptBuilder.types';
 
 /**
  * Helper to create a valid AI-generated test script
@@ -231,6 +231,74 @@ describe('Save and Play Flow Integration Tests', () => {
 
       expect(prepared.metadata.screen_resolution).toEqual([1920, 1080]);
       expect(prepared.metadata.platform).toBe('windows');
+    });
+
+    /**
+     * Test: Metadata includes source='ai_generated'
+     * Requirements: 7.3
+     */
+    it('should add source=ai_generated to metadata', () => {
+      const script = createAIGeneratedScript();
+      const prepared = prepareScriptForSave(script, 'Test Script');
+
+      expect(prepared.metadata.additional_data?.source).toBe('ai_generated');
+    });
+
+    /**
+     * Test: Metadata includes target_os when provided
+     * Requirements: 8.6
+     */
+    it('should add target_os to metadata when provided', () => {
+      const script = createAIGeneratedScript();
+      const prepared = prepareScriptForSave(script, 'Test Script', 'macos');
+
+      expect(prepared.metadata.additional_data?.target_os).toBe('macos');
+    });
+
+    /**
+     * Test: Metadata works without target_os
+     * Requirements: 8.6
+     */
+    it('should work without target_os when not provided', () => {
+      // Create a script without target_os in the original metadata
+      const script: ScriptData = {
+        version: '1.0',
+        metadata: {
+          created_at: new Date().toISOString(),
+          duration: 5000,
+          action_count: 2,
+          core_type: 'ai_generated',
+          platform: 'macos',
+        },
+        actions: [
+          { type: 'mouse_click', timestamp: 0, x: 100, y: 200, button: 'left' },
+          { type: 'wait', timestamp: 1000 },
+        ],
+      };
+
+      const prepared = prepareScriptForSave(script, 'Test Script');
+
+      expect(prepared.metadata.additional_data?.source).toBe('ai_generated');
+      expect(prepared.metadata.additional_data?.generated_at).toBeDefined();
+      // target_os should not be present if not provided
+      expect(prepared.metadata.additional_data?.target_os).toBeUndefined();
+    });
+
+    /**
+     * Test: Metadata includes all target_os options
+     * Requirements: 8.6
+     */
+    it('should support all target_os options', () => {
+      const script = createAIGeneratedScript();
+
+      const macOS = prepareScriptForSave(script, 'Test', 'macos');
+      expect(macOS.metadata.additional_data?.target_os).toBe('macos');
+
+      const windows = prepareScriptForSave(script, 'Test', 'windows');
+      expect(windows.metadata.additional_data?.target_os).toBe('windows');
+
+      const universal = prepareScriptForSave(script, 'Test', 'universal');
+      expect(universal.metadata.additional_data?.target_os).toBe('universal');
     });
   });
 
