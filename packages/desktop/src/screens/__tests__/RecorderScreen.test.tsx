@@ -16,6 +16,23 @@ jest.mock('../../services/ipcBridgeService', () => ({
   resetIPCBridge: jest.fn(),
 }));
 
+// Mock Tauri APIs used directly by RecorderScreen and ClickCursorOverlay so the
+// component can render/operate without a real Tauri runtime.
+jest.mock('@tauri-apps/api/tauri', () => ({
+  invoke: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('@tauri-apps/api/event', () => ({
+  listen: jest.fn().mockResolvedValue(jest.fn()),
+}));
+
+// The screen enriches the script list via scriptStorageService; stub it so the
+// async script loading during init resolves cleanly.
+jest.mock('../../services/scriptStorageService', () => ({
+  scriptStorageService: {
+    listScripts: jest.fn().mockResolvedValue([]),
+  },
+}));
+
 // Mock react-router-dom navigate
 const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
@@ -76,11 +93,14 @@ describe('RecorderScreen', () => {
   };
 
   describe('Initial Rendering', () => {
-    it('should render the component with title', () => {
+    it('should render the component with its main sections', () => {
       const { getByText } = renderWithRouter(<RecorderScreen />);
 
-      expect(getByText('GeniusQA Recorder')).toBeInTheDocument();
-      expect(getByText('Record and replay desktop interactions')).toBeInTheDocument();
+      // The header title/subtitle were removed; assert the current top-level
+      // sections that the screen renders instead.
+      expect(getByText('Controls')).toBeInTheDocument();
+      expect(getByText('Information')).toBeInTheDocument();
+      expect(getByText('Status')).toBeInTheDocument();
     });
 
     it('should display idle status initially', () => {
@@ -169,10 +189,11 @@ describe('RecorderScreen', () => {
 
       const { getByText } = renderWithRouter(<RecorderScreen />);
 
+      // Wait until the Start button is enabled (recordings loaded) before clicking.
       await waitFor(() => {
-        const startButton = getByText('Start Playback').closest('button');
-        fireEvent.click(startButton!);
+        expect(getByText('Start Playback').closest('button')).not.toBeDisabled();
       });
+      fireEvent.click(getByText('Start Playback').closest('button')!);
 
       await waitFor(() => {
         expect(getByText('Playing')).toBeInTheDocument();
@@ -202,9 +223,9 @@ describe('RecorderScreen', () => {
       const { getByText } = renderWithRouter(<RecorderScreen />);
 
       await waitFor(() => {
-        const startButton = getByText('Start Playback').closest('button');
-        fireEvent.click(startButton!);
+        expect(getByText('Start Playback').closest('button')).not.toBeDisabled();
       });
+      fireEvent.click(getByText('Start Playback').closest('button')!);
 
       await waitFor(() => {
         expect(getByText('Playback failed')).toBeInTheDocument();
@@ -253,9 +274,9 @@ describe('RecorderScreen', () => {
       const { getByText } = renderWithRouter(<RecorderScreen />);
 
       await waitFor(() => {
-        const startButton = getByText('Start Playback').closest('button');
-        fireEvent.click(startButton!);
+        expect(getByText('Start Playback').closest('button')).not.toBeDisabled();
       });
+      fireEvent.click(getByText('Start Playback').closest('button')!);
 
       await waitFor(() => {
         expect(mockIPCBridge.startPlayback).toHaveBeenCalled();
@@ -288,11 +309,11 @@ describe('RecorderScreen', () => {
 
       const { getByText } = renderWithRouter(<RecorderScreen />);
 
-      // Start playback
+      // Start playback (wait until the button is enabled, then click)
       await waitFor(() => {
-        const startButton = getByText('Start Playback').closest('button');
-        fireEvent.click(startButton!);
+        expect(getByText('Start Playback').closest('button')).not.toBeDisabled();
       });
+      fireEvent.click(getByText('Start Playback').closest('button')!);
 
       await waitFor(() => {
         expect(getByText('Playing')).toBeInTheDocument();

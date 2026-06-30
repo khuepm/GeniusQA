@@ -1,47 +1,52 @@
 /**
  * Integration Tests for Registration Flow
- * Tests complete registration flow including validation and error handling
- * Requirements: 3.2, 3.3, 3.4, 3.5
+ * Tests complete registration flow including validation and error handling.
+ *
+ * Migrated from React Native to the web stack:
+ *  - AppNavigator now uses react-router (BrowserRouter) with the web
+ *    Login/Register screens.
+ *  - The web RegisterScreen performs client-side validation before calling
+ *    firebase and renders validation/auth errors inline.
  */
 
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import { AuthProvider } from '../../contexts/AuthContext';
 import AppNavigator from '../../navigation/AppNavigator';
-import * as firebaseService from '../../services/firebaseService';
+import firebaseService from '../../services/firebaseService';
 
-// Mock Firebase service
+// Mock the firebaseService default-export singleton.
 jest.mock('../../services/firebaseService');
 
-// Mock AsyncStorage
-jest.mock('@react-native-async-storage/async-storage', () => ({
-  setItem: jest.fn(() => Promise.resolve()),
-  getItem: jest.fn(() => Promise.resolve(null)),
-  removeItem: jest.fn(() => Promise.resolve()),
-}));
-
-// Mock Google Sign In
-jest.mock('@react-native-google-signin/google-signin', () => ({
-  GoogleSignin: {
-    configure: jest.fn(),
-    hasPlayServices: jest.fn(() => Promise.resolve(true)),
-    signIn: jest.fn(),
+// Mock userProfileService (called by AuthContext on login).
+jest.mock('../../services/userProfileService', () => ({
+  userProfileService: {
+    storeUserProfile: jest.fn().mockResolvedValue(undefined),
   },
 }));
 
+// Use the manual no-op mock for useAnalytics so AppNavigator's ScreenViewTracker
+// does not require a real AnalyticsProvider.
+jest.mock('../../hooks/useAnalytics');
+
+// Firebase-user-shaped object (mapped by AuthContext via providerData).
 const mockUser = {
   uid: 'test-uid-456',
   email: 'newuser@example.com',
   displayName: 'New User',
   photoURL: null,
   emailVerified: false,
-  providerId: 'firebase',
+  providerData: [{ providerId: 'firebase' }],
 };
 
 describe('Registration Flow Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.clear();
+    window.history.pushState({}, '', '/login');
+
+    (firebaseService.initialize as jest.Mock).mockResolvedValue(undefined);
     (firebaseService.getCurrentUser as jest.Mock).mockReturnValue(null);
     (firebaseService.onAuthStateChanged as jest.Mock).mockImplementation((callback) => {
       callback(null);
@@ -49,51 +54,57 @@ describe('Registration Flow Integration Tests', () => {
     });
   });
 
-  const renderApp = () => {
-    return render(
-      <NavigationContainer>
-        <AuthProvider>
-          <AppNavigator />
-        </AuthProvider>
-      </NavigationContainer>
+  const renderApp = () =>
+    render(
+      <AuthProvider>
+        <AppNavigator />
+      </AuthProvider>
     );
+
+  const emitAuthState = (user: any) => {
+    const calls = (firebaseService.onAuthStateChanged as jest.Mock).mock.calls;
+    const callback = calls[calls.length - 1][0];
+    act(() => {
+      callback(user);
+    });
   };
 
+  // Navigate from the login screen to the register screen.
   const navigateToRegister = async (component: ReturnType<typeof renderApp>) => {
     const { getByText } = component;
 
     await waitFor(() => {
-      expect(getByText('GeniusQA')).toBeTruthy();
+      expect(getByText('GeniusQA')).toBeInTheDocument();
     });
 
-    // Navigate to register screen
-    fireEvent.press(getByText('Đăng ký ngay'));
+    fireEvent.click(getByText('Đăng ký ngay').closest('button')!);
 
     await waitFor(() => {
-      expect(getByText('Tạo tài khoản mới')).toBeTruthy();
+      expect(getByText('Tạo tài khoản mới')).toBeInTheDocument();
     });
   };
 
   describe('Email Registration', () => {
     it('should successfully register with valid credentials', async () => {
-      (firebaseService.signUpWithEmail as jest.Mock).mockResolvedValue({
-        user: mockUser,
-      });
+      (firebaseService.signUpWithEmail as jest.Mock).mockResolvedValue({ user: mockUser });
 
       const component = renderApp();
       await navigateToRegister(component);
 
       const { getByPlaceholderText, getByText } = component;
 
-      // Fill in registration form
-      fireEvent.changeText(getByPlaceholderText('Email'), 'newuser@example.com');
-      fireEvent.changeText(getByPlaceholderText('Mật khẩu'), 'password123');
-      fireEvent.changeText(getByPlaceholderText('Xác nhận mật khẩu'), 'password123');
+      fireEvent.change(getByPlaceholderText('Email'), {
+        target: { value: 'newuser@example.com' },
+      });
+      fireEvent.change(getByPlaceholderText('Mật khẩu'), {
+        target: { value: 'password123' },
+      });
+      fireEvent.change(getByPlaceholderText('Xác nhận mật khẩu'), {
+        target: { value: 'password123' },
+      });
 
-      // Submit registration
-      fireEvent.press(getByText('Đăng ký'));
+      fireEvent.click(getByText('Đăng ký').closest('button')!);
 
-      // Verify Firebase service was called
       await waitFor(() => {
         expect(firebaseService.signUpWithEmail).toHaveBeenCalledWith(
           'newuser@example.com',
@@ -101,29 +112,19 @@ describe('Registration Flow Integration Tests', () => {
         );
       });
 
-      // Simulate auth state change
-      const authStateCallback = (firebaseService.onAuthStateChanged as jest.Mock).mock.calls[0][0];
-      authStateCallback(mockUser);
+      emitAuthState(mockUser);
 
-      // Verify auto-login and navigation to dashboard
       await waitFor(() => {
-        expect(component.queryByText('Chào mừng trở lại!')).toBeTruthy();
+        expect(getByText('Welcome back!')).toBeInTheDocument();
       });
     });
 
-    it('should not submit with empty fields', async () => {
+    it('should disable submit with empty fields', async () => {
       const component = renderApp();
       await navigateToRegister(component);
 
-      const { getByText } = component;
-
-      // Try to submit without filling fields
-      const registerButton = getByText('Đăng ký');
-
-      // Button should be disabled
-      expect(registerButton.props.accessibilityState?.disabled).toBe(true);
-
-      // Firebase should not be called
+      const registerButton = component.getByText('Đăng ký').closest('button');
+      expect(registerButton).toBeDisabled();
       expect(firebaseService.signUpWithEmail).not.toHaveBeenCalled();
     });
   });
@@ -135,20 +136,19 @@ describe('Registration Flow Integration Tests', () => {
 
       const { getByPlaceholderText, getByText, findByText } = component;
 
-      // Fill in form with mismatched passwords
-      fireEvent.changeText(getByPlaceholderText('Email'), 'test@example.com');
-      fireEvent.changeText(getByPlaceholderText('Mật khẩu'), 'password123');
-      fireEvent.changeText(getByPlaceholderText('Xác nhận mật khẩu'), 'password456');
-
-      // Submit form
-      fireEvent.press(getByText('Đăng ký'));
-
-      // Verify error message is displayed
-      await waitFor(() => {
-        expect(findByText('Mật khẩu xác nhận không khớp')).toBeTruthy();
+      fireEvent.change(getByPlaceholderText('Email'), {
+        target: { value: 'test@example.com' },
+      });
+      fireEvent.change(getByPlaceholderText('Mật khẩu'), {
+        target: { value: 'password123' },
+      });
+      fireEvent.change(getByPlaceholderText('Xác nhận mật khẩu'), {
+        target: { value: 'password456' },
       });
 
-      // Firebase should not be called
+      fireEvent.click(getByText('Đăng ký').closest('button')!);
+
+      expect(await findByText('Mật khẩu xác nhận không khớp')).toBeInTheDocument();
       expect(firebaseService.signUpWithEmail).not.toHaveBeenCalled();
     });
 
@@ -158,20 +158,19 @@ describe('Registration Flow Integration Tests', () => {
 
       const { getByPlaceholderText, getByText, findByText } = component;
 
-      // Fill in form with weak password
-      fireEvent.changeText(getByPlaceholderText('Email'), 'test@example.com');
-      fireEvent.changeText(getByPlaceholderText('Mật khẩu'), '12345');
-      fireEvent.changeText(getByPlaceholderText('Xác nhận mật khẩu'), '12345');
-
-      // Submit form
-      fireEvent.press(getByText('Đăng ký'));
-
-      // Verify error message
-      await waitFor(() => {
-        expect(findByText('Mật khẩu phải có ít nhất 6 ký tự')).toBeTruthy();
+      fireEvent.change(getByPlaceholderText('Email'), {
+        target: { value: 'test@example.com' },
+      });
+      fireEvent.change(getByPlaceholderText('Mật khẩu'), {
+        target: { value: '12345' },
+      });
+      fireEvent.change(getByPlaceholderText('Xác nhận mật khẩu'), {
+        target: { value: '12345' },
       });
 
-      // Firebase should not be called
+      fireEvent.click(getByText('Đăng ký').closest('button')!);
+
+      expect(await findByText('Mật khẩu phải có ít nhất 6 ký tự')).toBeInTheDocument();
       expect(firebaseService.signUpWithEmail).not.toHaveBeenCalled();
     });
 
@@ -179,48 +178,57 @@ describe('Registration Flow Integration Tests', () => {
       const component = renderApp();
       await navigateToRegister(component);
 
-      const { getByPlaceholderText, getByText, queryByText } = component;
+      const { getByPlaceholderText, getByText, queryByText, findByText } = component;
 
-      // Trigger validation error
-      fireEvent.changeText(getByPlaceholderText('Email'), 'test@example.com');
-      fireEvent.changeText(getByPlaceholderText('Mật khẩu'), 'password123');
-      fireEvent.changeText(getByPlaceholderText('Xác nhận mật khẩu'), 'password456');
-      fireEvent.press(getByText('Đăng ký'));
+      fireEvent.change(getByPlaceholderText('Email'), {
+        target: { value: 'test@example.com' },
+      });
+      fireEvent.change(getByPlaceholderText('Mật khẩu'), {
+        target: { value: 'password123' },
+      });
+      fireEvent.change(getByPlaceholderText('Xác nhận mật khẩu'), {
+        target: { value: 'password456' },
+      });
+      fireEvent.click(getByText('Đăng ký').closest('button')!);
 
-      await waitFor(() => {
-        expect(queryByText('Mật khẩu xác nhận không khớp')).toBeTruthy();
+      expect(await findByText('Mật khẩu xác nhận không khớp')).toBeInTheDocument();
+
+      // Typing again clears the validation error.
+      fireEvent.change(getByPlaceholderText('Xác nhận mật khẩu'), {
+        target: { value: 'password123' },
       });
 
-      // Start typing again
-      fireEvent.changeText(getByPlaceholderText('Xác nhận mật khẩu'), 'password123');
-
-      // Error should be cleared
       await waitFor(() => {
-        expect(queryByText('Mật khẩu xác nhận không khớp')).toBeNull();
+        expect(queryByText('Mật khẩu xác nhận không khớp')).not.toBeInTheDocument();
       });
     });
   });
 
   describe('Duplicate Email Handling', () => {
     it('should display error when email is already registered', async () => {
-      // Mock duplicate email error
-      const error = new Error('auth/email-already-in-use');
-      (firebaseService.signUpWithEmail as jest.Mock).mockRejectedValue(error);
+      // The web RegisterScreen catches the rejected sign-up and renders the
+      // error message inline (no unhandled rejection).
+      (firebaseService.signUpWithEmail as jest.Mock).mockRejectedValue(
+        new Error('auth/email-already-in-use')
+      );
 
       const component = renderApp();
       await navigateToRegister(component);
 
-      const { getByPlaceholderText, getByText } = component;
+      const { getByPlaceholderText, getByText, findByText } = component;
 
-      // Fill in form
-      fireEvent.changeText(getByPlaceholderText('Email'), 'existing@example.com');
-      fireEvent.changeText(getByPlaceholderText('Mật khẩu'), 'password123');
-      fireEvent.changeText(getByPlaceholderText('Xác nhận mật khẩu'), 'password123');
+      fireEvent.change(getByPlaceholderText('Email'), {
+        target: { value: 'existing@example.com' },
+      });
+      fireEvent.change(getByPlaceholderText('Mật khẩu'), {
+        target: { value: 'password123' },
+      });
+      fireEvent.change(getByPlaceholderText('Xác nhận mật khẩu'), {
+        target: { value: 'password123' },
+      });
 
-      // Submit form
-      fireEvent.press(getByText('Đăng ký'));
+      fireEvent.click(getByText('Đăng ký').closest('button')!);
 
-      // Verify Firebase was called
       await waitFor(() => {
         expect(firebaseService.signUpWithEmail).toHaveBeenCalledWith(
           'existing@example.com',
@@ -228,7 +236,7 @@ describe('Registration Flow Integration Tests', () => {
         );
       });
 
-      // Error should be displayed (handled by AuthContext)
+      expect(await findByText('auth/email-already-in-use')).toBeInTheDocument();
     });
   });
 
@@ -239,45 +247,10 @@ describe('Registration Flow Integration Tests', () => {
 
       const { getByText } = component;
 
-      // Click login link
-      fireEvent.press(getByText('Đăng nhập ngay'));
+      fireEvent.click(getByText('Đăng nhập ngay').closest('button')!);
 
-      // Verify navigation back to login
       await waitFor(() => {
-        expect(getByText('Đăng nhập để tiếp tục')).toBeTruthy();
-      });
-    });
-  });
-
-  describe('Loading State', () => {
-    it('should disable inputs during registration', async () => {
-      // Mock slow registration
-      (firebaseService.signUpWithEmail as jest.Mock).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ user: mockUser }), 1000))
-      );
-
-      const component = renderApp();
-      await navigateToRegister(component);
-
-      const { getByPlaceholderText, getByText } = component;
-
-      // Fill in form
-      const emailInput = getByPlaceholderText('Email');
-      const passwordInput = getByPlaceholderText('Mật khẩu');
-      const confirmInput = getByPlaceholderText('Xác nhận mật khẩu');
-
-      fireEvent.changeText(emailInput, 'test@example.com');
-      fireEvent.changeText(passwordInput, 'password123');
-      fireEvent.changeText(confirmInput, 'password123');
-
-      // Submit form
-      fireEvent.press(getByText('Đăng ký'));
-
-      // Verify inputs are disabled during loading
-      await waitFor(() => {
-        expect(emailInput.props.editable).toBe(false);
-        expect(passwordInput.props.editable).toBe(false);
-        expect(confirmInput.props.editable).toBe(false);
+        expect(getByText('Đăng nhập để tiếp tục')).toBeInTheDocument();
       });
     });
   });

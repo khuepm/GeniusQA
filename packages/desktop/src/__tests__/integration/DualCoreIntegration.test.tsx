@@ -1,745 +1,270 @@
 /**
  * Dual-Core Integration Tests
- * Tests complete workflow from core selection to automation execution
- * Validates cross-platform compatibility, error handling, and fallback scenarios
- * Requirements: All requirements (1.1-10.5)
+ *
+ * NOTE (2026 rewrite): The dual-core (Python/Rust) selector feature these tests
+ * originally targeted has been removed from RecorderScreen. The component now
+ * forces the Rust core only (see RecorderScreen.tsx `initializeCoreStatus`) and
+ * the <CoreSelector> render is commented out, so there is no `core-selector` /
+ * `core-option-*` UI, no runtime `selectCore`/`getAvailableCores`/`getCoreStatus`
+ * calls, and no fallback / performance-recommendation behaviour.
+ *
+ * The component is also plain web React (Testing Library `fireEvent.click`,
+ * `getByText`), not React Native (`fireEvent.press`, `.props.accessibilityState`).
+ *
+ * These tests have been rewritten to validate the CURRENT recording / playback /
+ * error-handling behaviour. Tests that asserted genuinely-removed dual-core
+ * functionality are `it.skip`-ed with a reason.
  */
 
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react';
+import { render, fireEvent, waitFor, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import RecorderScreen from '../../screens/RecorderScreen';
 import * as ipcBridgeService from '../../services/ipcBridgeService';
 
-// Mock IPC Bridge Service
+// Mock IPC Bridge Service (manual mock at src/services/__mocks__/ipcBridgeService.ts)
 jest.mock('../../services/ipcBridgeService');
+// RecorderScreen + ClickCursorOverlay talk to Tauri directly.
+jest.mock('@tauri-apps/api/tauri', () => ({ invoke: jest.fn() }));
+jest.mock('@tauri-apps/api/event', () => ({ listen: jest.fn().mockResolvedValue(jest.fn()) }));
+
+const renderScreen = () =>
+  render(
+    <MemoryRouter>
+      <RecorderScreen />
+    </MemoryRouter>
+  );
 
 describe('Dual-Core Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Sensible defaults; individual tests override as needed.
+    (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(false);
+    (ipcBridgeService.getLatestRecording as jest.Mock).mockResolvedValue(null);
+    (ipcBridgeService.listScripts as jest.Mock).mockResolvedValue([]);
+    (ipcBridgeService.startRecording as jest.Mock).mockResolvedValue(undefined);
+    (ipcBridgeService.stopRecording as jest.Mock).mockResolvedValue({
+      success: true,
+      scriptPath: '/path/to/script.json',
+      actionCount: 10,
+      duration: 5.0,
+    });
+    (ipcBridgeService.startPlayback as jest.Mock).mockResolvedValue(undefined);
+    (ipcBridgeService.stopPlayback as jest.Mock).mockResolvedValue(undefined);
   });
 
   describe('Core Selection and Switching', () => {
-    it('should successfully switch between Python and Rust cores', async () => {
-      // Mock both cores available
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue(['python', 'rust']);
-      (ipcBridgeService.getCoreStatus as jest.Mock).mockResolvedValue({
-        activeCoreType: 'python',
-        availableCores: ['python', 'rust'],
-        coreHealth: { python: true, rust: true }
-      });
-      (ipcBridgeService.selectCore as jest.Mock).mockResolvedValue(undefined);
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(false);
+    // Removed feature: runtime Python/Rust core selector UI.
+    it.skip('should successfully switch between Python and Rust cores (REMOVED: dual-core selector)', () => {});
+    it.skip('should handle core switching during active recording (REMOVED: dual-core selector)', () => {});
+    it.skip('should handle core switching during active playback (REMOVED: dual-core selector)', () => {});
 
-      const { getByTestId, getByText } = render(<RecorderScreen />);
-
-      // Wait for initial load
+    it('forces the Rust core only (no core selector rendered)', async () => {
+      renderScreen();
       await waitFor(() => {
-        expect(getByText('Record')).toBeTruthy();
+        expect(screen.getByText('Record')).toBeInTheDocument();
       });
-
-      // Verify core selector is present
-      const coreSelector = getByTestId('core-selector');
-      expect(coreSelector).toBeTruthy();
-
-      // Switch to Rust core
-      const rustOption = getByTestId('core-option-rust');
-      fireEvent.press(rustOption);
-
-      // Verify core selection was called
-      await waitFor(() => {
-        expect(ipcBridgeService.selectCore).toHaveBeenCalledWith('rust');
-      });
-
-      // Switch back to Python core
-      const pythonOption = getByTestId('core-option-python');
-      fireEvent.press(pythonOption);
-
-      await waitFor(() => {
-        expect(ipcBridgeService.selectCore).toHaveBeenCalledWith('python');
-      });
-    });
-
-    it('should handle core switching during active recording', async () => {
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue(['python', 'rust']);
-      (ipcBridgeService.getCoreStatus as jest.Mock).mockResolvedValue({
-        activeCoreType: 'python',
-        availableCores: ['python', 'rust'],
-        coreHealth: { python: true, rust: true }
-      });
-      (ipcBridgeService.startRecording as jest.Mock).mockResolvedValue(undefined);
-      (ipcBridgeService.stopRecording as jest.Mock).mockResolvedValue({
-        success: true,
-        scriptPath: '/path/to/script.json',
-        actionCount: 10,
-        duration: 5.0
-      });
-      (ipcBridgeService.selectCore as jest.Mock).mockResolvedValue(undefined);
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(false);
-
-      const { getByTestId, getByText } = render(<RecorderScreen />);
-
-      await waitFor(() => {
-        expect(getByText('Record')).toBeTruthy();
-      });
-
-      // Start recording
-      fireEvent.press(getByText('Record'));
-      await waitFor(() => {
-        expect(ipcBridgeService.startRecording).toHaveBeenCalled();
-      });
-
-      // Try to switch cores during recording - should be disabled
-      const rustOption = getByTestId('core-option-rust');
-      expect(rustOption).toBeDisabled();
-
-      // Stop recording
-      fireEvent.press(getByText('Stop'));
-      await waitFor(() => {
-        expect(ipcBridgeService.stopRecording).toHaveBeenCalled();
-      });
-
-      // Core switching should be enabled again
-      await waitFor(() => {
-        expect(rustOption.props.accessibilityState?.disabled).toBe(false);
-      });
-    });
-
-    it('should handle core switching during active playback', async () => {
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue(['python', 'rust']);
-      (ipcBridgeService.getCoreStatus as jest.Mock).mockResolvedValue({
-        activeCoreType: 'python',
-        availableCores: ['python', 'rust'],
-        coreHealth: { python: true, rust: true }
-      });
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(true);
-      (ipcBridgeService.startPlayback as jest.Mock).mockResolvedValue(undefined);
-      (ipcBridgeService.stopPlayback as jest.Mock).mockResolvedValue(undefined);
-      (ipcBridgeService.selectCore as jest.Mock).mockResolvedValue(undefined);
-
-      const { getByTestId, getByText } = render(<RecorderScreen />);
-
-      await waitFor(() => {
-        expect(getByText('Start')).toBeTruthy();
-      });
-
-      // Start playback
-      fireEvent.press(getByText('Start'));
-      await waitFor(() => {
-        expect(ipcBridgeService.startPlayback).toHaveBeenCalled();
-      });
-
-      // Try to switch cores during playback - should be disabled
-      const rustOption = getByTestId('core-option-rust');
-      expect(rustOption.props.accessibilityState?.disabled).toBe(true);
-
-      // Stop playback
-      fireEvent.press(getByText('Stop'));
-      await waitFor(() => {
-        expect(ipcBridgeService.stopPlayback).toHaveBeenCalled();
-      });
-
-      // Core switching should be enabled again
-      await waitFor(() => {
-        expect(rustOption.props.accessibilityState?.disabled).toBe(false);
-      });
+      // Core selector UI has been removed.
+      expect(screen.queryByTestId('core-selector')).toBeNull();
+      // Core APIs are no longer invoked from the UI.
+      expect(ipcBridgeService.selectCore).not.toHaveBeenCalled();
+      expect(ipcBridgeService.getAvailableCores).not.toHaveBeenCalled();
     });
   });
 
-  describe('Cross-Core Script File Compatibility', () => {
-    it('should play recordings created with Python core using Rust core', async () => {
-      // Mock Python recording creation
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue(['python', 'rust']);
-      (ipcBridgeService.getCoreStatus as jest.Mock)
-        .mockResolvedValueOnce({
-          activeCoreType: 'python',
-          availableCores: ['python', 'rust'],
-          coreHealth: { python: true, rust: true }
-        })
-        .mockResolvedValueOnce({
-          activeCoreType: 'rust',
-          availableCores: ['python', 'rust'],
-          coreHealth: { python: true, rust: true }
-        });
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(false);
-      (ipcBridgeService.startRecording as jest.Mock).mockResolvedValue(undefined);
-      (ipcBridgeService.stopRecording as jest.Mock).mockResolvedValue({
-        success: true,
-        scriptPath: '/path/to/python_script.json',
-        actionCount: 15,
-        duration: 8.0
-      });
-      (ipcBridgeService.selectCore as jest.Mock).mockResolvedValue(undefined);
-      (ipcBridgeService.startPlayback as jest.Mock).mockResolvedValue(undefined);
-
-      const { getByTestId, getByText } = render(<RecorderScreen />);
+  describe('Recording and Playback Workflow', () => {
+    it('records and stops a recording', async () => {
+      renderScreen();
 
       await waitFor(() => {
-        expect(getByText('Record')).toBeTruthy();
+        expect(screen.getByText('Record')).toBeInTheDocument();
       });
 
-      // Record with Python core
-      fireEvent.press(getByText('Record'));
+      fireEvent.click(screen.getByText('Record'));
       await waitFor(() => {
         expect(ipcBridgeService.startRecording).toHaveBeenCalled();
       });
+      expect(screen.getByText(/Recording in Progress/i)).toBeInTheDocument();
 
-      fireEvent.press(getByText('Stop'));
+      fireEvent.click(screen.getByText('Stop Recording'));
       await waitFor(() => {
         expect(ipcBridgeService.stopRecording).toHaveBeenCalled();
       });
+    });
 
-      // Switch to Rust core
-      const rustOption = getByTestId('core-option-rust');
-      fireEvent.press(rustOption);
+    it('starts playback for an existing recording', async () => {
+      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(true);
+      (ipcBridgeService.getLatestRecording as jest.Mock).mockResolvedValue('/path/to/script.json');
+
+      renderScreen();
+
+      // Wait for the async initialize() to enable playback once recordings load.
       await waitFor(() => {
-        expect(ipcBridgeService.selectCore).toHaveBeenCalledWith('rust');
+        expect(screen.getByText('Start Playback').closest('button')).not.toBeDisabled();
       });
 
-      // Mock that recordings are now available
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(true);
-
-      // Try to play the Python-created recording with Rust core
-      fireEvent.press(getByText('Start'));
+      fireEvent.click(screen.getByText('Start Playback'));
       await waitFor(() => {
         expect(ipcBridgeService.startPlayback).toHaveBeenCalled();
       });
     });
 
-    it('should play recordings created with Rust core using Python core', async () => {
-      // Mock Rust recording creation
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue(['python', 'rust']);
-      (ipcBridgeService.getCoreStatus as jest.Mock)
-        .mockResolvedValueOnce({
-          activeCoreType: 'rust',
-          availableCores: ['python', 'rust'],
-          coreHealth: { python: true, rust: true }
-        })
-        .mockResolvedValueOnce({
-          activeCoreType: 'python',
-          availableCores: ['python', 'rust'],
-          coreHealth: { python: true, rust: true }
-        });
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(false);
-      (ipcBridgeService.startRecording as jest.Mock).mockResolvedValue(undefined);
-      (ipcBridgeService.stopRecording as jest.Mock).mockResolvedValue({
-        success: true,
-        scriptPath: '/path/to/rust_script.json',
-        actionCount: 20,
-        duration: 12.0
-      });
-      (ipcBridgeService.selectCore as jest.Mock).mockResolvedValue(undefined);
-      (ipcBridgeService.startPlayback as jest.Mock).mockResolvedValue(undefined);
-
-      const { getByTestId, getByText } = render(<RecorderScreen />);
-
-      await waitFor(() => {
-        expect(getByText('Record')).toBeTruthy();
-      });
-
-      // Start with Rust core selected
-      const rustOption = getByTestId('core-option-rust');
-      fireEvent.press(rustOption);
-      await waitFor(() => {
-        expect(ipcBridgeService.selectCore).toHaveBeenCalledWith('rust');
-      });
-
-      // Record with Rust core
-      fireEvent.press(getByText('Record'));
-      await waitFor(() => {
-        expect(ipcBridgeService.startRecording).toHaveBeenCalled();
-      });
-
-      fireEvent.press(getByText('Stop'));
-      await waitFor(() => {
-        expect(ipcBridgeService.stopRecording).toHaveBeenCalled();
-      });
-
-      // Switch to Python core
-      const pythonOption = getByTestId('core-option-python');
-      fireEvent.press(pythonOption);
-      await waitFor(() => {
-        expect(ipcBridgeService.selectCore).toHaveBeenCalledWith('python');
-      });
-
-      // Mock that recordings are now available
+    it('displays a script format validation error from playback', async () => {
       (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(true);
-
-      // Try to play the Rust-created recording with Python core
-      fireEvent.press(getByText('Start'));
-      await waitFor(() => {
-        expect(ipcBridgeService.startPlayback).toHaveBeenCalled();
-      });
-    });
-
-    it('should validate script file format compatibility', async () => {
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue(['python', 'rust']);
-      (ipcBridgeService.getCoreStatus as jest.Mock).mockResolvedValue({
-        activeCoreType: 'python',
-        availableCores: ['python', 'rust'],
-        coreHealth: { python: true, rust: true }
-      });
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(true);
+      (ipcBridgeService.getLatestRecording as jest.Mock).mockResolvedValue('/path/to/script.json');
       (ipcBridgeService.startPlayback as jest.Mock).mockRejectedValue(
         new Error('Script format validation failed: Incompatible JSON schema version')
       );
 
-      const { getByText, queryByText } = render(<RecorderScreen />);
+      renderScreen();
 
       await waitFor(() => {
-        expect(getByText('Start')).toBeTruthy();
+        expect(screen.getByText('Start Playback').closest('button')).not.toBeDisabled();
       });
 
-      // Try to play incompatible script
-      fireEvent.press(getByText('Start'));
+      fireEvent.click(screen.getByText('Start Playback'));
 
-      // Should display format validation error
       await waitFor(() => {
-        expect(queryByText(/format validation failed/)).toBeTruthy();
+        expect(screen.getByText(/format validation failed/)).toBeInTheDocument();
       });
     });
   });
 
-  describe('Error Handling and Fallback Scenarios', () => {
-    it('should fallback to Python core when Rust core fails', async () => {
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue(['python', 'rust']);
-      (ipcBridgeService.getCoreStatus as jest.Mock).mockResolvedValue({
-        activeCoreType: 'rust',
-        availableCores: ['python', 'rust'],
-        coreHealth: { python: true, rust: true }
-      });
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(false);
-      (ipcBridgeService.startRecording as jest.Mock)
-        .mockRejectedValueOnce(new Error('Rust core failed: Permission denied'))
-        .mockResolvedValueOnce(undefined); // Fallback to Python succeeds
-      (ipcBridgeService.selectCore as jest.Mock).mockResolvedValue(undefined);
-
-      const { getByTestId, getByText, queryByText } = render(<RecorderScreen />);
-
-      await waitFor(() => {
-        expect(getByText('Record')).toBeTruthy();
-      });
-
-      // Select Rust core
-      const rustOption = getByTestId('core-option-rust');
-      fireEvent.press(rustOption);
-      await waitFor(() => {
-        expect(ipcBridgeService.selectCore).toHaveBeenCalledWith('rust');
-      });
-
-      // Try to record with Rust core (should fail and fallback)
-      fireEvent.press(getByText('Record'));
-
-      // Should show error and fallback message
-      await waitFor(() => {
-        expect(queryByText(/Permission denied/)).toBeTruthy();
-        expect(queryByText(/fallback/i) || queryByText(/switched/i)).toBeTruthy();
-      });
-    });
-
-    it('should fallback to Rust core when Python core fails', async () => {
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue(['python', 'rust']);
-      (ipcBridgeService.getCoreStatus as jest.Mock).mockResolvedValue({
-        activeCoreType: 'python',
-        availableCores: ['python', 'rust'],
-        coreHealth: { python: true, rust: true }
-      });
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(false);
-      (ipcBridgeService.startRecording as jest.Mock)
-        .mockRejectedValueOnce(new Error('Python core failed: Dependencies missing'))
-        .mockResolvedValueOnce(undefined); // Fallback to Rust succeeds
-      (ipcBridgeService.selectCore as jest.Mock).mockResolvedValue(undefined);
-
-      const { getByText, queryByText } = render(<RecorderScreen />);
-
-      await waitFor(() => {
-        expect(getByText('Record')).toBeTruthy();
-      });
-
-      // Try to record with Python core (should fail and fallback)
-      fireEvent.press(getByText('Record'));
-
-      // Should show error and fallback message
-      await waitFor(() => {
-        expect(queryByText(/Dependencies missing/)).toBeTruthy();
-        expect(queryByText(/fallback/i) || queryByText(/switched/i)).toBeTruthy();
-      });
-    });
-
-    it('should handle both cores unavailable scenario', async () => {
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue([]);
-      (ipcBridgeService.getCoreStatus as jest.Mock).mockResolvedValue({
-        activeCoreType: 'python',
-        availableCores: [],
-        coreHealth: { python: false, rust: false }
-      });
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockRejectedValue(
-        new Error('No automation cores available')
+  describe('Error Handling', () => {
+    it('displays recording errors to the user', async () => {
+      (ipcBridgeService.startRecording as jest.Mock).mockRejectedValue(
+        new Error('Rust core failed: Permission denied')
       );
 
-      const { queryByText } = render(<RecorderScreen />);
+      renderScreen();
 
-      // Should display no cores available message
       await waitFor(() => {
-        expect(queryByText(/No automation cores available/)).toBeTruthy();
+        expect(screen.getByText('Record')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Record'));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Permission denied/)).toBeInTheDocument();
       });
     });
 
-    it('should recover from temporary core failures', async () => {
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue(['python', 'rust']);
-      (ipcBridgeService.getCoreStatus as jest.Mock).mockResolvedValue({
-        activeCoreType: 'python',
-        availableCores: ['python', 'rust'],
-        coreHealth: { python: true, rust: true }
-      });
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(false);
+    it('recovers from a temporary recording failure on retry', async () => {
       (ipcBridgeService.startRecording as jest.Mock)
         .mockRejectedValueOnce(new Error('Temporary failure'))
-        .mockResolvedValueOnce(undefined); // Retry succeeds
+        .mockResolvedValueOnce(undefined);
 
-      const { getByText, queryByText } = render(<RecorderScreen />);
+      renderScreen();
 
       await waitFor(() => {
-        expect(getByText('Record')).toBeTruthy();
+        expect(screen.getByText('Record')).toBeInTheDocument();
       });
 
-      // First attempt fails
-      fireEvent.press(getByText('Record'));
+      // First attempt fails.
+      fireEvent.click(screen.getByText('Record'));
       await waitFor(() => {
-        expect(queryByText(/Temporary failure/)).toBeTruthy();
+        expect(screen.getByText(/Temporary failure/)).toBeInTheDocument();
       });
 
-      // Retry should succeed
-      fireEvent.press(getByText('Record'));
+      // Retry succeeds.
+      fireEvent.click(screen.getByText('Record'));
       await waitFor(() => {
         expect(ipcBridgeService.startRecording).toHaveBeenCalledTimes(2);
       });
     });
+
+    // Removed feature: automatic cross-core fallback.
+    it.skip('should fallback to Python core when Rust core fails (REMOVED: dual-core fallback)', () => {});
+    it.skip('should fallback to Rust core when Python core fails (REMOVED: dual-core fallback)', () => {});
+    it.skip('should handle both cores unavailable scenario (REMOVED: dual-core availability UI)', () => {});
   });
 
   describe('Performance Monitoring and Comparison', () => {
-    it('should display performance metrics for both cores', async () => {
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue(['python', 'rust']);
-      (ipcBridgeService.getCoreStatus as jest.Mock).mockResolvedValue({
-        activeCoreType: 'python',
-        availableCores: ['python', 'rust'],
-        coreHealth: { python: true, rust: true }
-      });
-      (ipcBridgeService.getCorePerformanceMetrics as jest.Mock).mockResolvedValue({
-        python: {
-          avgResponseTime: 150,
-          successRate: 0.95,
-          totalOperations: 100,
-          lastUpdated: new Date().toISOString()
-        },
-        rust: {
-          avgResponseTime: 80,
-          successRate: 0.98,
-          totalOperations: 50,
-          lastUpdated: new Date().toISOString()
-        }
-      });
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(false);
+    // Removed feature: per-core performance metrics / recommendation UI.
+    it.skip('should display performance metrics for both cores (REMOVED: dual-core metrics)', () => {});
+    it.skip('should recommend better performing core (REMOVED: dual-core recommendation)', () => {});
 
-      const { getByTestId, queryByText } = render(<RecorderScreen />);
+    it('tracks operation timing across a slow recording', async () => {
+      (ipcBridgeService.startRecording as jest.Mock).mockImplementation(
+        () => new Promise(resolve => setTimeout(resolve, 1000))
+      );
+
+      renderScreen();
 
       await waitFor(() => {
-        expect(getByTestId('core-selector')).toBeTruthy();
-      });
-
-      // Should display performance metrics
-      await waitFor(() => {
-        expect(queryByText(/150ms/) || queryByText(/80ms/)).toBeTruthy();
-        expect(queryByText(/95%/) || queryByText(/98%/)).toBeTruthy();
-      });
-    });
-
-    it('should recommend better performing core', async () => {
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue(['python', 'rust']);
-      (ipcBridgeService.getCoreStatus as jest.Mock).mockResolvedValue({
-        activeCoreType: 'python',
-        availableCores: ['python', 'rust'],
-        coreHealth: { python: true, rust: true }
-      });
-      (ipcBridgeService.getCorePerformanceMetrics as jest.Mock).mockResolvedValue({
-        python: {
-          avgResponseTime: 300, // Slow
-          successRate: 0.85, // Lower success rate
-          totalOperations: 100,
-          lastUpdated: new Date().toISOString()
-        },
-        rust: {
-          avgResponseTime: 50, // Fast
-          successRate: 0.99, // High success rate
-          totalOperations: 50,
-          lastUpdated: new Date().toISOString()
-        }
-      });
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(false);
-
-      const { queryByText } = render(<RecorderScreen />);
-
-      // Should recommend switching to Rust core
-      await waitFor(() => {
-        expect(queryByText(/recommend/i) && queryByText(/rust/i)).toBeTruthy();
-      });
-    });
-
-    it('should track performance during operations', async () => {
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue(['python', 'rust']);
-      (ipcBridgeService.getCoreStatus as jest.Mock).mockResolvedValue({
-        activeCoreType: 'python',
-        availableCores: ['python', 'rust'],
-        coreHealth: { python: true, rust: true }
-      });
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(false);
-      (ipcBridgeService.startRecording as jest.Mock).mockImplementation(() => {
-        // Simulate slow operation
-        return new Promise(resolve => setTimeout(resolve, 1000));
-      });
-      (ipcBridgeService.stopRecording as jest.Mock).mockResolvedValue({
-        success: true,
-        scriptPath: '/path/to/script.json',
-        actionCount: 10,
-        duration: 5.0
-      });
-
-      const { getByText } = render(<RecorderScreen />);
-
-      await waitFor(() => {
-        expect(getByText('Record')).toBeTruthy();
+        expect(screen.getByText('Record')).toBeInTheDocument();
       });
 
       const startTime = Date.now();
-
-      // Start recording
-      fireEvent.press(getByText('Record'));
-      await waitFor(() => {
-        expect(ipcBridgeService.startRecording).toHaveBeenCalled();
-      });
-
-      // Stop recording
-      fireEvent.press(getByText('Stop'));
-      await waitFor(() => {
-        expect(ipcBridgeService.stopRecording).toHaveBeenCalled();
-      });
-
-      const endTime = Date.now();
-      const operationTime = endTime - startTime;
-
-      // Should have tracked the operation time (at least 1 second due to mock delay)
+      fireEvent.click(screen.getByText('Record'));
+      // Recording only becomes active after the slow startRecording resolves,
+      // which is reflected by the "Recording in Progress" status.
+      await waitFor(
+        () => {
+          expect(screen.getByText(/Recording in Progress/i)).toBeInTheDocument();
+        },
+        { timeout: 3000 }
+      );
+      const operationTime = Date.now() - startTime;
       expect(operationTime).toBeGreaterThan(900);
     });
   });
 
   describe('User Preference Persistence', () => {
-    it('should persist core selection across app restarts', async () => {
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue(['python', 'rust']);
-      (ipcBridgeService.getCoreStatus as jest.Mock).mockResolvedValue({
-        activeCoreType: 'rust', // Previously selected Rust
-        availableCores: ['python', 'rust'],
-        coreHealth: { python: true, rust: true }
-      });
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(false);
+    // Removed feature: persisted core preference selection.
+    it.skip('should persist core selection across app restarts (REMOVED: dual-core selector)', () => {});
 
-      const { getByTestId } = render(<RecorderScreen />);
-
-      await waitFor(() => {
-        expect(getByTestId('core-selector')).toBeTruthy();
-      });
-
-      // Should show Rust as selected (persisted preference)
-      const rustOption = getByTestId('core-option-rust');
-      expect(rustOption.props.accessibilityState?.selected).toBe(true);
-    });
-
-    it('should preserve settings during core switching', async () => {
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue(['python', 'rust']);
-      (ipcBridgeService.getCoreStatus as jest.Mock).mockResolvedValue({
-        activeCoreType: 'python',
-        availableCores: ['python', 'rust'],
-        coreHealth: { python: true, rust: true }
-      });
-      (ipcBridgeService.selectCore as jest.Mock).mockResolvedValue(undefined);
+    it('keeps recordings available after the initial load', async () => {
       (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(true);
+      (ipcBridgeService.getLatestRecording as jest.Mock).mockResolvedValue('/path/to/script.json');
 
-      const { getByTestId } = render(<RecorderScreen />);
-
-      await waitFor(() => {
-        expect(getByTestId('core-selector')).toBeTruthy();
-      });
-
-      // Switch cores
-      const rustOption = getByTestId('core-option-rust');
-      fireEvent.press(rustOption);
+      renderScreen();
 
       await waitFor(() => {
-        expect(ipcBridgeService.selectCore).toHaveBeenCalledWith('rust');
+        expect(screen.getByText('Start Playback')).toBeInTheDocument();
       });
-
-      // Settings should be preserved (recordings still available, etc.)
-      // This is verified by the fact that checkForRecordings is still true
+      // Playback button is enabled once recordings exist.
+      expect(screen.getByText('Start Playback')).not.toBeDisabled();
     });
   });
 
   describe('UI Responsiveness and Feedback', () => {
-    it('should provide visual feedback during core switching', async () => {
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue(['python', 'rust']);
-      (ipcBridgeService.getCoreStatus as jest.Mock).mockResolvedValue({
-        activeCoreType: 'python',
-        availableCores: ['python', 'rust'],
-        coreHealth: { python: true, rust: true }
-      });
-      (ipcBridgeService.selectCore as jest.Mock).mockImplementation(() => {
-        // Simulate slow core switching
-        return new Promise(resolve => setTimeout(resolve, 500));
-      });
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(false);
+    // Removed feature: core-switching visual feedback / active-core status display.
+    it.skip('should provide visual feedback during core switching (REMOVED: dual-core selector)', () => {});
+    it.skip('should update status display to show active core (REMOVED: dual-core status)', () => {});
+    it.skip('should show core availability indicators (REMOVED: dual-core availability UI)', () => {});
 
-      const { getByTestId, queryByText } = render(<RecorderScreen />);
+    it('shows recording status feedback while recording', async () => {
+      renderScreen();
 
       await waitFor(() => {
-        expect(getByTestId('core-selector')).toBeTruthy();
+        expect(screen.getByText('Record')).toBeInTheDocument();
       });
 
-      // Switch to Rust core
-      const rustOption = getByTestId('core-option-rust');
-      fireEvent.press(rustOption);
-
-      // Should show loading/switching feedback
-      await waitFor(() => {
-        expect(queryByText(/switching/i) || queryByText(/loading/i)).toBeTruthy();
-      });
-
-      // Should complete switching
-      await waitFor(() => {
-        expect(ipcBridgeService.selectCore).toHaveBeenCalledWith('rust');
-      }, { timeout: 1000 });
-    });
-
-    it('should update status display to show active core', async () => {
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue(['python', 'rust']);
-      (ipcBridgeService.getCoreStatus as jest.Mock).mockResolvedValue({
-        activeCoreType: 'rust',
-        availableCores: ['python', 'rust'],
-        coreHealth: { python: true, rust: true }
-      });
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(false);
-
-      const { queryByText } = render(<RecorderScreen />);
-
-      // Should display active core in status
-      await waitFor(() => {
-        expect(queryByText(/rust/i) && queryByText(/active/i)).toBeTruthy();
-      });
-    });
-
-    it('should show core availability indicators', async () => {
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue(['python']);
-      (ipcBridgeService.getCoreStatus as jest.Mock).mockResolvedValue({
-        activeCoreType: 'python',
-        availableCores: ['python'],
-        coreHealth: { python: true, rust: false }
-      });
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(false);
-
-      const { getByTestId } = render(<RecorderScreen />);
+      fireEvent.click(screen.getByText('Record'));
 
       await waitFor(() => {
-        expect(getByTestId('core-selector')).toBeTruthy();
+        expect(screen.getByText(/Recording in Progress/i)).toBeInTheDocument();
       });
-
-      // Python should be available
-      const pythonOption = getByTestId('core-option-python');
-      expect(pythonOption.props.accessibilityState?.disabled).toBe(false);
-
-      // Rust should be unavailable
-      const rustOption = getByTestId('core-option-rust');
-      expect(rustOption.props.accessibilityState?.disabled).toBe(true);
     });
   });
 
   describe('Cross-Platform Compatibility', () => {
-    it('should handle Windows-specific automation features', async () => {
-      // Mock Windows environment
-      Object.defineProperty(process, 'platform', {
-        value: 'win32'
-      });
+    const platforms = ['win32', 'darwin', 'linux'];
+    platforms.forEach(platform => {
+      it(`records successfully on ${platform}`, async () => {
+        Object.defineProperty(process, 'platform', { value: platform, configurable: true });
 
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue(['python', 'rust']);
-      (ipcBridgeService.getCoreStatus as jest.Mock).mockResolvedValue({
-        activeCoreType: 'rust',
-        availableCores: ['python', 'rust'],
-        coreHealth: { python: true, rust: true }
-      });
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(false);
-      (ipcBridgeService.startRecording as jest.Mock).mockResolvedValue(undefined);
+        renderScreen();
 
-      const { getByText } = render(<RecorderScreen />);
+        await waitFor(() => {
+          expect(screen.getByText('Record')).toBeInTheDocument();
+        });
 
-      await waitFor(() => {
-        expect(getByText('Record')).toBeTruthy();
-      });
-
-      // Should work on Windows
-      fireEvent.press(getByText('Record'));
-      await waitFor(() => {
-        expect(ipcBridgeService.startRecording).toHaveBeenCalled();
-      });
-    });
-
-    it('should handle macOS-specific automation features', async () => {
-      // Mock macOS environment
-      Object.defineProperty(process, 'platform', {
-        value: 'darwin'
-      });
-
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue(['python', 'rust']);
-      (ipcBridgeService.getCoreStatus as jest.Mock).mockResolvedValue({
-        activeCoreType: 'rust',
-        availableCores: ['python', 'rust'],
-        coreHealth: { python: true, rust: true }
-      });
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(false);
-      (ipcBridgeService.startRecording as jest.Mock).mockResolvedValue(undefined);
-
-      const { getByText } = render(<RecorderScreen />);
-
-      await waitFor(() => {
-        expect(getByText('Record')).toBeTruthy();
-      });
-
-      // Should work on macOS
-      fireEvent.press(getByText('Record'));
-      await waitFor(() => {
-        expect(ipcBridgeService.startRecording).toHaveBeenCalled();
-      });
-    });
-
-    it('should handle Linux-specific automation features', async () => {
-      // Mock Linux environment
-      Object.defineProperty(process, 'platform', {
-        value: 'linux'
-      });
-
-      (ipcBridgeService.getAvailableCores as jest.Mock).mockResolvedValue(['python', 'rust']);
-      (ipcBridgeService.getCoreStatus as jest.Mock).mockResolvedValue({
-        activeCoreType: 'rust',
-        availableCores: ['python', 'rust'],
-        coreHealth: { python: true, rust: true }
-      });
-      (ipcBridgeService.checkForRecordings as jest.Mock).mockResolvedValue(false);
-      (ipcBridgeService.startRecording as jest.Mock).mockResolvedValue(undefined);
-
-      const { getByText } = render(<RecorderScreen />);
-
-      await waitFor(() => {
-        expect(getByText('Record')).toBeTruthy();
-      });
-
-      // Should work on Linux
-      fireEvent.press(getByText('Record'));
-      await waitFor(() => {
-        expect(ipcBridgeService.startRecording).toHaveBeenCalled();
+        fireEvent.click(screen.getByText('Record'));
+        await waitFor(() => {
+          expect(ipcBridgeService.startRecording).toHaveBeenCalled();
+        });
       });
     });
   });

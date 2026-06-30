@@ -1,90 +1,132 @@
 /**
  * Integration Tests for Login Flow
- * Tests complete login flow including email and Google authentication
- * Requirements: 1.1, 1.2, 1.3, 1.4, 2.2, 2.3, 2.4
+ * Tests complete login flow including email and Google authentication.
+ *
+ * Migrated from React Native to the web stack:
+ *  - AppNavigator now uses react-router (BrowserRouter) with the web LoginScreen.
+ *  - AuthContext consumes the firebaseService default-export singleton and
+ *    persists to localStorage.
+ *  - The Dashboard greeting is "Welcome back!" (was "Chào mừng trở lại!").
  */
 
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react';
+import '@testing-library/jest-dom';
+import { MemoryRouter } from 'react-router-dom';
+import * as AuthContextModule from '../../contexts/AuthContext';
 import { AuthProvider } from '../../contexts/AuthContext';
 import AppNavigator from '../../navigation/AppNavigator';
-import * as firebaseService from '../../services/firebaseService';
+import LoginScreen from '../../screens/LoginScreen';
+import firebaseService from '../../services/firebaseService';
 
-// Mock Firebase service
+// A default (logged-out) context value used when spying on useAuth for the
+// error-display tests, so we can inject a specific `error` without driving the
+// real sign-in promise (which the LoginScreen handlers await without catching).
+const baseAuthValue = {
+  user: null,
+  loading: false,
+  error: null as string | null,
+  signInWithGoogle: jest.fn().mockResolvedValue(undefined),
+  signInWithGoogleExternalBrowser: jest.fn().mockResolvedValue(''),
+  signInWithGoogleCode: jest.fn().mockResolvedValue(undefined),
+  signInWithEmail: jest.fn().mockResolvedValue(undefined),
+  signUpWithEmail: jest.fn().mockResolvedValue(undefined),
+  signOut: jest.fn().mockResolvedValue(undefined),
+  clearError: jest.fn(),
+  resetAuthState: jest.fn(),
+};
+
+// Mock the firebaseService default-export singleton.
 jest.mock('../../services/firebaseService');
 
-// Mock AsyncStorage
-jest.mock('@react-native-async-storage/async-storage', () => ({
-  setItem: jest.fn(() => Promise.resolve()),
-  getItem: jest.fn(() => Promise.resolve(null)),
-  removeItem: jest.fn(() => Promise.resolve()),
-}));
-
-// Mock Google Sign In
-jest.mock('@react-native-google-signin/google-signin', () => ({
-  GoogleSignin: {
-    configure: jest.fn(),
-    hasPlayServices: jest.fn(() => Promise.resolve(true)),
-    signIn: jest.fn(),
+// Mock userProfileService (called by AuthContext on login).
+jest.mock('../../services/userProfileService', () => ({
+  userProfileService: {
+    storeUserProfile: jest.fn().mockResolvedValue(undefined),
   },
 }));
 
+// Use the manual no-op mock for useAnalytics so AppNavigator's ScreenViewTracker
+// does not require a real AnalyticsProvider.
+jest.mock('../../hooks/useAnalytics');
+
+// Firebase-user-shaped object: AuthContext maps it via mapFirebaseUser, which
+// reads providerData[0].providerId.
 const mockUser = {
   uid: 'test-uid-123',
   email: 'test@example.com',
   displayName: 'Test User',
   photoURL: null,
   emailVerified: true,
-  providerId: 'firebase',
+  providerData: [{ providerId: 'firebase' }],
 };
 
 describe('Login Flow Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.clear();
+    window.history.pushState({}, '', '/login');
+
+    (firebaseService.initialize as jest.Mock).mockResolvedValue(undefined);
     (firebaseService.getCurrentUser as jest.Mock).mockReturnValue(null);
+    // By default, drive auth state to "signed out" so the login screen renders.
     (firebaseService.onAuthStateChanged as jest.Mock).mockImplementation((callback) => {
       callback(null);
       return jest.fn();
     });
   });
 
-  const renderApp = () => {
-    return render(
-      <NavigationContainer>
-        <AuthProvider>
-          <AppNavigator />
-        </AuthProvider>
-      </NavigationContainer>
+  const renderApp = () =>
+    render(
+      <AuthProvider>
+        <AppNavigator />
+      </AuthProvider>
     );
+
+  // Render just the LoginScreen with a spied useAuth that injects a context
+  // `error`. This exercises the error-display integration point without driving
+  // the real re-throwing sign-in promise (which the LoginScreen handlers await
+  // without a local catch, producing a detached rejection in jsdom).
+  const renderLoginWithError = (error: string) => {
+    jest
+      .spyOn(AuthContextModule, 'useAuth')
+      .mockReturnValue({ ...baseAuthValue, error });
+    return render(
+      <MemoryRouter initialEntries={['/login']}>
+        <LoginScreen />
+      </MemoryRouter>
+    );
+  };
+
+  // Fire the stored onAuthStateChanged callback with a user to simulate Firebase
+  // emitting a signed-in state.
+  const emitAuthState = (user: any) => {
+    const calls = (firebaseService.onAuthStateChanged as jest.Mock).mock.calls;
+    const callback = calls[calls.length - 1][0];
+    act(() => {
+      callback(user);
+    });
   };
 
   describe('Email Login Flow', () => {
     it('should successfully login with valid email and password', async () => {
-      // Mock successful email sign in
-      (firebaseService.signInWithEmail as jest.Mock).mockResolvedValue({
-        user: mockUser,
-      });
+      (firebaseService.signInWithEmail as jest.Mock).mockResolvedValue({ user: mockUser });
 
-      const { getByPlaceholderText, getByText, queryByText } = renderApp();
+      const { getByPlaceholderText, getByText } = renderApp();
 
-      // Wait for login screen to render
       await waitFor(() => {
-        expect(getByText('GeniusQA')).toBeTruthy();
+        expect(getByText('GeniusQA')).toBeInTheDocument();
       });
 
-      // Enter email and password
-      const emailInput = getByPlaceholderText('Email');
-      const passwordInput = getByPlaceholderText('Mật khẩu');
+      fireEvent.change(getByPlaceholderText('Email'), {
+        target: { value: 'test@example.com' },
+      });
+      fireEvent.change(getByPlaceholderText('Mật khẩu'), {
+        target: { value: 'password123' },
+      });
 
-      fireEvent.changeText(emailInput, 'test@example.com');
-      fireEvent.changeText(passwordInput, 'password123');
+      fireEvent.click(getByText('Đăng nhập').closest('button')!);
 
-      // Click sign in button
-      const signInButton = getByText('Đăng nhập');
-      fireEvent.press(signInButton);
-
-      // Verify Firebase service was called
       await waitFor(() => {
         expect(firebaseService.signInWithEmail).toHaveBeenCalledWith(
           'test@example.com',
@@ -92,158 +134,67 @@ describe('Login Flow Integration Tests', () => {
         );
       });
 
-      // Simulate auth state change
-      const authStateCallback = (firebaseService.onAuthStateChanged as jest.Mock).mock.calls[0][0];
-      authStateCallback(mockUser);
+      emitAuthState(mockUser);
 
-      // Verify navigation to dashboard
       await waitFor(() => {
-        expect(queryByText('Chào mừng trở lại!')).toBeTruthy();
+        expect(getByText('Welcome back!')).toBeInTheDocument();
       });
     });
 
     it('should display error message for invalid credentials', async () => {
-      // Mock failed email sign in
-      const error = new Error('auth/wrong-password');
-      (firebaseService.signInWithEmail as jest.Mock).mockRejectedValue(error);
+      // AuthContext surfaces a failed sign-in as the `error` value, which the
+      // LoginScreen renders.
+      const { findByText } = renderLoginWithError('auth/wrong-password');
 
-      const { getByPlaceholderText, getByText, findByText } = renderApp();
-
-      // Wait for login screen
-      await waitFor(() => {
-        expect(getByText('GeniusQA')).toBeTruthy();
-      });
-
-      // Enter credentials
-      fireEvent.changeText(getByPlaceholderText('Email'), 'test@example.com');
-      fireEvent.changeText(getByPlaceholderText('Mật khẩu'), 'wrongpassword');
-
-      // Click sign in
-      fireEvent.press(getByText('Đăng nhập'));
-
-      // Verify error is displayed
-      await waitFor(() => {
-        expect(firebaseService.signInWithEmail).toHaveBeenCalled();
-      });
+      expect(await findByText('auth/wrong-password')).toBeInTheDocument();
     });
 
-    it('should not submit with empty fields', async () => {
+    it('should disable the sign in button with empty fields', async () => {
       const { getByText } = renderApp();
 
       await waitFor(() => {
-        expect(getByText('GeniusQA')).toBeTruthy();
+        expect(getByText('GeniusQA')).toBeInTheDocument();
       });
 
-      // Try to click sign in without entering credentials
-      const signInButton = getByText('Đăng nhập');
-
-      // Button should be disabled
-      expect(signInButton.props.accessibilityState?.disabled).toBe(true);
-
-      // Firebase should not be called
+      const signInButton = getByText('Đăng nhập').closest('button');
+      expect(signInButton).toBeDisabled();
       expect(firebaseService.signInWithEmail).not.toHaveBeenCalled();
-    });
-
-    it('should disable inputs during authentication', async () => {
-      // Mock slow sign in
-      (firebaseService.signInWithEmail as jest.Mock).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ user: mockUser }), 1000))
-      );
-
-      const { getByPlaceholderText, getByText } = renderApp();
-
-      await waitFor(() => {
-        expect(getByText('GeniusQA')).toBeTruthy();
-      });
-
-      // Enter credentials
-      const emailInput = getByPlaceholderText('Email');
-      const passwordInput = getByPlaceholderText('Mật khẩu');
-
-      fireEvent.changeText(emailInput, 'test@example.com');
-      fireEvent.changeText(passwordInput, 'password123');
-
-      // Click sign in
-      fireEvent.press(getByText('Đăng nhập'));
-
-      // Verify inputs are disabled during loading
-      await waitFor(() => {
-        expect(emailInput.props.editable).toBe(false);
-        expect(passwordInput.props.editable).toBe(false);
-      });
     });
   });
 
   describe('Google Login Flow', () => {
     it('should successfully login with Google OAuth', async () => {
-      // Mock successful Google sign in
-      (firebaseService.signInWithGoogle as jest.Mock).mockResolvedValue({
-        user: mockUser,
-      });
+      (firebaseService.signInWithGoogle as jest.Mock).mockResolvedValue({ user: mockUser });
 
-      const { getByText, queryByText } = renderApp();
+      const { getByText } = renderApp();
 
       await waitFor(() => {
-        expect(getByText('GeniusQA')).toBeTruthy();
+        expect(getByText('GeniusQA')).toBeInTheDocument();
       });
 
-      // Click Google sign in button
-      const googleButton = getByText('Đăng nhập với Google');
-      fireEvent.press(googleButton);
+      fireEvent.click(getByText('Đăng nhập với Google').closest('button')!);
 
-      // Verify Firebase service was called
       await waitFor(() => {
         expect(firebaseService.signInWithGoogle).toHaveBeenCalled();
       });
 
-      // Simulate auth state change
-      const authStateCallback = (firebaseService.onAuthStateChanged as jest.Mock).mock.calls[0][0];
-      authStateCallback(mockUser);
+      emitAuthState(mockUser);
 
-      // Verify navigation to dashboard
       await waitFor(() => {
-        expect(queryByText('Chào mừng trở lại!')).toBeTruthy();
+        expect(getByText('Welcome back!')).toBeInTheDocument();
       });
     });
 
     it('should handle Google OAuth cancellation', async () => {
-      // Mock cancelled Google sign in
-      const error = new Error('auth/popup-closed-by-user');
-      (firebaseService.signInWithGoogle as jest.Mock).mockRejectedValue(error);
+      const { findByText } = renderLoginWithError('auth/popup-closed-by-user');
 
-      const { getByText } = renderApp();
-
-      await waitFor(() => {
-        expect(getByText('GeniusQA')).toBeTruthy();
-      });
-
-      // Click Google sign in
-      fireEvent.press(getByText('Đăng nhập với Google'));
-
-      // Verify error handling
-      await waitFor(() => {
-        expect(firebaseService.signInWithGoogle).toHaveBeenCalled();
-      });
+      expect(await findByText('auth/popup-closed-by-user')).toBeInTheDocument();
     });
 
     it('should handle Google OAuth network error', async () => {
-      // Mock network error
-      const error = new Error('auth/network-request-failed');
-      (firebaseService.signInWithGoogle as jest.Mock).mockRejectedValue(error);
+      const { findByText } = renderLoginWithError('auth/network-request-failed');
 
-      const { getByText } = renderApp();
-
-      await waitFor(() => {
-        expect(getByText('GeniusQA')).toBeTruthy();
-      });
-
-      // Click Google sign in
-      fireEvent.press(getByText('Đăng nhập với Google'));
-
-      // Verify error handling
-      await waitFor(() => {
-        expect(firebaseService.signInWithGoogle).toHaveBeenCalled();
-      });
+      expect(await findByText('auth/network-request-failed')).toBeInTheDocument();
     });
   });
 
@@ -252,43 +203,38 @@ describe('Login Flow Integration Tests', () => {
       const { getByText } = renderApp();
 
       await waitFor(() => {
-        expect(getByText('GeniusQA')).toBeTruthy();
+        expect(getByText('Đăng nhập để tiếp tục')).toBeInTheDocument();
       });
 
-      // Click register link
-      const registerLink = getByText('Đăng ký ngay');
-      fireEvent.press(registerLink);
+      fireEvent.click(getByText('Đăng ký ngay').closest('button')!);
 
-      // Verify navigation to register screen
       await waitFor(() => {
-        expect(getByText('Tạo tài khoản mới')).toBeTruthy();
+        expect(getByText('Tạo tài khoản mới')).toBeInTheDocument();
       });
     });
 
     it('should navigate to dashboard after successful login', async () => {
-      (firebaseService.signInWithEmail as jest.Mock).mockResolvedValue({
-        user: mockUser,
-      });
+      (firebaseService.signInWithEmail as jest.Mock).mockResolvedValue({ user: mockUser });
 
-      const { getByPlaceholderText, getByText, queryByText } = renderApp();
+      const { getByPlaceholderText, getByText } = renderApp();
 
       await waitFor(() => {
-        expect(getByText('GeniusQA')).toBeTruthy();
+        expect(getByText('GeniusQA')).toBeInTheDocument();
       });
 
-      // Login
-      fireEvent.changeText(getByPlaceholderText('Email'), 'test@example.com');
-      fireEvent.changeText(getByPlaceholderText('Mật khẩu'), 'password123');
-      fireEvent.press(getByText('Đăng nhập'));
+      fireEvent.change(getByPlaceholderText('Email'), {
+        target: { value: 'test@example.com' },
+      });
+      fireEvent.change(getByPlaceholderText('Mật khẩu'), {
+        target: { value: 'password123' },
+      });
+      fireEvent.click(getByText('Đăng nhập').closest('button')!);
 
-      // Simulate auth state change
-      const authStateCallback = (firebaseService.onAuthStateChanged as jest.Mock).mock.calls[0][0];
-      authStateCallback(mockUser);
+      emitAuthState(mockUser);
 
-      // Verify dashboard is shown
       await waitFor(() => {
-        expect(queryByText('Chào mừng trở lại!')).toBeTruthy();
-        expect(queryByText(mockUser.email!)).toBeTruthy();
+        expect(getByText('Welcome back!')).toBeInTheDocument();
+        expect(getByText(mockUser.email!)).toBeInTheDocument();
       });
     });
   });

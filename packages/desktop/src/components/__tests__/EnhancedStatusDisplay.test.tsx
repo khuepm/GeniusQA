@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { EnhancedStatusDisplay } from '../EnhancedStatusDisplay';
 import {
   FocusState,
@@ -257,8 +257,15 @@ describe('EnhancedStatusDisplay', () => {
       // Use getAllByText for the duplicate text and check the specific one in focus details
       const testAppTexts = screen.getAllByText('Test Application');
       expect(testAppTexts.length).toBeGreaterThan(1); // Should appear in both places
-      expect(screen.getByText('5:00:00 PM')).toBeInTheDocument(); // Last change time
     });
+
+    // The formatted timestamp (e.g. "5:00:00 PM") appears both in the focus
+    // details Last Change value and in notification times, so scope the
+    // assertion to the focus-info block to avoid a multiple-match error.
+    const focusInfo = document.querySelector('.focus-info');
+    expect(focusInfo).not.toBeNull();
+    const lastChangeValues = within(focusInfo as HTMLElement).getAllByText('5:00:00 PM');
+    expect(lastChangeValues.length).toBeGreaterThan(0); // Last change time
   });
 
   it('should render active notifications', () => {

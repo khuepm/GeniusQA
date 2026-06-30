@@ -5,8 +5,19 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import { invoke } from '@tauri-apps/api/tauri';
 import { PlaybackControls } from '../PlaybackControls';
 import { PlaybackSession, PlaybackState, FocusLossStrategy, RegisteredApplication, ApplicationStatus } from '../../types/applicationFocusedAutomation.types';
+
+// The component loads registered applications via the Tauri bridge on mount and
+// uses the dialog API for the Browse button. Mock both so the component can
+// render without a real Tauri runtime.
+jest.mock('@tauri-apps/api/tauri', () => ({
+  invoke: jest.fn().mockResolvedValue([]),
+}));
+jest.mock('@tauri-apps/api/dialog', () => ({
+  open: jest.fn().mockResolvedValue(null),
+}));
 
 describe('PlaybackControls', () => {
   const mockOnStartPlayback = jest.fn();
@@ -34,6 +45,8 @@ describe('PlaybackControls', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // resetMocks clears implementations between tests; restore the default.
+    (invoke as jest.Mock).mockResolvedValue([]);
   });
 
   it('should render playback controls header', () => {
@@ -153,10 +166,13 @@ describe('PlaybackControls', () => {
     expect(getByText('Browse')).toBeInTheDocument();
   });
 
-  it('should show no apps message when no registered applications', () => {
+  it('should show no apps message when no registered applications', async () => {
     const { getByText } = render(<PlaybackControls {...defaultProps} />);
 
-    expect(getByText('No registered applications. Please add applications first.')).toBeInTheDocument();
+    // The message only shows once the async load completes (isLoading false).
+    await waitFor(() => {
+      expect(getByText('No registered applications. Please add applications first.')).toBeInTheDocument();
+    });
   });
 
   it('should render session details when session is active', () => {

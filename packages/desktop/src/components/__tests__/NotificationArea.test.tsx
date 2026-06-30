@@ -45,19 +45,21 @@ describe('NotificationArea', () => {
     jest.clearAllMocks();
   });
 
-  it('should not render when no notifications', () => {
-    const { container } = render(
+  it('should render empty state when no notifications', () => {
+    const { container, getByText } = render(
       <NotificationArea notifications={[]} onDismissNotification={mockOnDismissNotification} />
     );
 
-    expect(container.firstChild).toBeNull();
+    // Component now renders an empty-state placeholder instead of nothing
+    expect(container.querySelector('.notification-area.empty')).toBeInTheDocument();
+    expect(getByText('No notifications')).toBeInTheDocument();
   });
 
   it('should render notification header with count', () => {
-    const { getByText } = render(<NotificationArea {...defaultProps} />);
+    const { getByText, container } = render(<NotificationArea {...defaultProps} />);
 
-    expect(getByText('Notifications')).toBeInTheDocument();
-    expect(getByText('3')).toBeInTheDocument();
+    expect(getByText('Status Notifications')).toBeInTheDocument();
+    expect(container.querySelector('.notification-count')).toHaveTextContent('3');
   });
 
   it('should render all notifications', () => {
@@ -69,11 +71,16 @@ describe('NotificationArea', () => {
   });
 
   it('should render notification icons correctly', () => {
-    const { getByText } = render(<NotificationArea {...defaultProps} />);
+    const { container } = render(<NotificationArea {...defaultProps} />);
 
-    expect(getByText('⚠️')).toBeInTheDocument(); // focus_lost
-    expect(getByText('⏸️')).toBeInTheDocument(); // automation_paused
-    expect(getByText('❌')).toBeInTheDocument(); // error
+    // Scope to the per-notification icon elements; ⚠️ is also used by the
+    // header error-indicator, so query within .notification-icon to be precise.
+    const icons = Array.from(container.querySelectorAll('.notification-icon')).map(
+      (el) => el.textContent
+    );
+    expect(icons).toContain('⚠️'); // focus_lost
+    expect(icons).toContain('⏸️'); // automation_paused
+    expect(icons).toContain('❌'); // error
   });
 
   it('should render notification messages', () => {
@@ -93,8 +100,14 @@ describe('NotificationArea', () => {
   it('should call onDismissNotification when dismiss button is clicked', () => {
     const { container } = render(<NotificationArea {...defaultProps} />);
 
-    const dismissButtons = container.querySelectorAll('.dismiss-button');
-    fireEvent.click(dismissButtons[0]);
+    // Notifications are sorted by priority/timestamp, so locate the focus_lost
+    // notification (notif-1) by its title and click its dismiss button.
+    const notifications = Array.from(container.querySelectorAll('.notification'));
+    const focusLostNotification = notifications.find((n) =>
+      n.querySelector('.notification-title')?.textContent === 'Focus Lost'
+    )!;
+    const dismissButton = focusLostNotification.querySelector('.dismiss-button') as HTMLElement;
+    fireEvent.click(dismissButton);
 
     expect(mockOnDismissNotification).toHaveBeenCalledWith('notif-1');
   });
@@ -102,13 +115,14 @@ describe('NotificationArea', () => {
   it('should render clear all button', () => {
     const { getByText } = render(<NotificationArea {...defaultProps} />);
 
-    expect(getByText('Clear All')).toBeInTheDocument();
+    // Button label includes the count: "Clear All (3)"
+    expect(getByText('Clear All (3)')).toBeInTheDocument();
   });
 
   it('should call onDismissNotification for all notifications when clear all is clicked', () => {
-    const { getByText } = render(<NotificationArea {...defaultProps} />);
+    const { container } = render(<NotificationArea {...defaultProps} />);
 
-    const clearAllButton = getByText('Clear All');
+    const clearAllButton = container.querySelector('.clear-all-button') as HTMLElement;
     fireEvent.click(clearAllButton);
 
     expect(mockOnDismissNotification).toHaveBeenCalledTimes(3);
@@ -117,10 +131,11 @@ describe('NotificationArea', () => {
     expect(mockOnDismissNotification).toHaveBeenCalledWith('notif-3');
   });
 
-  it('should render action hint for focus_lost notifications', () => {
-    const { getByText } = render(<NotificationArea {...defaultProps} />);
+  it('should render action hint for notifications with recovery actions', () => {
+    const { getAllByText } = render(<NotificationArea {...defaultProps} />);
 
-    expect(getByText('Click to focus application')).toBeInTheDocument();
+    // Notifications with recovery actions show a "Click for quick actions" hint
+    expect(getAllByText('Click for quick actions').length).toBeGreaterThan(0);
   });
 
   it('should apply correct CSS classes for notification types', () => {
@@ -170,8 +185,13 @@ describe('NotificationArea', () => {
   it('should prevent event propagation when dismiss button is clicked', () => {
     const { container } = render(<NotificationArea {...defaultProps} />);
 
-    const dismissButton = container.querySelector('.dismiss-button');
-    fireEvent.click(dismissButton!);
+    // Target the dismiss button inside the focus_lost notification (notif-1).
+    const notifications = Array.from(container.querySelectorAll('.notification'));
+    const focusLostNotification = notifications.find((n) =>
+      n.querySelector('.notification-title')?.textContent === 'Focus Lost'
+    )!;
+    const dismissButton = focusLostNotification.querySelector('.dismiss-button') as HTMLElement;
+    fireEvent.click(dismissButton);
 
     expect(mockOnDismissNotification).toHaveBeenCalledWith('notif-1');
   });

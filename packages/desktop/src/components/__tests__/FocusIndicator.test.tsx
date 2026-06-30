@@ -63,9 +63,12 @@ describe('FocusIndicator', () => {
   });
 
   it('should show focused status when target is focused', () => {
-    const { getByText } = render(<FocusIndicator {...defaultProps} />);
+    const { container, getByText } = render(<FocusIndicator {...defaultProps} />);
 
-    expect(getByText('🟢')).toBeInTheDocument();
+    // The 🟢 emoji also appears in the connection-health and app-status icons,
+    // so scope the assertion to the focus status icon in the status-main block.
+    const statusIcon = container.querySelector('.status-main .status-icon');
+    expect(statusIcon).toHaveTextContent('🟢');
     expect(getByText('Focused')).toBeInTheDocument();
   });
 

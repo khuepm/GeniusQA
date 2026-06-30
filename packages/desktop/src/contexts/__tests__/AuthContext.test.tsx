@@ -1,16 +1,28 @@
 /**
  * Unit tests for AuthContext
+ *
+ * Migrated from React Native to the Firebase Web SDK + web testing-library.
+ * The current AuthContext persists to localStorage (key `geniusqa_auth_user`),
+ * uses the firebaseService default-export singleton, and exposes a context value
+ * of { user, loading, error, sign-in/sign-up/sign-out methods, clearError, resetAuthState }.
  */
 
 import React from 'react';
-import { renderHook, act, waitFor } from '@testing-library/react-native';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { AuthProvider, useAuth } from '../AuthContext';
 import firebaseService from '../../services/firebaseService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Mock dependencies
+// Mock the firebaseService default-export singleton.
 jest.mock('../../services/firebaseService');
-jest.mock('@react-native-async-storage/async-storage');
+
+// Mock userProfileService (imported transitively by AuthContext on login).
+jest.mock('../../services/userProfileService', () => ({
+  userProfileService: {
+    storeUserProfile: jest.fn().mockResolvedValue(undefined),
+  },
+}));
+
+const AUTH_STORAGE_KEY = 'geniusqa_auth_user';
 
 describe('AuthContext', () => {
   const mockUser = {
@@ -23,22 +35,27 @@ describe('AuthContext', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    // The `react` jest project resets mocks between tests, so (re)apply
+    // implementations here.
+    localStorage.clear();
     (firebaseService.initialize as jest.Mock).mockResolvedValue(undefined);
     (firebaseService.onAuthStateChanged as jest.Mock).mockReturnValue(jest.fn());
-    (AsyncStorage.getItem as jest.Mock).mockResolvedValue(null);
-    (AsyncStorage.setItem as jest.Mock).mockResolvedValue(undefined);
-    (AsyncStorage.removeItem as jest.Mock).mockResolvedValue(undefined);
   });
 
   describe('useAuth hook', () => {
     it('should throw error when used outside AuthProvider', () => {
-      const { result } = renderHook(() => useAuth());
-
-      expect(result.error).toBeDefined();
+      expect(() => renderHook(() => useAuth())).toThrow(
+        'useAuth must be used within an AuthProvider'
+      );
     });
 
     it('should provide auth context when used inside AuthProvider', async () => {
+      // Drive loading to false by invoking the auth-state callback.
+      (firebaseService.onAuthStateChanged as jest.Mock).mockImplementation((cb) => {
+        cb(null);
+        return jest.fn();
+      });
+
       const wrapper = ({ children }: { children: React.ReactNode }) => (
         <AuthProvider>{children}</AuthProvider>
       );
@@ -78,8 +95,8 @@ describe('AuthContext', () => {
       });
     });
 
-    it('should load persisted user from storage', async () => {
-      (AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(mockUser));
+    it('should load persisted user from localStorage', async () => {
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(mockUser));
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
         <AuthProvider>{children}</AuthProvider>
@@ -88,7 +105,7 @@ describe('AuthContext', () => {
       const { result } = renderHook(() => useAuth(), { wrapper });
 
       await waitFor(() => {
-        expect(AsyncStorage.getItem).toHaveBeenCalledWith('@geniusqa_auth_user');
+        expect(result.current.user).toEqual(mockUser);
       });
     });
   });
@@ -238,7 +255,8 @@ describe('AuthContext', () => {
   });
 
   describe('signOut', () => {
-    it('should sign out successfully', async () => {
+    it('should sign out successfully and clear persisted user', async () => {
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(mockUser));
       (firebaseService.signOut as jest.Mock).mockResolvedValue(undefined);
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -252,7 +270,7 @@ describe('AuthContext', () => {
       });
 
       expect(firebaseService.signOut).toHaveBeenCalled();
-      expect(AsyncStorage.removeItem).toHaveBeenCalledWith('@geniusqa_auth_user');
+      expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull();
       expect(result.current.user).toBeNull();
     });
 
