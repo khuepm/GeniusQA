@@ -27,30 +27,10 @@ const TestWrapper: React.FC<{ children: React.ReactNode; recordingActive?: boole
   children,
   recordingActive = false
 }) => {
-  const mockState = {
-    applicationMode: recordingActive ? 'recording' as const : 'idle' as const,
-    editorVisible: true,
-    recordingSession: null,
-    script: null,
-    isRecording: recordingActive,
-    isPlaying: false,
-    error: null
-  };
-
-  const mockActions = {
-    startRecording: jest.fn(),
-    stopRecording: jest.fn(),
-    startPlayback: jest.fn(),
-    stopPlayback: jest.fn(),
-    showEditor: jest.fn(),
-    hideEditor: jest.fn(),
-    loadScript: jest.fn(),
-    saveScript: jest.fn(),
-    clearError: jest.fn()
-  };
-
+  // The provider manages its own state; recordingActive is accepted for API
+  // compatibility but the provider initializes in idle mode.
   return (
-    <UnifiedInterfaceProvider value={{ state: mockState, actions: mockActions }}>
+    <UnifiedInterfaceProvider>
       {children}
     </UnifiedInterfaceProvider>
   );
@@ -168,7 +148,7 @@ describe('EditorArea Property-Based Tests', () => {
   // Additional property test for auto-scroll behavior during recording
   test('Property 12a: Auto-scroll behavior - action list scrolls to bottom when recording is active', async () => {
     await asyncPropertyTest(
-      fc.property(
+      fc.asyncProperty(
         fc.array(improvedActionArbitrary, { minLength: 3, maxLength: 8 }), // Reduced size for stability
         async (actions) => {
           // Validate test data

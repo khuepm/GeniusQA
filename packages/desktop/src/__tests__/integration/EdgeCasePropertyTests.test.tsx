@@ -11,7 +11,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import * as fc from 'fast-check';
-import { UnifiedInterface } from '../../components/UnifiedInterface';
+import { UnifiedInterface, UnifiedInterfaceProvider } from '../../components/UnifiedInterface';
 import { TopToolbar } from '../../components/TopToolbar';
 import { EditorArea } from '../../components/EditorArea';
 import { TestErrorBoundary } from '../utils/TestErrorBoundary';
@@ -22,6 +22,28 @@ import {
   asyncPropertyTest
 } from '../utils/propertyTestUtils';
 import { isolatedCleanup, safeGetByTestId } from '../utils/testIsolation';
+
+// Deep trees reach useAuth/useAnalytics; use the manual no-op mocks so renders
+// don't require Auth/Analytics providers.
+jest.mock('../../contexts/AuthContext');
+jest.mock('../../hooks/useAnalytics');
+
+// Mock the tab content components to avoid the deep dependency chain
+// (AIChatInterface → useChatState/useAnalytics/useAuth → firebase). Rendering
+// the real tree both requires providers we don't set up here and triggers a
+// module reload that splits the UnifiedInterfaceContext identity.
+jest.mock('../../components/tabs/RecordingTabContent', () => ({
+  RecordingTabContent: () => <div data-testid="recording-tab-content">Recording Content</div>,
+}));
+jest.mock('../../components/tabs/ScriptListTabContent', () => ({
+  ScriptListTabContent: () => <div data-testid="script-list-tab-content">Script List Content</div>,
+}));
+jest.mock('../../components/tabs/AIBuilderTabContent', () => ({
+  AIBuilderTabContent: () => <div data-testid="ai-builder-tab-content">AI Builder Content</div>,
+}));
+jest.mock('../../components/tabs/EditorTabContent', () => ({
+  EditorTabContent: () => <div data-testid="editor-tab-content">Editor Content</div>,
+}));
 
 // Mock CSS imports
 jest.mock('../../components/UnifiedInterface.css', () => ({}));
@@ -58,7 +80,7 @@ describe('Edge Case Property-Based Tests', () => {
               <TestErrorBoundary
                 onError={() => { errorOccurred = true; }}
               >
-                <UnifiedInterface>
+                <UnifiedInterfaceProvider><UnifiedInterface>
                   <TopToolbar />
                   <EditorArea
                     recordingSession={emptyScript}
@@ -66,7 +88,7 @@ describe('Edge Case Property-Based Tests', () => {
                     onActionEdit={jest.fn()}
                     onActionDelete={jest.fn()}
                   />
-                </UnifiedInterface>
+                </UnifiedInterface></UnifiedInterfaceProvider>
               </TestErrorBoundary>
             );
 
@@ -114,6 +136,7 @@ describe('Edge Case Property-Based Tests', () => {
               <TestErrorBoundary
                 onError={() => { errorOccurred = true; }}
               >
+                <UnifiedInterfaceProvider>
                 <TopToolbar
                   isRecording={false}
                   isPlaying={false}
@@ -124,6 +147,7 @@ describe('Edge Case Property-Based Tests', () => {
                   onSave={mockHandlers.onSave}
                   onOpen={mockHandlers.onOpen}
                 />
+                </UnifiedInterfaceProvider>
               </TestErrorBoundary>
             );
 
@@ -152,7 +176,7 @@ describe('Edge Case Property-Based Tests', () => {
   describe('Rapid State Transitions', () => {
     test('Property 17.3c: Rapid state transitions - components handle quick mode changes without errors', async () => {
       await asyncPropertyTest(
-        fc.property(
+        fc.asyncProperty(
           fc.array(
             fc.constantFrom('idle', 'recording', 'playing', 'editing'),
             { minLength: 3, maxLength: 8 }
@@ -182,7 +206,7 @@ describe('Edge Case Property-Based Tests', () => {
                 <TestErrorBoundary
                   onError={() => { errorOccurred = true; }}
                 >
-                  <UnifiedInterface>
+                  <UnifiedInterfaceProvider><UnifiedInterface>
                     <TopToolbar
                       isRecording={mode === 'recording'}
                       isPlaying={mode === 'playing'}
@@ -198,7 +222,7 @@ describe('Edge Case Property-Based Tests', () => {
                       onActionEdit={jest.fn()}
                       onActionDelete={jest.fn()}
                     />
-                  </UnifiedInterface>
+                  </UnifiedInterface></UnifiedInterfaceProvider>
                 </TestErrorBoundary>
               );
             };
@@ -229,7 +253,7 @@ describe('Edge Case Property-Based Tests', () => {
   describe('Window Resize Scenarios', () => {
     test('Property 17.3d: Window resize handling - components adapt to different window sizes', async () => {
       await asyncPropertyTest(
-        fc.property(
+        fc.asyncProperty(
           fc.record({
             width: fc.integer({ min: 320, max: 2560 }),
             height: fc.integer({ min: 240, max: 1440 })
@@ -258,7 +282,7 @@ describe('Edge Case Property-Based Tests', () => {
               <TestErrorBoundary
                 onError={() => { errorOccurred = true; }}
               >
-                <UnifiedInterface>
+                <UnifiedInterfaceProvider><UnifiedInterface>
                   <TopToolbar />
                   <EditorArea
                     recordingSession={{
@@ -270,7 +294,7 @@ describe('Edge Case Property-Based Tests', () => {
                     onActionEdit={jest.fn()}
                     onActionDelete={jest.fn()}
                   />
-                </UnifiedInterface>
+                </UnifiedInterface></UnifiedInterfaceProvider>
               </TestErrorBoundary>
             );
 
@@ -283,8 +307,8 @@ describe('Edge Case Property-Based Tests', () => {
 
             // Wait for any resize handlers to complete
             await waitFor(() => {
-              const interface = document.querySelector('.unified-interface');
-              expect(interface).toBeTruthy();
+              const unifiedInterface = document.querySelector('.unified-interface');
+              expect(unifiedInterface).toBeTruthy();
             });
 
             // Should not crash on resize
@@ -294,7 +318,8 @@ describe('Edge Case Property-Based Tests', () => {
             const toolbar = document.querySelector('.top-toolbar') ||
               document.querySelector('[data-testid="top-toolbar"]');
             const editor = document.querySelector('.editor-area-container') ||
-              document.querySelector('[data-testid="editor-area-container"]');
+              document.querySelector('[data-testid="editor-area-container"]') ||
+              document.querySelector('.action-list-empty');
 
             expect(toolbar).toBeTruthy();
             expect(editor).toBeTruthy();
@@ -324,7 +349,7 @@ describe('Edge Case Property-Based Tests', () => {
               <TestErrorBoundary
                 onError={() => { errorOccurred = true; }}
               >
-                <UnifiedInterface>
+                <UnifiedInterfaceProvider><UnifiedInterface>
                   <TopToolbar
                     isRecording={isRecording}
                     isPlaying={false}
@@ -340,7 +365,7 @@ describe('Edge Case Property-Based Tests', () => {
                     onActionEdit={jest.fn()}
                     onActionDelete={jest.fn()}
                   />
-                </UnifiedInterface>
+                </UnifiedInterface></UnifiedInterfaceProvider>
               </TestErrorBoundary>
             );
 
@@ -389,11 +414,13 @@ describe('Edge Case Property-Based Tests', () => {
               <TestErrorBoundary
                 onError={() => { errorOccurred = true; }}
               >
+                <UnifiedInterfaceProvider>
                 <TopToolbar
                   isRecording={false}
                   isPlaying={false}
                   hasRecordings={true}
                 />
+                </UnifiedInterfaceProvider>
               </TestErrorBoundary>
             );
 

@@ -8,6 +8,25 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { UnifiedInterface, UnifiedInterfaceProvider, useUnifiedInterface } from '../UnifiedInterface';
 
+// UnifiedInterface renders a deep tree (AIChatInterface → useChatState) that
+// calls useAuth, which throws outside an AuthProvider. Use the existing manual
+// mock (src/contexts/__mocks__/AuthContext.tsx) which returns a logged-out stub.
+jest.mock('../../contexts/AuthContext');
+
+// The same tree calls useAnalytics, which throws when not wrapped in an
+// AnalyticsProvider. Mock the hook so the tree renders without the provider.
+jest.mock('../../hooks/useAnalytics', () => ({
+  useAnalytics: () => ({
+    trackEvent: jest.fn(),
+    trackScreenView: jest.fn(),
+    trackFeatureUsed: jest.fn(),
+    trackError: jest.fn(),
+    isEnabled: false,
+    setEnabled: jest.fn(),
+    isInitialized: true,
+  }),
+}));
+
 // Test component that uses the context
 const TestComponent: React.FC = () => {
   const { state, setMode, setEditorVisible } = useUnifiedInterface();
@@ -66,10 +85,15 @@ describe('UnifiedInterface', () => {
       </UnifiedInterface>
     );
 
+    // Children are rendered inside the unified interface container.
     expect(screen.getByTestId('test-child')).toBeInTheDocument();
     expect(document.querySelector('.unified-interface')).toBeInTheDocument();
-    expect(document.querySelector('.toolbar-area')).toBeInTheDocument();
-    expect(document.querySelector('.editor-area')).toBeInTheDocument();
+    // The component now renders a bottom section (tab content + TabBar) rather
+    // than toolbar-area/editor-area, which come from the children it wraps.
+    expect(document.querySelector('.bottom-section')).toBeInTheDocument();
+    expect(document.querySelector('.data-area')).toBeInTheDocument();
+    // The root acts as the application main landmark.
+    expect(screen.getByRole('main')).toBeInTheDocument();
   });
 
   test('applies correct CSS classes based on state', () => {
@@ -80,14 +104,18 @@ describe('UnifiedInterface', () => {
     );
 
     const unifiedInterface = document.querySelector('.unified-interface');
+    // Toolbar is expanded by default and the mode class reflects the app mode.
     expect(unifiedInterface).not.toHaveClass('toolbar-collapsed');
+    expect(unifiedInterface).toHaveClass('mode-idle');
 
-    const editorArea = document.querySelector('.editor-area');
-    expect(editorArea).toHaveClass('visible');
+    // The unified interface no longer renders/owns the editor-area visibility
+    // class (that markup comes from the children it wraps), but the editor
+    // visibility state is still managed in the provider context.
+    expect(screen.getByTestId('editor-visible')).toHaveTextContent('visible');
 
-    // Toggle editor visibility
+    // Toggle editor visibility and confirm the context state updates.
     fireEvent.click(screen.getByTestId('toggle-editor'));
-    expect(editorArea).toHaveClass('hidden');
+    expect(screen.getByTestId('editor-visible')).toHaveTextContent('hidden');
   });
 
   test('throws error when used outside provider', () => {

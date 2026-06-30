@@ -21,56 +21,53 @@ describe('TabBar Component', () => {
   });
 
   describe('Rendering', () => {
-    it('should render 4 tabs correctly', () => {
+    it('should render 3 tabs correctly', () => {
       render(
         <TabBar
-          activeTab="recording"
+          activeTab="builder"
           onTabChange={mockOnTabChange}
           applicationMode="idle"
         />
       );
 
-      // Check all 4 tabs are rendered
-      expect(screen.getByTestId('tab-recording')).toBeInTheDocument();
-      expect(screen.getByTestId('tab-list')).toBeInTheDocument();
+      // Check all 3 tabs are rendered (builder, list, editor)
       expect(screen.getByTestId('tab-builder')).toBeInTheDocument();
+      expect(screen.getByTestId('tab-list')).toBeInTheDocument();
       expect(screen.getByTestId('tab-editor')).toBeInTheDocument();
     });
 
     it('should render tabs with correct labels', () => {
       render(
         <TabBar
-          activeTab="recording"
+          activeTab="builder"
           onTabChange={mockOnTabChange}
           applicationMode="idle"
         />
       );
 
-      expect(screen.getByText('Recording')).toBeInTheDocument();
-      expect(screen.getByText('Script List')).toBeInTheDocument();
       expect(screen.getByText('AI Builder')).toBeInTheDocument();
+      expect(screen.getByText('Script List')).toBeInTheDocument();
       expect(screen.getByText('Editor')).toBeInTheDocument();
     });
 
     it('should render tabs with correct icons', () => {
       render(
         <TabBar
-          activeTab="recording"
+          activeTab="builder"
           onTabChange={mockOnTabChange}
           applicationMode="idle"
         />
       );
 
-      expect(screen.getByText('🎬')).toBeInTheDocument();
-      expect(screen.getByText('📋')).toBeInTheDocument();
       expect(screen.getByText('🤖')).toBeInTheDocument();
+      expect(screen.getByText('📋')).toBeInTheDocument();
       expect(screen.getByText('✏️')).toBeInTheDocument();
     });
 
     it('should render tab bar with correct role', () => {
       render(
         <TabBar
-          activeTab="recording"
+          activeTab="builder"
           onTabChange={mockOnTabChange}
           applicationMode="idle"
         />
@@ -93,10 +90,10 @@ describe('TabBar Component', () => {
       );
 
       const listTab = screen.getByTestId('tab-list');
-      const recordingTab = screen.getByTestId('tab-recording');
+      const builderTab = screen.getByTestId('tab-builder');
 
       expect(listTab).toHaveClass('active');
-      expect(recordingTab).not.toHaveClass('active');
+      expect(builderTab).not.toHaveClass('active');
     });
 
     it('should set aria-selected correctly for active tab', () => {
@@ -118,13 +115,13 @@ describe('TabBar Component', () => {
     it('should update active tab when activeTab prop changes', () => {
       const { rerender } = render(
         <TabBar
-          activeTab="recording"
+          activeTab="builder"
           onTabChange={mockOnTabChange}
           applicationMode="idle"
         />
       );
 
-      expect(screen.getByTestId('tab-recording')).toHaveClass('active');
+      expect(screen.getByTestId('tab-builder')).toHaveClass('active');
 
       rerender(
         <TabBar
@@ -134,7 +131,7 @@ describe('TabBar Component', () => {
         />
       );
 
-      expect(screen.getByTestId('tab-recording')).not.toHaveClass('active');
+      expect(screen.getByTestId('tab-builder')).not.toHaveClass('active');
       expect(screen.getByTestId('tab-editor')).toHaveClass('active');
     });
   });
@@ -156,13 +153,13 @@ describe('TabBar Component', () => {
     it('should not call onTabChange when clicking the active tab', () => {
       render(
         <TabBar
-          activeTab="recording"
+          activeTab="builder"
           onTabChange={mockOnTabChange}
           applicationMode="idle"
         />
       );
 
-      fireEvent.click(screen.getByTestId('tab-recording'));
+      fireEvent.click(screen.getByTestId('tab-builder'));
       expect(mockOnTabChange).not.toHaveBeenCalled();
     });
 

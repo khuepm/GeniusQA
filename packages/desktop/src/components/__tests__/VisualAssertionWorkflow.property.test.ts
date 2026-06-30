@@ -111,7 +111,9 @@ const executionEnvironmentArbitrary = fc.constantFrom('desktop', 'ci');
  * Generate valid visual assertion configuration
  */
 const visualAssertConfigArbitrary: fc.Arbitrary<VisualAssertConfig> = fc.record({
-  threshold: fc.float({ min: 0.0, max: 1.0 }),
+  // noNaN: fc.float can otherwise generate NaN, which is neither >= 0 nor <= 1
+  // and fails the bounds properties (a real threshold is always a finite number).
+  threshold: fc.float({ min: 0.0, max: 1.0, noNaN: true }),
   sensitivity_profile: sensitivityProfileArbitrary,
   comparison_method: comparisonMethodArbitrary,
   timeout: fc.integer({ min: 1000, max: 30000 }),

@@ -38,7 +38,7 @@ describe('Icon Recognition and Consistency Property-Based Tests', () => {
         fc.constantFrom(...validIcons), // icon type
         fc.integer({ min: 8, max: 32 }), // size (reduced range to avoid DOM issues)
         fc.constantFrom(...validColors), // color
-        fc.float({ min: Math.fround(0.1), max: Math.fround(1) }), // opacity (avoid 0 to prevent invisible elements)
+        fc.float({ min: Math.fround(0.1), max: Math.fround(1), noNaN: true }), // opacity (avoid 0 to prevent invisible elements)
         fc.string({ minLength: 0, maxLength: 10 }), // className (shorter to avoid issues)
         (iconType, size, color, opacity, className) => {
           // Handle NaN opacity values gracefully

@@ -70,6 +70,34 @@ jest.mock('firebase/app', () => ({
   initializeApp: jest.fn(() => ({ name: 'test-app' })),
 }));
 
+// firebase.config.ts initializes Firestore and Analytics at module load.
+// Mock them so importing any component tree that pulls in the config does not
+// hit the real Firebase SDK (which throws "getProvider" against a mock app).
+jest.mock('firebase/firestore', () => ({
+  getFirestore: jest.fn(() => ({ type: 'firestore' })),
+  collection: jest.fn(),
+  doc: jest.fn(),
+  getDoc: jest.fn(),
+  getDocs: jest.fn(),
+  setDoc: jest.fn(),
+  addDoc: jest.fn(),
+  updateDoc: jest.fn(),
+  deleteDoc: jest.fn(),
+  query: jest.fn(),
+  where: jest.fn(),
+  orderBy: jest.fn(),
+  limit: jest.fn(),
+  onSnapshot: jest.fn(),
+  serverTimestamp: jest.fn(() => ({})),
+  Timestamp: { now: jest.fn(() => ({ toDate: () => new Date(0) })) },
+}));
+
+jest.mock('firebase/analytics', () => ({
+  getAnalytics: jest.fn(() => ({ type: 'analytics' })),
+  isSupported: jest.fn().mockResolvedValue(false),
+  logEvent: jest.fn(),
+}));
+
 jest.mock('firebase/auth', () => ({
   getAuth: jest.fn(() => ({
     currentUser: null,

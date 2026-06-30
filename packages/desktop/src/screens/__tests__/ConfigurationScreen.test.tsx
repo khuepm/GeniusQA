@@ -4,8 +4,15 @@ import { MemoryRouter } from 'react-router-dom';
 import { ConfigurationScreen } from '../ConfigurationScreen';
 import { FocusLossStrategy } from '../../types/applicationFocusedAutomation.types';
 
-// Mock console.log to avoid noise in tests
-const mockConsoleLog = jest.spyOn(console, 'log').mockImplementation(() => { });
+// ConfigurationScreen renders <AnalyticsSettings/>, which calls useAnalytics and
+// throws outside an <AnalyticsProvider>. Use the manual mock so it returns a
+// harmless stub.
+jest.mock('../../hooks/useAnalytics');
+
+// Mock console.log to avoid noise in tests. The `react` jest project enables
+// resetMocks, which detaches a module-scope spy between tests, so (re)create the
+// spy in beforeEach to keep it attached to console.log for each test.
+let mockConsoleLog: jest.SpyInstance;
 
 // Helper function to render ConfigurationScreen with Router context
 const renderWithRouter = (component: React.ReactElement) => {
@@ -18,10 +25,10 @@ const renderWithRouter = (component: React.ReactElement) => {
 
 describe('ConfigurationScreen', () => {
   beforeEach(() => {
-    mockConsoleLog.mockClear();
+    mockConsoleLog = jest.spyOn(console, 'log').mockImplementation(() => { });
   });
 
-  afterAll(() => {
+  afterEach(() => {
     mockConsoleLog.mockRestore();
   });
 

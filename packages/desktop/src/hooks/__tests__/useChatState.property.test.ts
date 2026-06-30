@@ -12,6 +12,7 @@
 import * as fc from 'fast-check';
 import { renderHook, act } from '@testing-library/react';
 import { useChatState } from '../useChatState';
+import { useAuth } from '../../contexts/AuthContext';
 import { ChatMessage, ScriptData } from '../../types/aiScriptBuilder.types';
 
 // ============================================================================
@@ -149,6 +150,14 @@ const mockChatMessageArbitrary: fc.Arbitrary<Omit<ChatMessage, 'id' | 'timestamp
 describe('useChatState Property Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // The `react` jest project resets mock implementations between tests, which
+    // strips the factory impl of the mocked useAuth (making it return undefined
+    // and breaking `const { user } = useAuth()`). Re-apply it here.
+    (useAuth as jest.Mock).mockReturnValue({
+      user: { uid: 'test-user-id' },
+      loading: false,
+      error: null,
+    });
   });
 
   /**

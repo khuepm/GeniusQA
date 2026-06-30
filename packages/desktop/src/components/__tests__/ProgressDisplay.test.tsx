@@ -137,8 +137,8 @@ describe('ProgressDisplay', () => {
       <ProgressDisplay {...defaultProps} currentSession={failedSession} />
     );
 
-    expect(getByText('Error Information')).toBeInTheDocument();
-    expect(getByText('The automation session failed. Check the logs for more details.')).toBeInTheDocument();
+    expect(getByText('Error Recovery')).toBeInTheDocument();
+    expect(getByText('Automation session failed')).toBeInTheDocument();
   });
 
   it('should show completion details when session completed', () => {
@@ -147,8 +147,8 @@ describe('ProgressDisplay', () => {
       <ProgressDisplay {...defaultProps} currentSession={completedSession} />
     );
 
-    expect(getByText('Session Completed')).toBeInTheDocument();
-    expect(getByText('The automation session completed successfully!')).toBeInTheDocument();
+    expect(getByText('Session Completed Successfully! 🎉')).toBeInTheDocument();
+    expect(getByText('The automation session completed all steps successfully.')).toBeInTheDocument();
   });
 
   it('should apply correct CSS classes for session state', () => {

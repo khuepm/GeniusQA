@@ -4,6 +4,8 @@
  */
 
 import { IPCBridgeService, resetIPCBridge } from '../ipcBridgeService';
+import { invoke } from '@tauri-apps/api/tauri';
+import { listen } from '@tauri-apps/api/event';
 
 // Mock Tauri APIs
 jest.mock('@tauri-apps/api/tauri', () => ({
@@ -14,25 +16,25 @@ jest.mock('@tauri-apps/api/event', () => ({
   listen: jest.fn(),
 }));
 
+// Reference the mocked functions through the same static import the service
+// uses. (The `react` jest project enables resetModules, so requiring them
+// fresh inside beforeEach could yield a different instance than the service
+// captured at import time.)
+const mockInvoke = invoke as jest.Mock;
+const mockListen = listen as jest.Mock;
+
 describe('IPCBridgeService', () => {
   let service: IPCBridgeService;
-  let mockInvoke: jest.Mock;
-  let mockListen: jest.Mock;
   let mockUnlisten: jest.Mock;
 
   beforeEach(() => {
     // Reset the singleton
     resetIPCBridge();
 
-    // Get mock functions
-    const { invoke } = require('@tauri-apps/api/tauri');
-    const { listen } = require('@tauri-apps/api/event');
-    
-    mockInvoke = invoke as jest.Mock;
-    mockListen = listen as jest.Mock;
     mockUnlisten = jest.fn();
 
-    // Setup default mock implementations
+    // Setup default mock implementations (re-applied each test because the
+    // `react` project resets mocks between tests).
     mockInvoke.mockResolvedValue({ success: true, data: {} });
     mockListen.mockResolvedValue(mockUnlisten);
 
@@ -950,12 +952,16 @@ describe('IPCBridgeService', () => {
     });
 
     it('should format corrupted script file errors', async () => {
+      // startPlayback first calls getCoreStatus (errors there are swallowed),
+      // then invokes start_playback — that second call must be the rejection.
+      mockInvoke.mockResolvedValueOnce({ activeCoreType: 'python', availableCores: ['python'] });
       mockInvoke.mockRejectedValueOnce(new Error('Script file corrupted: Invalid JSON format'));
 
       await expect(service.startPlayback()).rejects.toThrow('corrupted');
     });
 
     it('should format no recordings found errors', async () => {
+      mockInvoke.mockResolvedValueOnce({ activeCoreType: 'python', availableCores: ['python'] });
       mockInvoke.mockRejectedValueOnce(new Error('No recordings found'));
 
       await expect(service.startPlayback()).rejects.toThrow('No recordings found');
@@ -994,7 +1000,8 @@ describe('IPCBridgeService', () => {
       const result1 = await service.stopRecording();
       expect(result1.success).toBe(false);
 
-      // Error 2: No recordings found
+      // Error 2: No recordings found (startPlayback calls getCoreStatus first)
+      mockInvoke.mockResolvedValueOnce({ activeCoreType: 'python', availableCores: ['python'] });
       mockInvoke.mockRejectedValueOnce(new Error('No recordings found'));
       await expect(service.startPlayback()).rejects.toThrow();
 

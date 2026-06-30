@@ -118,7 +118,10 @@ describe('VisualAssertionEditor Integration Tests', () => {
 
       // Check status badges
       expect(screen.getByText('Visual Test')).toBeInTheDocument();
-      expect(screen.getByText('Moderate')).toBeInTheDocument(); // Default sensitivity profile
+      // "Moderate" also appears as a sensitivity profile button, so scope the
+      // assertion to the status badge specifically.
+      const moderateBadge = document.querySelector('.status-badge.status-profile');
+      expect(moderateBadge).toHaveTextContent('Moderate'); // Default sensitivity profile
     });
 
     it('should display execution context information', () => {

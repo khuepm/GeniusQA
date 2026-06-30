@@ -26,6 +26,17 @@ jest.mock('../../components/EditorArea.css', () => ({}));
 jest.mock('../../components/UnifiedInterface.css', () => ({}));
 jest.mock('../../styles/design-system.css', () => ({}));
 
+// Mock context/hook providers required by the tab content chain so that
+// UnifiedInterface can render without an AnalyticsProvider/AuthProvider wrapper.
+jest.mock('../../contexts/AuthContext');
+jest.mock('../../hooks/useAnalytics');
+
+// Mock tab content components (deep dependency chain otherwise throws and the
+// ErrorBoundary swallows the toolbar). Essential for the toolbar to render.
+jest.mock('../../components/tabs/ScriptListTabContent', () => ({ ScriptListTabContent: () => <div data-testid="script-list-tab-content" /> }));
+jest.mock('../../components/tabs/AIBuilderTabContent', () => ({ AIBuilderTabContent: () => <div data-testid="ai-builder-tab-content" /> }));
+jest.mock('../../components/tabs/EditorTabContent', () => ({ EditorTabContent: () => <div data-testid="editor-tab-content" /> }));
+
 // Mock IPC bridge service
 jest.mock('../../services/ipcBridgeService', () => ({
   getIPCBridge: () => ({

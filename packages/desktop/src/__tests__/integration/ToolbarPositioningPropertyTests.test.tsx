@@ -26,6 +26,14 @@ jest.mock('../../components/TopToolbar.css', () => ({}));
 jest.mock('../../components/UnifiedInterface.css', () => ({}));
 jest.mock('../../screens/UnifiedRecorderScreen.css', () => ({}));
 
+// Break the deep dependency chain pulled in by UnifiedInterface's tab content
+// (AIChatInterface -> useChatState -> useAuth/useAnalytics -> firebase).
+jest.mock('../../contexts/AuthContext');
+jest.mock('../../hooks/useAnalytics');
+jest.mock('../../components/tabs/ScriptListTabContent', () => ({ ScriptListTabContent: () => <div data-testid="script-list-tab-content" /> }));
+jest.mock('../../components/tabs/AIBuilderTabContent', () => ({ AIBuilderTabContent: () => <div data-testid="ai-builder-tab-content" /> }));
+jest.mock('../../components/tabs/EditorTabContent', () => ({ EditorTabContent: () => <div data-testid="editor-tab-content" /> }));
+
 // Mock IPC bridge service
 jest.mock('../../services/ipcBridgeService', () => ({
   getIPCBridge: () => ({
@@ -225,9 +233,14 @@ describe('Toolbar Positioning Property Tests', () => {
 
           if (!unifiedInterface) return false;
 
-          // Toolbar area should be the first child of unified interface
+          // The toolbar is rendered as the first child of the unified interface
+          // (children are rendered before the ResizableDivider and bottom-section).
+          // In this harness the TopToolbar is passed directly as a child, so the
+          // first element child is the .top-toolbar itself.
           const firstChild = unifiedInterface.firstElementChild;
-          return firstChild?.classList.contains('toolbar-area');
+          return firstChild?.classList.contains('top-toolbar') ||
+            firstChild?.classList.contains('toolbar-area') ||
+            !!firstChild?.querySelector('.top-toolbar');
         }),
         { numRuns: 100 }
       );

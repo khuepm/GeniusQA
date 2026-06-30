@@ -17,6 +17,15 @@ jest.mock('../../components/UnifiedInterface.css', () => ({}));
 jest.mock('../../components/TopToolbar.css', () => ({}));
 jest.mock('../../components/EditorArea.css', () => ({}));
 
+// Mock contexts/hooks that throw outside their providers (manual mocks exist)
+jest.mock('../../contexts/AuthContext');
+jest.mock('../../hooks/useAnalytics');
+
+// Mock tab content so UnifiedInterface's active-tab chain doesn't pull in deep deps
+jest.mock('../../components/tabs/ScriptListTabContent', () => ({ ScriptListTabContent: () => <div data-testid="script-list-tab-content" /> }));
+jest.mock('../../components/tabs/AIBuilderTabContent', () => ({ AIBuilderTabContent: () => <div data-testid="ai-builder-tab-content" /> }));
+jest.mock('../../components/tabs/EditorTabContent', () => ({ EditorTabContent: () => <div data-testid="editor-tab-content" /> }));
+
 // Test component that simulates the recording workflow
 const TestRecordingWorkflow: React.FC<{
   initialMode?: 'idle' | 'recording' | 'playing' | 'editing';
@@ -92,8 +101,8 @@ describe('Immediate Editor Visibility Property-Based Tests', () => {
 
   // Feature: desktop-ui-redesign, Property 5: Immediate editor visibility during recording
   test('Property 5: Immediate editor visibility - editor becomes visible immediately when recording starts and displays real-time actions', async () => {
-    fc.assert(
-      fc.property(
+    await fc.assert(
+      fc.asyncProperty(
         fc.record({
           hasRecordings: fc.boolean(),
           initialEditorVisible: fc.boolean()
@@ -202,8 +211,8 @@ describe('Immediate Editor Visibility Property-Based Tests', () => {
 
   // Property test for editor visibility timing during recording start
   test('Property 5a: Editor visibility timing - editor becomes visible within acceptable time limits when recording starts', async () => {
-    fc.assert(
-      fc.property(
+    await fc.assert(
+      fc.asyncProperty(
         fc.boolean(), // hasRecordings
         async (hasRecordings) => {
           const startTime = performance.now();
@@ -252,8 +261,8 @@ describe('Immediate Editor Visibility Property-Based Tests', () => {
 
   // Property test for editor persistence across mode transitions
   test('Property 5b: Editor persistence - editor remains visible across recording mode transitions', async () => {
-    fc.assert(
-      fc.property(
+    await fc.assert(
+      fc.asyncProperty(
         fc.record({
           hasRecordings: fc.boolean(),
           performMultipleRecordings: fc.boolean()
@@ -350,8 +359,8 @@ describe('Immediate Editor Visibility Property-Based Tests', () => {
 
   // Property test for real-time action display during recording
   test('Property 5c: Real-time action display - editor shows recording progress immediately', async () => {
-    fc.assert(
-      fc.property(
+    await fc.assert(
+      fc.asyncProperty(
         fc.boolean(), // hasRecordings
         async (hasRecordings) => {
           // Use isolated render

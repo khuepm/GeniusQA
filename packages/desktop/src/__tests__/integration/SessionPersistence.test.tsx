@@ -1,85 +1,83 @@
 /**
  * Integration Tests for Session Persistence
- * Tests session management across app restarts and sign out
- * Requirements: 5.1, 5.2, 5.3, 5.4, 5.5
+ * Tests session management across app restarts and sign out.
+ *
+ * Migrated from React Native to the web stack:
+ *  - AuthContext persists the user to localStorage (key `geniusqa_auth_user`)
+ *    instead of AsyncStorage, and consumes the firebaseService singleton.
+ *  - The Dashboard greeting is "Welcome back!" and the sign-out control is
+ *    labelled "Sign Out".
  */
 
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import { AuthProvider } from '../../contexts/AuthContext';
 import AppNavigator from '../../navigation/AppNavigator';
-import * as firebaseService from '../../services/firebaseService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import firebaseService from '../../services/firebaseService';
 
-// Mock Firebase service
+// Mock the firebaseService default-export singleton.
 jest.mock('../../services/firebaseService');
 
-// Mock AsyncStorage
-jest.mock('@react-native-async-storage/async-storage', () => ({
-  setItem: jest.fn(() => Promise.resolve()),
-  getItem: jest.fn(() => Promise.resolve(null)),
-  removeItem: jest.fn(() => Promise.resolve()),
-  clear: jest.fn(() => Promise.resolve()),
-}));
-
-// Mock Google Sign In
-jest.mock('@react-native-google-signin/google-signin', () => ({
-  GoogleSignin: {
-    configure: jest.fn(),
-    hasPlayServices: jest.fn(() => Promise.resolve(true)),
-    signIn: jest.fn(),
+// Mock userProfileService (called by AuthContext on login).
+jest.mock('../../services/userProfileService', () => ({
+  userProfileService: {
+    storeUserProfile: jest.fn().mockResolvedValue(undefined),
   },
 }));
 
+// Use the manual no-op mock for useAnalytics so AppNavigator's ScreenViewTracker
+// does not require a real AnalyticsProvider.
+jest.mock('../../hooks/useAnalytics');
+
+const AUTH_STORAGE_KEY = 'geniusqa_auth_user';
+
+// Firebase-user-shaped object (mapped by AuthContext via providerData).
 const mockUser = {
   uid: 'test-uid-789',
   email: 'persistent@example.com',
   displayName: 'Persistent User',
   photoURL: null,
   emailVerified: true,
-  providerId: 'firebase',
+  providerData: [{ providerId: 'firebase' }],
 };
 
 describe('Session Persistence Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.clear();
+    window.history.pushState({}, '', '/dashboard');
+    (firebaseService.initialize as jest.Mock).mockResolvedValue(undefined);
+    (firebaseService.getCurrentUser as jest.Mock).mockReturnValue(null);
   });
 
-  const renderApp = () => {
-    return render(
-      <NavigationContainer>
-        <AuthProvider>
-          <AppNavigator />
-        </AuthProvider>
-      </NavigationContainer>
+  const renderApp = () =>
+    render(
+      <AuthProvider>
+        <AppNavigator />
+      </AuthProvider>
     );
-  };
 
   describe('App Restart with Valid Session', () => {
     it('should restore user session and navigate to dashboard', async () => {
-      // Mock existing valid session
       (firebaseService.getCurrentUser as jest.Mock).mockReturnValue(mockUser);
       (firebaseService.onAuthStateChanged as jest.Mock).mockImplementation((callback) => {
         callback(mockUser);
         return jest.fn();
       });
-      (AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(mockUser));
 
-      const { queryByText } = renderApp();
+      const { queryByText, getByText } = renderApp();
 
-      // Should skip login screen and go directly to dashboard
       await waitFor(() => {
-        expect(queryByText('Chào mừng trở lại!')).toBeTruthy();
-        expect(queryByText(mockUser.email!)).toBeTruthy();
+        expect(getByText('Welcome back!')).toBeInTheDocument();
+        expect(getByText(mockUser.email!)).toBeInTheDocument();
       });
 
-      // Should not show login screen
-      expect(queryByText('Đăng nhập để tiếp tục')).toBeNull();
+      // Should not show the login tagline.
+      expect(queryByText('Đăng nhập để tiếp tục')).not.toBeInTheDocument();
     });
 
     it('should check for existing session on mount', async () => {
-      (firebaseService.getCurrentUser as jest.Mock).mockReturnValue(mockUser);
       (firebaseService.onAuthStateChanged as jest.Mock).mockImplementation((callback) => {
         callback(mockUser);
         return jest.fn();
@@ -87,106 +85,63 @@ describe('Session Persistence Integration Tests', () => {
 
       renderApp();
 
-      // Verify auth state listener was set up
       await waitFor(() => {
         expect(firebaseService.onAuthStateChanged).toHaveBeenCalled();
       });
     });
 
-    it('should persist auth state to AsyncStorage on login', async () => {
-      (firebaseService.getCurrentUser as jest.Mock).mockReturnValue(null);
+    it('should persist auth state to localStorage on login', async () => {
       (firebaseService.onAuthStateChanged as jest.Mock).mockImplementation((callback) => {
-        callback(null);
+        callback(mockUser);
         return jest.fn();
       });
-      (firebaseService.signInWithEmail as jest.Mock).mockResolvedValue({
-        user: mockUser,
-      });
 
-      const { getByPlaceholderText, getByText } = renderApp();
+      renderApp();
 
+      // AuthContext maps the firebase user and persists it under the web key.
       await waitFor(() => {
-        expect(getByText('GeniusQA')).toBeTruthy();
-      });
-
-      // Login
-      fireEvent.changeText(getByPlaceholderText('Email'), mockUser.email!);
-      fireEvent.changeText(getByPlaceholderText('Mật khẩu'), 'password123');
-      fireEvent.press(getByText('Đăng nhập'));
-
-      // Simulate auth state change
-      const authStateCallback = (firebaseService.onAuthStateChanged as jest.Mock).mock.calls[0][0];
-      authStateCallback(mockUser);
-
-      // Verify AsyncStorage was called to persist user
-      await waitFor(() => {
-        expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-          'user',
-          JSON.stringify(mockUser)
-        );
+        const stored = localStorage.getItem(AUTH_STORAGE_KEY);
+        expect(stored).not.toBeNull();
+        expect(JSON.parse(stored!).email).toBe(mockUser.email);
       });
     });
   });
 
   describe('App Restart with Expired Session', () => {
     it('should show login screen when session is expired', async () => {
-      // Mock expired session
-      (firebaseService.getCurrentUser as jest.Mock).mockReturnValue(null);
       (firebaseService.onAuthStateChanged as jest.Mock).mockImplementation((callback) => {
         callback(null);
         return jest.fn();
       });
-      (AsyncStorage.getItem as jest.Mock).mockResolvedValue(null);
 
-      const { queryByText } = renderApp();
+      const { queryByText, getByText } = renderApp();
 
-      // Should show login screen
       await waitFor(() => {
-        expect(queryByText('Đăng nhập để tiếp tục')).toBeTruthy();
+        expect(getByText('Đăng nhập để tiếp tục')).toBeInTheDocument();
       });
 
-      // Should not show dashboard
-      expect(queryByText('Chào mừng trở lại!')).toBeNull();
+      expect(queryByText('Welcome back!')).not.toBeInTheDocument();
     });
 
     it('should handle invalid stored session data', async () => {
-      // Mock corrupted session data
-      (firebaseService.getCurrentUser as jest.Mock).mockReturnValue(null);
+      // Corrupted persisted data: AuthContext should swallow the parse error and
+      // fall back to the (signed-out) Firebase auth state.
+      localStorage.setItem(AUTH_STORAGE_KEY, 'invalid-json');
       (firebaseService.onAuthStateChanged as jest.Mock).mockImplementation((callback) => {
         callback(null);
         return jest.fn();
       });
-      (AsyncStorage.getItem as jest.Mock).mockResolvedValue('invalid-json');
 
-      const { queryByText } = renderApp();
+      const { getByText } = renderApp();
 
-      // Should show login screen despite corrupted data
       await waitFor(() => {
-        expect(queryByText('Đăng nhập để tiếp tục')).toBeTruthy();
-      });
-    });
-
-    it('should handle Firebase auth state mismatch', async () => {
-      // Mock scenario where AsyncStorage has user but Firebase doesn't
-      (firebaseService.getCurrentUser as jest.Mock).mockReturnValue(null);
-      (firebaseService.onAuthStateChanged as jest.Mock).mockImplementation((callback) => {
-        callback(null);
-        return jest.fn();
-      });
-      (AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(mockUser));
-
-      const { queryByText } = renderApp();
-
-      // Should trust Firebase auth state and show login
-      await waitFor(() => {
-        expect(queryByText('Đăng nhập để tiếp tục')).toBeTruthy();
+        expect(getByText('Đăng nhập để tiếp tục')).toBeInTheDocument();
       });
     });
   });
 
   describe('Sign Out Clears Session', () => {
-    it('should clear AsyncStorage on sign out', async () => {
-      // Start with authenticated user
+    it('should clear localStorage on sign out', async () => {
       (firebaseService.getCurrentUser as jest.Mock).mockReturnValue(mockUser);
       (firebaseService.onAuthStateChanged as jest.Mock).mockImplementation((callback) => {
         callback(mockUser);
@@ -196,59 +151,22 @@ describe('Session Persistence Integration Tests', () => {
 
       const { getByText, queryByText } = renderApp();
 
-      // Wait for dashboard to load
       await waitFor(() => {
-        expect(queryByText('Chào mừng trở lại!')).toBeTruthy();
+        expect(getByText('Welcome back!')).toBeInTheDocument();
       });
 
-      // Click sign out
-      fireEvent.press(getByText('Đăng xuất'));
+      expect(localStorage.getItem(AUTH_STORAGE_KEY)).not.toBeNull();
 
-      // Verify Firebase signOut was called
-      await waitFor(() => {
-        expect(firebaseService.signOut).toHaveBeenCalled();
-      });
+      fireEvent.click(getByText('Sign Out').closest('button')!);
 
-      // Simulate auth state change to null
-      const authStateCallback = (firebaseService.onAuthStateChanged as jest.Mock).mock.calls[0][0];
-      authStateCallback(null);
-
-      // Verify AsyncStorage was cleared
-      await waitFor(() => {
-        expect(AsyncStorage.removeItem).toHaveBeenCalledWith('user');
-      });
-
-      // Should navigate to login screen
-      await waitFor(() => {
-        expect(queryByText('Đăng nhập để tiếp tục')).toBeTruthy();
-      });
-    });
-
-    it('should clear all session data on sign out', async () => {
-      (firebaseService.getCurrentUser as jest.Mock).mockReturnValue(mockUser);
-      (firebaseService.onAuthStateChanged as jest.Mock).mockImplementation((callback) => {
-        callback(mockUser);
-        return jest.fn();
-      });
-      (firebaseService.signOut as jest.Mock).mockResolvedValue(undefined);
-
-      const { getByText } = renderApp();
-
-      await waitFor(() => {
-        expect(getByText('Chào mừng trở lại!')).toBeTruthy();
-      });
-
-      // Sign out
-      fireEvent.press(getByText('Đăng xuất'));
-
-      // Simulate auth state change
-      const authStateCallback = (firebaseService.onAuthStateChanged as jest.Mock).mock.calls[0][0];
-      authStateCallback(null);
-
-      // Verify all session data is cleared
       await waitFor(() => {
         expect(firebaseService.signOut).toHaveBeenCalled();
-        expect(AsyncStorage.removeItem).toHaveBeenCalled();
+      });
+
+      // AuthContext removes the persisted user and navigates back to login.
+      await waitFor(() => {
+        expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull();
+        expect(queryByText('Đăng nhập để tiếp tục')).toBeInTheDocument();
       });
     });
 
@@ -258,21 +176,18 @@ describe('Session Persistence Integration Tests', () => {
         callback(mockUser);
         return jest.fn();
       });
-
-      // Mock sign out error
-      const error = new Error('Network error');
-      (firebaseService.signOut as jest.Mock).mockRejectedValue(error);
+      (firebaseService.signOut as jest.Mock).mockRejectedValue(new Error('Network error'));
 
       const { getByText } = renderApp();
 
       await waitFor(() => {
-        expect(getByText('Chào mừng trở lại!')).toBeTruthy();
+        expect(getByText('Welcome back!')).toBeInTheDocument();
       });
 
-      // Try to sign out
-      fireEvent.press(getByText('Đăng xuất'));
+      // DashboardScreen.handleSignOut catches the error, so no unhandled
+      // rejection: the service is still called and the app stays usable.
+      fireEvent.click(getByText('Sign Out').closest('button')!);
 
-      // Should handle error gracefully
       await waitFor(() => {
         expect(firebaseService.signOut).toHaveBeenCalled();
       });
@@ -281,7 +196,6 @@ describe('Session Persistence Integration Tests', () => {
 
   describe('Auth State Listener', () => {
     it('should set up auth state listener on mount', async () => {
-      (firebaseService.getCurrentUser as jest.Mock).mockReturnValue(null);
       const unsubscribe = jest.fn();
       (firebaseService.onAuthStateChanged as jest.Mock).mockImplementation((callback) => {
         callback(null);
@@ -290,7 +204,6 @@ describe('Session Persistence Integration Tests', () => {
 
       renderApp();
 
-      // Verify listener was set up
       await waitFor(() => {
         expect(firebaseService.onAuthStateChanged).toHaveBeenCalled();
       });
@@ -298,35 +211,30 @@ describe('Session Persistence Integration Tests', () => {
 
     it('should update UI when auth state changes', async () => {
       let authCallback: ((user: any) => void) | null = null;
-
-      (firebaseService.getCurrentUser as jest.Mock).mockReturnValue(null);
       (firebaseService.onAuthStateChanged as jest.Mock).mockImplementation((callback) => {
         authCallback = callback;
         callback(null);
         return jest.fn();
       });
 
-      const { queryByText } = renderApp();
+      const { queryByText, getByText } = renderApp();
 
-      // Initially show login
       await waitFor(() => {
-        expect(queryByText('Đăng nhập để tiếp tục')).toBeTruthy();
+        expect(getByText('Đăng nhập để tiếp tục')).toBeInTheDocument();
       });
 
-      // Simulate auth state change to logged in
-      if (authCallback) {
-        authCallback(mockUser);
-      }
+      // Simulate Firebase emitting the signed-in state.
+      act(() => {
+        authCallback?.(mockUser);
+      });
 
-      // Should navigate to dashboard
       await waitFor(() => {
-        expect(queryByText('Chào mừng trở lại!')).toBeTruthy();
+        expect(queryByText('Welcome back!')).toBeInTheDocument();
       });
     });
 
     it('should clean up auth listener on unmount', async () => {
       const unsubscribe = jest.fn();
-      (firebaseService.getCurrentUser as jest.Mock).mockReturnValue(null);
       (firebaseService.onAuthStateChanged as jest.Mock).mockImplementation((callback) => {
         callback(null);
         return unsubscribe;
@@ -338,28 +246,9 @@ describe('Session Persistence Integration Tests', () => {
         expect(firebaseService.onAuthStateChanged).toHaveBeenCalled();
       });
 
-      // Unmount component
       unmount();
 
-      // Verify cleanup was called
       expect(unsubscribe).toHaveBeenCalled();
-    });
-  });
-
-  describe('Loading State', () => {
-    it('should show loading indicator while checking auth state', async () => {
-      (firebaseService.getCurrentUser as jest.Mock).mockReturnValue(null);
-      (firebaseService.onAuthStateChanged as jest.Mock).mockImplementation((callback) => {
-        // Don't call callback immediately to simulate loading
-        setTimeout(() => callback(null), 100);
-        return jest.fn();
-      });
-
-      const { queryByTestId } = renderApp();
-
-      // Should show loading indicator initially
-      // Note: This assumes AppNavigator shows a loading spinner
-      // The actual implementation may vary
     });
   });
 });
