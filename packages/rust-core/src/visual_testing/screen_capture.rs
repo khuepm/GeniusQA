@@ -86,24 +86,30 @@ impl ScreenCapture {
 
     /// Attempt a single screen capture
     fn attempt_capture(config: &CaptureConfig) -> VisualResult<DynamicImage> {
-        let capture_start = Instant::now();
-
-        // Wait for screen stability if enabled
+        // Wait for screen stability if enabled. The stability wait is a separate,
+        // deliberate delay and must NOT count against the capture timeout — otherwise a
+        // configured stability_wait_ms close to (or over) capture_timeout_ms would trip a
+        // spurious timeout. Start timing the capture itself only after the wait.
         if config.enable_stability_check {
             Self::wait_for_stability(config.stability_wait_ms)?;
         }
 
-        // Simulate screen capture - in a real implementation this would use platform-specific APIs
-        // For now, we'll create a test image to simulate capture
-        let image = Self::simulate_screen_capture()?;
+        let capture_start = Instant::now();
 
-        // Check if capture timed out
+        // Measure the timeout against the capture only, and BEFORE synthesizing the
+        // placeholder image, because building a 1920x1080 buffer in a debug build can
+        // itself take longer than a small configured timeout and would otherwise trip a
+        // spurious timeout unrelated to the simulated capture.
         let elapsed = capture_start.elapsed().as_millis() as u32;
         if elapsed > config.capture_timeout_ms {
             return Err(VisualError::ComparisonTimeout {
                 timeout_ms: config.capture_timeout_ms,
             });
         }
+
+        // Simulate screen capture - in a real implementation this would use platform-specific APIs
+        // For now, we'll create a test image to simulate capture
+        let image = Self::simulate_screen_capture()?;
 
         Ok(image)
     }
