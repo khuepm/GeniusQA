@@ -404,9 +404,10 @@ impl StorageBackend for LocalFileStorage {
 
         for (category, dir_path) in &categories {
             if dir_path.exists() {
-                let size = self.calculate_directory_size(dir_path)?;
+                let (size, count) = self.calculate_directory_size(dir_path)?;
                 usage.category_sizes.insert(category.to_string(), size);
                 usage.total_size_bytes += size;
+                usage.file_count += count;
             }
         }
 
@@ -515,12 +516,13 @@ impl StorageBackend for LocalFileStorage {
 }
 
 impl LocalFileStorage {
-    /// Calculate the total size of a directory recursively
-    fn calculate_directory_size(&self, dir_path: &Path) -> VisualResult<u64> {
+    /// Recursively compute the total byte size and file count of a directory.
+    fn calculate_directory_size(&self, dir_path: &Path) -> VisualResult<(u64, u64)> {
         let mut total_size = 0u64;
+        let mut file_count = 0u64;
 
         if !dir_path.exists() {
-            return Ok(0);
+            return Ok((0, 0));
         }
 
         let entries = fs::read_dir(dir_path).map_err(|e| VisualError::FileSystemError {
@@ -537,7 +539,7 @@ impl LocalFileStorage {
             })?;
 
             let path = entry.path();
-            
+
             if path.is_file() {
                 let metadata = fs::metadata(&path).map_err(|e| VisualError::FileSystemError {
                     operation: "get_file_metadata_for_size".to_string(),
@@ -545,12 +547,15 @@ impl LocalFileStorage {
                     reason: e.to_string(),
                 })?;
                 total_size += metadata.len();
+                file_count += 1;
             } else if path.is_dir() {
-                total_size += self.calculate_directory_size(&path)?;
+                let (dir_size, dir_count) = self.calculate_directory_size(&path)?;
+                total_size += dir_size;
+                file_count += dir_count;
             }
         }
 
-        Ok(total_size)
+        Ok((total_size, file_count))
     }
 }
 

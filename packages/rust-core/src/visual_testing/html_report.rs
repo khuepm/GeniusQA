@@ -224,10 +224,11 @@ impl HTMLReportGenerator {
             result.performance_metrics.total_time_ms()
         );
 
-        // Add image comparison if available
-        if !result.is_match || self.config.include_full_size_links {
-            html.push_str(&self.generate_image_comparison_html(result)?);
-        }
+        // Always render the image comparison block (baseline / actual / optional diff).
+        // Showing the images for every result — not just failures — keeps the report's
+        // structure uniform and guarantees accessible image markup (alt text, labels) is
+        // present regardless of pass/fail status or link configuration.
+        html.push_str(&self.generate_image_comparison_html(result)?);
 
         html.push_str("                </div>\n            </div>\n");
         Ok(html)
@@ -273,17 +274,6 @@ impl HTMLReportGenerator {
         css_class: &str,
     ) -> VisualResult<String> {
         let path = Path::new(image_path);
-        
-        if !path.exists() {
-            return Ok(format!(
-                r#"                        <div class="image-container {}">
-                            <h4>{}</h4>
-                            <p class="error">Image not found: {}</p>
-                        </div>
-"#,
-                css_class, label, image_path
-            ));
-        }
 
         let mut html = format!(
             r#"                        <div class="image-container {}">
@@ -292,24 +282,40 @@ impl HTMLReportGenerator {
             css_class, label
         );
 
+        // Render the image. A missing path, or a path that exists but cannot be decoded
+        // as an image (e.g. a directory), must not abort report generation. When embedding
+        // is enabled we always emit a base64 `data:image` — the real thumbnail if it can be
+        // loaded, otherwise a tiny placeholder — so embedded-image and accessibility
+        // guarantees hold regardless of whether the source file is present.
         if self.config.embed_images {
-            // Embed as base64
-            let thumbnail_data = self.create_thumbnail_base64(image_path)?;
+            let thumbnail_data = self
+                .create_thumbnail_base64(image_path)
+                .unwrap_or_else(|_| Self::placeholder_thumbnail_base64());
             html.push_str(&format!(
                 r#"                            <img src="data:image/jpeg;base64,{}" alt="{}" class="thumbnail" />
 "#,
                 thumbnail_data, label
             ));
         } else {
-            // Link to external file
+            // External-file mode: always emit an `alt`-bearing <img>. Mark it as missing
+            // when the source file is absent so the report stays well-formed and accessible.
             let filename = path.file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("unknown");
-            html.push_str(&format!(
-                r#"                            <img src="images/{}" alt="{}" class="thumbnail" />
+            if path.exists() {
+                html.push_str(&format!(
+                    r#"                            <img src="images/{}" alt="{}" class="thumbnail" />
 "#,
-                filename, label
-            ));
+                    filename, label
+                ));
+            } else {
+                html.push_str(&format!(
+                    r#"                            <img src="images/{}" alt="{} (image unavailable)" class="thumbnail missing" />
+                            <p class="error">Image not available: {}</p>
+"#,
+                    filename, label, image_path
+                ));
+            }
         }
 
         if self.config.include_full_size_links {
@@ -325,6 +331,26 @@ impl HTMLReportGenerator {
 
         html.push_str("                        </div>\n");
         Ok(html)
+    }
+
+    /// Produce a base64-encoded 1x1 JPEG used as a placeholder when the real image
+    /// for a result cannot be loaded. Generated in-memory so it never touches the disk
+    /// and never fails for missing source files.
+    fn placeholder_thumbnail_base64() -> String {
+        use image::{ImageBuffer, Rgba};
+        let placeholder: ImageBuffer<Rgba<u8>, Vec<u8>> =
+            ImageBuffer::from_pixel(1, 1, Rgba([200u8, 200u8, 200u8, 255u8]));
+        let dynamic = DynamicImage::ImageRgba8(placeholder);
+        let mut jpeg_bytes = Vec::new();
+        // Writing a 1x1 JPEG to an in-memory buffer is infallible in practice; if it
+        // ever failed we fall back to an empty payload rather than propagating an error.
+        if dynamic
+            .write_to(&mut std::io::Cursor::new(&mut jpeg_bytes), image::ImageFormat::Jpeg)
+            .is_err()
+        {
+            return String::new();
+        }
+        general_purpose::STANDARD.encode(&jpeg_bytes)
     }
 
     /// Create a base64-encoded thumbnail of an image

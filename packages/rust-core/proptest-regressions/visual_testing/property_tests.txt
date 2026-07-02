@@ -16,3 +16,5 @@ cc 1a1161b863c35ee5f14b033d4e40c0114d7755c0d8989bfd1ec3f8dbb14586db # shrinks to
 cc 38b272c04390996f24ffb238938c6ae4fc27189de82bc0c290fa931e31795234 # shrinks to dimensions = (115, 154), baseline_color = [70, 134, 9, 154], actual_color = [241, 27, 162, 208]
 cc d7f645508ebf97821d73f81ff067074743c10f2f2bdb37a32b21039a506bdc56 # shrinks to dimensions = (1, 1), base_color = [245, 245, 245, 0]
 cc a194a0224295baeb9cf532c070351828bf61fdc954f11abbb09fb7ffa16b8933 # shrinks to dimensions = (185, 130), baseline_color = [70, 83, 87, 5], actual_color = [106, 133, 91, 134]
+cc dd6e4ea9c8b68907ea42614e3c2d6627308d253eb042d36887b3fb7e4d893c8b # shrinks to dimensions = (92, 63), baseline_color = [78, 93, 70, 54], actual_color = [36, 50, 148, 95]
+cc 7e0a7264526749a892676280fd9be5abe8150cc06e6553e2bb4d9e398dc9e6b3 # shrinks to config = CaptureConfig { max_retries: 3, capture_timeout_ms: 100, retry_delay_ms: 10, stability_wait_ms: 96, enable_stability_check: true }, failure_pattern = [PermissionDenied]

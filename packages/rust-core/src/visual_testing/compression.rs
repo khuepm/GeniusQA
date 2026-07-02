@@ -78,7 +78,10 @@ impl Default for ThumbnailSettings {
             filter: image::imageops::FilterType::Lanczos3,
             format: ImageFormat::Jpeg,
             quality: CompressionQuality::default(),
-            maintain_aspect_ratio: true,
+            // Resize to the exact configured dimensions by default. Aspect-ratio
+            // preservation is opt-in (set maintain_aspect_ratio: true) so callers that
+            // ask for a 300x200 thumbnail get exactly 300x200.
+            maintain_aspect_ratio: false,
         }
     }
 }

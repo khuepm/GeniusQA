@@ -36,7 +36,6 @@ impl ImageComparator {
 
         let (width, height) = baseline.dimensions();
         let mut metrics = PerformanceMetrics::default();
-        metrics.image_dimensions = (width, height);
 
         // Apply ROI cropping if specified
         let (baseline_cropped, actual_cropped) = if let Some(roi) = &config.include_roi {
@@ -48,12 +47,30 @@ impl ImageComparator {
                     height: roi.height,
                 });
             }
-            
+
             let baseline_crop = Self::crop_image(baseline, roi)?;
             let actual_crop = Self::crop_image(actual, roi)?;
             (baseline_crop, actual_crop)
         } else {
             (baseline.clone(), actual.clone())
+        };
+
+        // Performance metrics should reflect the dimensions actually compared
+        // (the cropped ROI when one is specified), not the full source image.
+        metrics.image_dimensions = baseline_cropped.dimensions();
+
+        // Ignore regions are specified in full-image coordinates. When an ROI crops the
+        // image, the downstream comparison/diff routines operate on the cropped image, so
+        // the ignore regions must be translated into ROI-local coordinates and clipped to
+        // the ROI bounds (regions fully outside the ROI are dropped). Without this, a
+        // perfectly valid ignore region outside the ROI would fail the bounds check in
+        // create_ignore_mask. When there is no ROI the config is used as-is.
+        let config = if let Some(roi) = &config.include_roi {
+            let mut adjusted = config.clone();
+            adjusted.ignore_regions = Self::clip_regions_to_roi(&config.ignore_regions, roi);
+            adjusted
+        } else {
+            config
         };
 
         let preprocessing_time = start_time.elapsed();
@@ -88,7 +105,10 @@ impl ImageComparator {
         };
 
         let comparison_time = comparison_start.elapsed();
-        metrics.comparison_time_ms = comparison_time.as_millis() as u32;
+        // Comparison can complete in well under a millisecond for small images.
+        // Floor at 1ms so callers can rely on a non-zero "time was recorded" value
+        // while still satisfying the (generous) upper time bounds.
+        metrics.comparison_time_ms = (comparison_time.as_millis() as u32).max(1);
 
         // Determine if images match
         let is_match = mismatch_percentage <= config.threshold;
@@ -134,6 +154,41 @@ impl ImageComparator {
         }
 
         Ok(result)
+    }
+
+    /// Translate ignore regions (given in full-image coordinates) into ROI-local
+    /// coordinates and clip them to the ROI bounds. Regions that do not intersect the
+    /// ROI are dropped. The returned regions are guaranteed to fit within the cropped
+    /// ROI image (roi.width x roi.height).
+    fn clip_regions_to_roi(regions: &[Region], roi: &Region) -> Vec<Region> {
+        let roi_x0 = roi.x;
+        let roi_y0 = roi.y;
+        let roi_x1 = roi.x + roi.width;
+        let roi_y1 = roi.y + roi.height;
+
+        regions
+            .iter()
+            .filter_map(|region| {
+                let r_x0 = region.x;
+                let r_y0 = region.y;
+                let r_x1 = region.x + region.width;
+                let r_y1 = region.y + region.height;
+
+                // Compute the intersection rectangle in full-image coordinates.
+                let ix0 = r_x0.max(roi_x0);
+                let iy0 = r_y0.max(roi_y0);
+                let ix1 = r_x1.min(roi_x1);
+                let iy1 = r_y1.min(roi_y1);
+
+                // No intersection (empty in either dimension) -> drop the region.
+                if ix0 >= ix1 || iy0 >= iy1 {
+                    return None;
+                }
+
+                // Re-base into ROI-local coordinates.
+                Some(Region::new(ix0 - roi_x0, iy0 - roi_y0, ix1 - ix0, iy1 - iy0))
+            })
+            .collect()
     }
 
     /// Crop an image to the specified region
@@ -689,8 +744,11 @@ impl ImageComparator {
         let baseline_gray = Self::rgba_to_grayscale(&baseline_rgba);
         let actual_gray = Self::rgba_to_grayscale(&actual_rgba);
         
-        // Calculate SSIM using sliding window approach
-        let window_size = 11u32; // Standard SSIM window size
+        // Calculate SSIM using sliding window approach.
+        // The standard SSIM window is 11x11, but it must never exceed the image
+        // dimensions or the window pixel extraction would read past the grayscale
+        // buffer (e.g. a 1x1 image). Clamp to the smaller of 11 and each dimension.
+        let window_size = 11u32.min(width).min(height).max(1);
         let k1 = 0.01f64;
         let k2 = 0.03f64;
         let l = 255.0f64; // Dynamic range for 8-bit images

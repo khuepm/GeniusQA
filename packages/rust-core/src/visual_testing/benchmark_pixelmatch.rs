@@ -9,7 +9,12 @@ mod benchmarks {
     };
     use std::time::Instant;
 
+    // Wall-clock performance benchmarks: the comparison_time_ms thresholds only hold for
+    // an optimized (release) build. Under `cargo test` (debug, unoptimized) the pixel loop
+    // is far slower, so these are ignored by default. Run with
+    // `cargo test --release -- --ignored` to validate the performance requirements.
     #[test]
+    #[ignore = "wall-clock benchmark; only meaningful in --release builds"]
     fn benchmark_pixelmatch_1920x1080() {
         // Create 1920x1080 test images (HD resolution)
         let image1 = ImageLoader::create_test_image(1920, 1080, [255, 0, 0, 255]); // Red
@@ -33,6 +38,7 @@ mod benchmarks {
     }
 
     #[test]
+    #[ignore = "wall-clock benchmark; only meaningful in --release builds"]
     fn benchmark_pixelmatch_different_images() {
         // Create 1920x1080 test images with differences
         let image1 = ImageLoader::create_test_image(1920, 1080, [255, 0, 0, 255]); // Red
@@ -56,6 +62,7 @@ mod benchmarks {
     }
 
     #[test]
+    #[ignore = "wall-clock benchmark; only meaningful in --release builds"]
     fn benchmark_pixelmatch_smaller_images() {
         // Test with smaller images for baseline
         let image1 = ImageLoader::create_test_image(800, 600, [255, 0, 0, 255]);
